@@ -117,6 +117,66 @@ header h1 {
     box-shadow: none;
 }
 
+/* ---- Feed pagination / windowing controls ---- */
+.feed-footer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    padding: 14px 0 4px;
+}
+
+.feed-more-button {
+    background: rgba(29, 161, 242, 0.12);
+    color: #1da1f2;
+    border: 1px solid rgba(29, 161, 242, 0.35);
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 0.9em;
+    cursor: pointer;
+    box-shadow: none;
+}
+
+.feed-more-button:hover {
+    background: rgba(29, 161, 242, 0.2);
+    filter: none;
+    box-shadow: none;
+}
+
+.feed-more-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* "Show newest" sits above the list and spans its width */
+.feed-newer-button {
+    display: block;
+    width: 100%;
+    margin-bottom: 10px;
+}
+
+.feed-peer-button {
+    background: rgba(121, 75, 196, 0.12);
+    color: #794bc4;
+    border-color: rgba(121, 75, 196, 0.35);
+}
+
+.feed-peer-button:hover {
+    background: rgba(121, 75, 196, 0.2);
+}
+
+.feed-end-note {
+    color: #8899a6;
+    font-size: 0.85em;
+    margin: 6px 0;
+}
+
+/* Zero-height tripwire the IntersectionObserver watches to auto-load */
+.feed-sentinel {
+    width: 100%;
+    height: 1px;
+}
+
 /* Media-preview buttons set their own background inline — clear the gradient image */
 .media-upload-button,
 .clear-media-button {

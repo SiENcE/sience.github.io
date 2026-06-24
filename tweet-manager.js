@@ -14,6 +14,11 @@ export class TweetManager {
 		this.MAX_TWEET_LENGTH = 1000; // Maximum length of tweet content in characters
 		this.MAX_TWEETS_STORAGE = 1000; // Maximum number of tweets to store locally
 		this.MAX_MEDIA_PER_TWEET = 1; // Start with just one attachment per message
+		this.MAX_USERNAME_LENGTH = 64;   // Max length of a (peer-supplied) username
+		this.MAX_CIRCLE_LENGTH = 64;     // Max length of a circle/audience name
+		this.MAX_THUMBNAIL_BYTES = 64 * 1024;      // Max inline thumbnail size (~64 KB)
+		this.MAX_FULLIMAGE_BYTES = 5 * 1024 * 1024; // Max full image accepted from a peer (~5 MB)
+		this.MAX_BULK_TWEETS = 500;      // Cap on tweets accepted in one all_tweets message
 		this.VALID_TWEET_PROPS = [
 		  'id', 'username', 'content', 'timestamp', 'mediaId', 'mediaThumbnail', 'mediaType',
 		  'authorId', 'circle'
@@ -429,6 +434,14 @@ export class TweetManager {
 	 */
 	async storeIncomingMedia(data) {
 		if (!data || !data.mediaId || !data.fullImage) return;
+		// Only persist inline image data from peers, and bound its size so a
+		// malicious peer cannot fill our IndexedDB / exhaust memory.
+		if (typeof data.fullImage !== 'string' ||
+			!data.fullImage.startsWith('data:image/') ||
+			data.fullImage.length > this.MAX_FULLIMAGE_BYTES) {
+			console.warn('Rejecting incoming media: not an inline image or too large', data.mediaId);
+			return;
+		}
 		try {
 			await this.mediaManager.storeReceivedMedia(data.mediaId, {
 				type: data.mediaType,
@@ -667,6 +680,10 @@ export class TweetManager {
 			(tweet.content && typeof tweet.content !== 'string') ||
 			typeof tweet.timestamp !== 'number') return false;
 
+		// Bound the (peer-supplied) username so a malicious peer cannot ship a
+		// multi-megabyte string and exhaust memory/storage.
+		if (tweet.username.length === 0 || tweet.username.length > this.MAX_USERNAME_LENGTH) return false;
+
 		// Check content length if present
 		if (tweet.content && (tweet.content.length === 0 || tweet.content.length > this.MAX_TWEET_LENGTH)) return false;
 
@@ -677,11 +694,20 @@ export class TweetManager {
 			  typeof tweet.mediaType !== 'string') {
 			return false;
 		  }
+		  // The thumbnail is rendered directly as <img src>. Only allow inline
+		  // image data URIs — never a remote URL (which would let a peer beacon
+		  // every viewer's IP and break the app's "no tracking" promise) — and
+		  // bound its size to avoid storage/memory abuse.
+		  if (!tweet.mediaThumbnail.startsWith('data:image/')) return false;
+		  if (tweet.mediaThumbnail.length > this.MAX_THUMBNAIL_BYTES) return false;
+		  if (tweet.mediaId.length > 128) return false;
 		}
 
 		// Optional author id / circle audience must be strings if present
 		if (tweet.authorId !== undefined && typeof tweet.authorId !== 'string') return false;
+		if (tweet.authorId !== undefined && tweet.authorId.length > 128) return false;
 		if (tweet.circle !== undefined && typeof tweet.circle !== 'string') return false;
+		if (tweet.circle !== undefined && tweet.circle.length > this.MAX_CIRCLE_LENGTH) return false;
 
 		// Check for unexpected properties
 		const tweetProps = Object.keys(tweet);
@@ -1011,12 +1037,19 @@ export class TweetManager {
 				return;
 			}
 
+			// Cap how many tweets we will process from a single message so a
+			// malicious peer cannot pin the main thread with a giant array.
+			const incomingTweets = data.tweets.slice(0, this.MAX_BULK_TWEETS);
+			if (data.tweets.length > this.MAX_BULK_TWEETS) {
+				console.warn(`Truncating bulk tweets from ${data.tweets.length} to ${this.MAX_BULK_TWEETS} from peer`, conn.peer);
+			}
+
 			// Track valid tweets and which ones are newly seen (for relay)
 			const validTweetIds = [];
 			const newlyAddedIds = [];
 
 			// Process the received tweets
-			for (const tweet of data.tweets) {
+			for (const tweet of incomingTweets) {
 				try {
 					// Strip the transport-only full image before validating/storing the
 					// tweet object itself (validateTweet rejects unexpected properties).

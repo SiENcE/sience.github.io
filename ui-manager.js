@@ -14,6 +14,20 @@ export class UIManager {
     // Currently selected circle for the feed view ('all' = everything)
     this.activeCircleId = 'all';
 
+    // ---- Feed pagination / windowing state ----
+    // The full message history lives in memory (loaded from IndexedDB, capped at
+    // 1000). We never render all of it at once: we keep a bounded window of DOM
+    // nodes so the feed cannot grow without limit as the user scrolls. This is
+    // the same idea Twitter/X uses — a virtualized timeline where off-screen
+    // rows above are removed (and replaced by a "show newer" affordance) while
+    // older rows are appended below, so the live DOM size stays roughly constant
+    // no matter how far you scroll.
+    this.FEED_INITIAL = 20;   // rows shown on first paint (>= the requested 10)
+    this.FEED_STEP = 20;      // rows revealed per "Load more" / auto-load
+    this.FEED_MAX_DOM = 120;  // hard cap on rows kept in the DOM at once
+    this.feedRevealed = this.FEED_INITIAL; // how many newest rows are revealed
+    this.feedObserver = null; // IntersectionObserver driving auto "load more"
+
     // DOM elements
     this.elements = {
       // Elements for media handling
@@ -458,6 +472,9 @@ export class UIManager {
       // Create the tweet with optional media, targeting the selected circle
       await this.tweetManager.createTweet(content, this.pendingMediaFile, circle);
 
+      // Jump the feed back to the top so the user sees their own new message.
+      this.resetFeedPaging();
+
       // Clear the inputs
       this.elements.tweetContentInput.value = '';
       this.clearMediaPreview();
@@ -634,18 +651,51 @@ export class UIManager {
   }
 
   /**
-   * Render tweets in the UI (filtered by the active circle)
+   * Reset the feed back to its first page (newest rows only). Call this when the
+   * underlying list changes wholesale — switching circles, or after the user
+   * posts their own message and should be taken to the top.
    */
-  renderTweets() {
+  resetFeedPaging() {
+    this.feedRevealed = this.FEED_INITIAL;
+  }
+
+  /**
+   * Render tweets in the UI (filtered by the active circle).
+   *
+   * Only a bounded window of the newest `feedRevealed` rows is rendered, and at
+   * most FEED_MAX_DOM rows live in the DOM at once. "Load more" reveals older
+   * rows; once the window exceeds the DOM cap the oldest-on-screen newest rows
+   * scroll out the top (replaced by a "show newest" control), keeping the live
+   * DOM small however far you scroll.
+   *
+   * @param {Object} [opts]
+   * @param {boolean} [opts.preserveScroll] - keep the viewport anchored on the
+   *        first visible row across the re-render (used by "Load more").
+   */
+  renderTweets(opts = {}) {
     const tweetsContainer = this.elements.tweetsContainer;
+
+    // Anchor the scroll position on the first on-screen row so revealing older
+    // rows (and dropping rows off the top) doesn't make the feed jump.
+    let anchorId = null;
+    let anchorTop = 0;
+    if (opts.preserveScroll) {
+      for (const el of tweetsContainer.querySelectorAll('.tweet[data-id]')) {
+        const rect = el.getBoundingClientRect();
+        if (rect.bottom > 0) { anchorId = el.dataset.id; anchorTop = rect.top; break; }
+      }
+    }
+
     tweetsContainer.innerHTML = '';
 
     this.updateFeedHeading();
 
-    // Get tweets from tweet manager, filtered by the active circle
+    // Get tweets from tweet manager (already newest-first), filtered by circle
     const tweets = this.tweetManager.getAllTweets().filter(t => this.tweetMatchesActiveCircle(t));
+    const total = tweets.length;
 
-    if (tweets.length === 0) {
+    if (total === 0) {
+      this.disconnectFeedObserver();
       const noTweets = document.createElement('p');
       noTweets.textContent = this.activeCircleId === 'all'
         ? 'No spells cast yet. Be the first to cast a spell!'
@@ -654,90 +704,208 @@ export class UIManager {
       return;
     }
 
+    // Keep the reveal count at/above the initial page, then derive the
+    // [start, end) window — clamped to the number of tweets we actually have so
+    // we never index past the array. `start > 0` means some newest rows are
+    // scrolled out the top (DOM cap reached).
+    this.feedRevealed = Math.max(this.FEED_INITIAL, this.feedRevealed);
+    const end = Math.min(this.feedRevealed, total);
+    const start = Math.max(0, end - this.FEED_MAX_DOM);
+
     const { username: myName } = this.userManager.getUserInfo();
 
-    tweets.forEach(tweet => {
-      const isMine = tweet.username === myName;
+    // "Show newest" control when newest rows have scrolled off the top.
+    if (start > 0) {
+      const newer = document.createElement('button');
+      newer.className = 'feed-more-button feed-newer-button';
+      newer.textContent = `↑ Show newest (${start} newer)`;
+      newer.addEventListener('click', () => {
+        this.resetFeedPaging();
+        this.renderTweets();
+        tweetsContainer.scrollIntoView({ block: 'start' });
+      });
+      tweetsContainer.appendChild(newer);
+    }
 
-      const tweetElement = document.createElement('div');
-      tweetElement.className = 'tweet';
-      tweetElement.dataset.id = tweet.id;
+    for (let i = start; i < end; i++) {
+      tweetsContainer.appendChild(this.buildTweetElement(tweets[i], myName));
+    }
 
-      // Layout: [ avatar ] [ body ]
-      const tweetMain = document.createElement('div');
-      tweetMain.className = 'tweet-main';
+    // Footer: either "Load more" (older rows remain locally), or — when the
+    // local history is exhausted — an option to pull older history from peers.
+    const remaining = total - end;
+    const footer = document.createElement('div');
+    footer.className = 'feed-footer';
 
-      const avatar = this.createAvatar(tweet.username, isMine);
-      tweetMain.appendChild(avatar);
+    if (remaining > 0) {
+      const more = document.createElement('button');
+      more.className = 'feed-more-button';
+      more.textContent = `Load more (${remaining} older)`;
+      more.addEventListener('click', () => this.loadMoreOlder());
+      footer.appendChild(more);
 
-      const tweetBody = document.createElement('div');
-      tweetBody.className = 'tweet-body';
-
-      const tweetHeader = document.createElement('div');
-      tweetHeader.className = 'tweet-header';
-
-      const tweetUser = document.createElement('div');
-      tweetUser.className = 'tweet-user';
-      tweetUser.textContent = tweet.username;
-      tweetHeader.appendChild(tweetUser);
-
-      // Show the audience badge for circle (narrow-cast) messages
-      if (tweet.circle) {
-        const badge = document.createElement('span');
-        badge.className = 'tweet-circle-badge';
-        badge.textContent = tweet.circle;
-        badge.title = `Sent to circle: ${tweet.circle}`;
-        tweetHeader.appendChild(badge);
+      // Sentinel for auto-loading the next page as it scrolls into view.
+      const sentinel = document.createElement('div');
+      sentinel.className = 'feed-sentinel';
+      footer.appendChild(sentinel);
+      this.observeFeedSentinel(sentinel);
+    } else {
+      this.disconnectFeedObserver();
+      const peerCount = this.peerManager.getAllConnections
+        ? this.peerManager.getAllConnections().length : 0;
+      if (peerCount > 0) {
+        const fromPeers = document.createElement('button');
+        fromPeers.className = 'feed-more-button feed-peer-button';
+        fromPeers.textContent = 'Request older messages from peers';
+        fromPeers.addEventListener('click', () => this.requestOlderFromPeers(fromPeers));
+        footer.appendChild(fromPeers);
+      } else {
+        const done = document.createElement('p');
+        done.className = 'feed-end-note';
+        done.textContent = 'You have reached the beginning.';
+        footer.appendChild(done);
       }
+    }
+    tweetsContainer.appendChild(footer);
 
-      const tweetTime = document.createElement('div');
-      tweetTime.className = 'tweet-time';
-      tweetTime.textContent = this.formatTimestamp(tweet.timestamp);
-      tweetHeader.appendChild(tweetTime);
-
-      const tweetContent = document.createElement('div');
-      tweetContent.className = 'tweet-content';
-
-      // Render text with clickable links (XSS-safe via linkify)
-      if (tweet.content && tweet.content.trim()) {
-        tweetContent.appendChild(linkify(tweet.content));
+    // Restore the anchored scroll position if requested.
+    if (anchorId) {
+      const anchorEl = tweetsContainer.querySelector(`.tweet[data-id="${CSS.escape(anchorId)}"]`);
+      if (anchorEl) {
+        const delta = anchorEl.getBoundingClientRect().top - anchorTop;
+        if (delta) window.scrollBy(0, delta);
       }
+    }
+  }
 
-      // Create media container
-      const tweetMediaContainer = document.createElement('div');
-      tweetMediaContainer.className = 'tweet-media-container';
+  /**
+   * Reveal the next page of older rows (from the in-memory history that was
+   * loaded out of IndexedDB), preserving the scroll position.
+   */
+  loadMoreOlder() {
+    const total = this.tweetManager.getAllTweets().filter(t => this.tweetMatchesActiveCircle(t)).length;
+    if (this.feedRevealed >= total) return;
+    this.feedRevealed = Math.min(this.feedRevealed + this.FEED_STEP, total);
+    this.renderTweets({ preserveScroll: true });
+  }
 
-      // Add attached image media if present
-      if (tweet.mediaId) {
-        this.renderMediaInTweet(tweet, tweetMediaContainer);
-      }
+  /**
+   * Ask every connected peer to (re)sync their history to us. New/older messages
+   * arrive asynchronously and are merged + re-rendered via onTweetsUpdated.
+   */
+  requestOlderFromPeers(button) {
+    const connections = this.peerManager.getAllConnections ? this.peerManager.getAllConnections() : [];
+    if (connections.length === 0) return;
+    if (button) { button.disabled = true; button.textContent = 'Requesting from peers…'; }
+    connections.forEach(conn => this.tweetManager.requestSync(conn));
+  }
 
-      // Add a link preview for the first URL in the message (if any)
-      this.renderLinkPreview(tweet, tweetMediaContainer);
+  /**
+   * Observe the bottom sentinel so scrolling near the end auto-loads the next
+   * page — the "older rows blend in at the bottom" behaviour.
+   */
+  observeFeedSentinel(sentinel) {
+    if (!('IntersectionObserver' in window)) return;
+    if (!this.feedObserver) {
+      this.feedObserver = new IntersectionObserver((entries) => {
+        if (entries.some(e => e.isIntersecting)) this.loadMoreOlder();
+      }, { rootMargin: '200px' });
+    }
+    this.feedObserver.disconnect();
+    this.feedObserver.observe(sentinel);
+  }
 
-      const tweetActions = document.createElement('div');
-      tweetActions.className = 'tweet-actions';
+  disconnectFeedObserver() {
+    if (this.feedObserver) this.feedObserver.disconnect();
+  }
 
-      // Only add delete button for user's own tweets
-      if (isMine) {
-        const deleteButton = document.createElement('button');
-        deleteButton.className = 'delete-tweet-button';
-        deleteButton.textContent = 'Delete';
-        deleteButton.addEventListener('click', () => this.deleteTweet(tweet.id));
+  /**
+   * Build the DOM for a single tweet row.
+   * @param {Object} tweet
+   * @param {string} myName - the current user's name (to flag own messages)
+   * @returns {HTMLElement}
+   */
+  buildTweetElement(tweet, myName) {
+    const isMine = tweet.username === myName;
 
-        tweetActions.appendChild(deleteButton);
-      }
+    const tweetElement = document.createElement('div');
+    tweetElement.className = 'tweet';
+    tweetElement.dataset.id = tweet.id;
 
-      tweetBody.appendChild(tweetHeader);
-      tweetBody.appendChild(tweetContent);
-      tweetBody.appendChild(tweetMediaContainer);
-      tweetBody.appendChild(tweetActions);
+    // Layout: [ avatar ] [ body ]
+    const tweetMain = document.createElement('div');
+    tweetMain.className = 'tweet-main';
 
-      tweetMain.appendChild(tweetBody);
-      tweetElement.appendChild(tweetMain);
+    const avatar = this.createAvatar(tweet.username, isMine);
+    tweetMain.appendChild(avatar);
 
-      tweetsContainer.appendChild(tweetElement);
-    });
+    const tweetBody = document.createElement('div');
+    tweetBody.className = 'tweet-body';
+
+    const tweetHeader = document.createElement('div');
+    tweetHeader.className = 'tweet-header';
+
+    const tweetUser = document.createElement('div');
+    tweetUser.className = 'tweet-user';
+    tweetUser.textContent = tweet.username;
+    tweetHeader.appendChild(tweetUser);
+
+    // Show the audience badge for circle (narrow-cast) messages
+    if (tweet.circle) {
+      const badge = document.createElement('span');
+      badge.className = 'tweet-circle-badge';
+      badge.textContent = tweet.circle;
+      badge.title = `Sent to circle: ${tweet.circle}`;
+      tweetHeader.appendChild(badge);
+    }
+
+    const tweetTime = document.createElement('div');
+    tweetTime.className = 'tweet-time';
+    tweetTime.textContent = this.formatTimestamp(tweet.timestamp);
+    tweetHeader.appendChild(tweetTime);
+
+    const tweetContent = document.createElement('div');
+    tweetContent.className = 'tweet-content';
+
+    // Render text with clickable links (XSS-safe via linkify)
+    if (tweet.content && tweet.content.trim()) {
+      tweetContent.appendChild(linkify(tweet.content));
+    }
+
+    // Create media container
+    const tweetMediaContainer = document.createElement('div');
+    tweetMediaContainer.className = 'tweet-media-container';
+
+    // Add attached image media if present
+    if (tweet.mediaId) {
+      this.renderMediaInTweet(tweet, tweetMediaContainer);
+    }
+
+    // Add a link preview for the first URL in the message (if any)
+    this.renderLinkPreview(tweet, tweetMediaContainer);
+
+    const tweetActions = document.createElement('div');
+    tweetActions.className = 'tweet-actions';
+
+    // Only add delete button for user's own tweets
+    if (isMine) {
+      const deleteButton = document.createElement('button');
+      deleteButton.className = 'delete-tweet-button';
+      deleteButton.textContent = 'Delete';
+      deleteButton.addEventListener('click', () => this.deleteTweet(tweet.id));
+
+      tweetActions.appendChild(deleteButton);
+    }
+
+    tweetBody.appendChild(tweetHeader);
+    tweetBody.appendChild(tweetContent);
+    tweetBody.appendChild(tweetMediaContainer);
+    tweetBody.appendChild(tweetActions);
+
+    tweetMain.appendChild(tweetBody);
+    tweetElement.appendChild(tweetMain);
+
+    return tweetElement;
   }
 
   /**
@@ -827,6 +995,7 @@ export class UIManager {
    */
   selectCircle(circleId) {
     this.activeCircleId = circleId;
+    this.resetFeedPaging(); // a different circle is a wholly different list
     this.renderCirclesSidebar();
     this.updateCastTarget();
     this.renderTweets();
@@ -1473,8 +1642,15 @@ export class UIManager {
     const { message, showRetry, retryFn } = event.detail;
 
     if (showRetry && retryFn) {
-      this.elements.statusElement.innerHTML = `${message} <button id="retry-now" class="small-button">Try Now</button>`;
-      document.getElementById('retry-now').addEventListener('click', retryFn);
+      // Build with DOM APIs (never innerHTML) so a status message can never be
+      // interpreted as markup.
+      this.elements.statusElement.textContent = message + ' ';
+      const retryButton = document.createElement('button');
+      retryButton.id = 'retry-now';
+      retryButton.className = 'small-button';
+      retryButton.textContent = 'Try Now';
+      retryButton.addEventListener('click', retryFn);
+      this.elements.statusElement.appendChild(retryButton);
     } else {
       this.elements.statusElement.textContent = message;
     }
