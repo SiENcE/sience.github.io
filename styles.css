@@ -213,6 +213,19 @@ header h1 {
     font-weight: 600;
 }
 
+/* ---- Identity backup (import on login) ---- */
+.login-import {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(136, 153, 166, 0.25);
+}
+
+.login-import input[type="file"] {
+    display: block;
+    margin: 8px 0;
+    width: 100%;
+}
+
 /* Media-preview buttons set their own background inline — clear the gradient image */
 .media-upload-button,
 .clear-media-button {

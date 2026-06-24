@@ -18,6 +18,20 @@
 const ALGO = { name: 'ECDSA', namedCurve: 'P-256' };
 const SIGN_ALGO = { name: 'ECDSA', hash: 'SHA-256' };
 const SIGNED_PREFIX = 'spellcast-tweet-v1';
+const PBKDF2_ITERATIONS = 250000;
+
+/** Derive an AES-GCM key from a passphrase via PBKDF2-SHA-256. */
+async function deriveAesKey(passphrase, salt, iterations = PBKDF2_ITERATIONS) {
+  const s = subtle();
+  const baseKey = await s.importKey('raw', new TextEncoder().encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  return s.deriveKey(
+    { name: 'PBKDF2', salt, iterations, hash: 'SHA-256' },
+    baseKey,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
 
 function subtle() {
   return (globalThis.crypto && globalThis.crypto.subtle) ? globalThis.crypto.subtle : null;
@@ -114,13 +128,99 @@ export class CryptoIdentity {
     return !!(this.privateKey && this.publicKeyB64);
   }
 
-  /** Generate a fresh keypair (private key non-extractable). */
+  /**
+   * Generate a fresh keypair. The private key is generated **extractable** so it
+   * can be exported into a passphrase-encrypted backup file (account
+   * portability). The residual risk — XSS could in principle export it — is
+   * accepted in exchange for the user being able to recover/move their account;
+   * the backup file itself is always encrypted (see exportEncrypted).
+   */
   static async generate() {
     const s = subtle();
     if (!s) return new CryptoIdentity(null, null);
-    const pair = await s.generateKey(ALGO, false, ['sign', 'verify']);
+    const pair = await s.generateKey(ALGO, true, ['sign', 'verify']);
     const publicKeyB64 = bufToB64(await s.exportKey('raw', pair.publicKey));
     return new CryptoIdentity(pair.privateKey, publicKeyB64);
+  }
+
+  /**
+   * Produce an encrypted backup of this identity as a JSON-serialisable object.
+   * The private key (JWK) + identifying metadata are encrypted with a key
+   * derived from the user's passphrase (PBKDF2-SHA-256 → AES-GCM), so the file
+   * is useless without the passphrase.
+   * @param {string} passphrase
+   * @param {{username?: string, peerId?: string}} meta
+   * @returns {Promise<Object>} backup envelope (safe to write to a file)
+   */
+  async exportEncrypted(passphrase, meta = {}) {
+    const s = subtle();
+    if (!s) throw new Error('WebCrypto unavailable (need HTTPS or localhost).');
+    if (!this.privateKey) throw new Error('No identity to export.');
+    if (!passphrase) throw new Error('A passphrase is required.');
+
+    let jwk;
+    try {
+      jwk = await s.exportKey('jwk', this.privateKey);
+    } catch (err) {
+      throw new Error('This identity predates backup support and cannot be exported. '
+        + '(It was created with a non-extractable key.)');
+    }
+
+    const payload = new TextEncoder().encode(JSON.stringify({
+      username: meta.username || '',
+      peerId: meta.peerId || '',
+      publicKeyB64: this.publicKeyB64,
+      privateKeyJwk: jwk
+    }));
+
+    const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
+    const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+    const aesKey = await deriveAesKey(passphrase, salt);
+    const cipher = await s.encrypt({ name: 'AES-GCM', iv }, aesKey, payload);
+
+    return {
+      type: 'spellcast-identity-backup',
+      v: 1,
+      kdf: 'PBKDF2-SHA256',
+      iterations: PBKDF2_ITERATIONS,
+      salt: bufToB64(salt),
+      iv: bufToB64(iv),
+      data: bufToB64(cipher),
+      // Cleartext hint only (not trusted on import — the encrypted blob wins):
+      hint: { username: meta.username || '', fingerprint: fingerprint(this.publicKeyB64) }
+    };
+  }
+
+  /**
+   * Decrypt a backup envelope and reconstruct the identity (private key imported
+   * extractable so it can be re-exported later).
+   * @param {Object} envelope - parsed backup file
+   * @param {string} passphrase
+   * @returns {Promise<{identity: CryptoIdentity, username: string, peerId: string}>}
+   */
+  static async importEncrypted(envelope, passphrase) {
+    const s = subtle();
+    if (!s) throw new Error('WebCrypto unavailable (need HTTPS or localhost).');
+    if (!envelope || envelope.type !== 'spellcast-identity-backup') {
+      throw new Error('Not a SpellCast identity backup file.');
+    }
+    if (!passphrase) throw new Error('A passphrase is required.');
+
+    const salt = new Uint8Array(b64ToBuf(envelope.salt));
+    const iv = new Uint8Array(b64ToBuf(envelope.iv));
+    const aesKey = await deriveAesKey(passphrase, salt, envelope.iterations || PBKDF2_ITERATIONS);
+
+    let plainBuf;
+    try {
+      plainBuf = await s.decrypt({ name: 'AES-GCM', iv }, aesKey, b64ToBuf(envelope.data));
+    } catch (err) {
+      throw new Error('Wrong passphrase or corrupted backup file.');
+    }
+
+    const parsed = JSON.parse(new TextDecoder().decode(plainBuf));
+    const privateKey = await s.importKey('jwk', parsed.privateKeyJwk, ALGO, true, ['sign']);
+    const identity = new CryptoIdentity(privateKey, parsed.publicKeyB64);
+    return { identity, username: parsed.username || '', peerId: parsed.peerId || '' };
   }
 
   /** Sign a message's signed fields; returns a base64 signature (or null). */

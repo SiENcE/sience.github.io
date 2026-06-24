@@ -1,7 +1,7 @@
 // Manages UI components, event listeners and display logic
 
 import { linkify, extractUrls, buildLinkPreview } from './link-preview.js';
-import { fingerprint, handleFor } from './crypto-identity.js';
+import { fingerprint, handleFor, CryptoIdentity } from './crypto-identity.js';
 
 export class UIManager {
   constructor(userManager, peerManager, tweetManager, storageManager, mediaManager, circleManager) {
@@ -79,6 +79,9 @@ export class UIManager {
       deleteAccountButton: document.getElementById('delete-account-button'),
       deleteAllMessagesButton: document.getElementById('delete-all-messages-button'),
       cleanupStorageButton: document.getElementById('cleanup-storage-button'),
+      exportIdentityButton: document.getElementById('export-identity-button'),
+      importIdentityButton: document.getElementById('import-identity-button'),
+      importIdentityFile: document.getElementById('import-identity-file'),
 
       // Inputs
       usernameInput: document.getElementById('username'),
@@ -268,6 +271,14 @@ export class UIManager {
     this.elements.connectButton.addEventListener('click', this.connectToPeer);
 
     this.elements.deleteAccountButton.addEventListener('click', this.deleteAccount.bind(this));
+
+    // Identity backup: export from the profile, import from the login screen.
+    if (this.elements.exportIdentityButton) {
+      this.elements.exportIdentityButton.addEventListener('click', this.exportIdentity.bind(this));
+    }
+    if (this.elements.importIdentityButton) {
+      this.elements.importIdentityButton.addEventListener('click', this.importIdentity.bind(this));
+    }
 
     // Status and connection quality update listeners
     window.addEventListener('status-update', this.handleStatusUpdate);
@@ -640,6 +651,106 @@ export class UIManager {
         this.showIntroScreen();
         alert('Your account has been deleted successfully.');
       });
+    }
+  }
+
+  /**
+   * Export the user's signing identity as a passphrase-encrypted backup file.
+   */
+  async exportIdentity() {
+    if (!this.userManager.publicKey) {
+      alert('No exportable identity is available. (WebCrypto needs HTTPS or localhost.)');
+      return;
+    }
+
+    const passphrase = prompt('Choose a passphrase to encrypt your identity backup.\n'
+      + 'You will need this exact passphrase to restore the account. There is no way to recover it.');
+    if (passphrase === null) return; // cancelled
+    if (passphrase.length < 6) {
+      alert('Please use a passphrase of at least 6 characters.');
+      return;
+    }
+    const confirmPass = prompt('Re-enter the passphrase to confirm:');
+    if (confirmPass === null) return;
+    if (confirmPass !== passphrase) {
+      alert('Passphrases did not match. Nothing was exported.');
+      return;
+    }
+
+    try {
+      const { username, peerId } = this.userManager.getUserInfo();
+      const envelope = await this.userManager.identity.exportEncrypted(passphrase, { username, peerId });
+
+      const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const safeName = (username || 'identity').replace(/[^a-z0-9_-]/gi, '_');
+      a.href = url;
+      a.download = `spellcast-identity-${safeName}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      alert('Identity backup downloaded. Store it somewhere safe — anyone with the file AND the passphrase can post as you.');
+    } catch (error) {
+      console.error('Identity export failed:', error);
+      alert(`Could not export identity: ${error.message}`);
+    }
+  }
+
+  /**
+   * Restore an identity from a backup file on the login screen, then log in.
+   */
+  async importIdentity() {
+    const fileInput = this.elements.importIdentityFile;
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if (!file) {
+      alert('Please choose an identity backup file first.');
+      return;
+    }
+
+    let envelope;
+    try {
+      envelope = JSON.parse(await file.text());
+    } catch (error) {
+      alert('That file is not a valid identity backup (could not parse JSON).');
+      return;
+    }
+
+    const passphrase = prompt('Enter the passphrase for this identity backup:');
+    if (passphrase === null) return;
+
+    try {
+      const { identity, username, peerId } = await CryptoIdentity.importEncrypted(envelope, passphrase);
+      if (!username || !peerId) {
+        throw new Error('Backup is missing the username or peer ID.');
+      }
+
+      // Adopt the restored identity + credentials and persist them.
+      this.userManager.identity = identity;
+      await this.storageManager.saveIdentity({
+        privateKey: identity.privateKey,
+        publicKeyB64: identity.publicKeyB64
+      });
+      await this.userManager.loginWithCredentials(username, peerId);
+      await this.tweetManager.pinOwnIdentity();
+
+      // Connect to the peer network and show the app (mirrors the login flow).
+      await this.peerManager.loginToPeer();
+      this.elements.loginContainer.style.display = 'none';
+      this.elements.appContainer.style.display = 'block';
+      this.elements.currentUserElement.textContent = username;
+
+      await this.tweetManager.loadTweets();
+      this.renderTweets();
+      this.updatePeersList();
+      this.updateProfileInfo();
+
+      alert(`Welcome back, ${handleFor(username, identity.publicKeyB64)}. Your identity was restored.`);
+    } catch (error) {
+      console.error('Identity import failed:', error);
+      alert(`Could not import identity: ${error.message}`);
     }
   }
 

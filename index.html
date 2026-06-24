@@ -52,6 +52,12 @@
             <input type="text" id="login-peerid" placeholder="Enter your peer ID">
         </div>
         <button id="login-continue-button">Login</button>
+
+        <div class="login-import">
+            <p class="hint">Have an identity backup file? Restore your account (key + username + peer ID):</p>
+            <input type="file" id="import-identity-file" accept="application/json,.json">
+            <button id="import-identity-button">Import Identity Backup</button>
+        </div>
     </div>
 
     <div id="app-container" class="container">
@@ -121,10 +127,12 @@
                         <div id="profile-qrcode" class="profile-qrcode"></div>
                     </div>
                     <div class="profile-actions">
+                        <button id="export-identity-button">Export Identity Backup</button>
                         <button id="cleanup-storage-button">Clean Up Storage</button>
                         <button id="delete-all-messages-button" class="danger-button">Delete All Messages</button>
                         <button id="delete-account-button" class="danger-button">Delete Account</button>
                     </div>
+                    <p class="hint">Export a passphrase-encrypted backup of your identity (signing key). Keep it safe — it is the only way to recover or move this account to another device.</p>
                 </div>
             </div>
         </div>
