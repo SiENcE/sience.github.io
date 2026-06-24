@@ -490,6 +490,10 @@ button:active {
 
 #circles-sidebar h3 {
     margin: 0 0 10px;
+    font-size: 0.8em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #657786;
 }
 
 .app-main {
@@ -570,8 +574,14 @@ button:active {
     background-color: white;
 }
 
-.tweet-form-actions #tweet-button {
+/* Push the image button + Cast button to the right, image on the left of Cast */
+.tweet-form-actions .media-upload-button {
     margin-left: auto;
+    flex-shrink: 0;
+}
+
+.tweet-form-actions #tweet-button {
+    margin-left: 0;
 }
 
 #feed-heading {

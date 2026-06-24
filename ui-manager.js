@@ -60,8 +60,6 @@ export class UIManager {
       // Circles
       circlesContainer: document.getElementById('circles-container'),
       circlesSidebarList: document.getElementById('circles-sidebar-list'),
-      sidebarCircleName: document.getElementById('sidebar-circle-name'),
-      sidebarCreateCircle: document.getElementById('sidebar-create-circle'),
       circlesManageList: document.getElementById('circles-manage-list'),
       newCircleName: document.getElementById('new-circle-name'),
       createCircleButton: document.getElementById('create-circle-button'),
@@ -254,14 +252,6 @@ export class UIManager {
         this.handleCreateCircle(this.elements.newCircleName);
       });
     }
-    if (this.elements.sidebarCreateCircle) {
-      this.elements.sidebarCreateCircle.addEventListener('click', () => {
-        this.handleCreateCircle(this.elements.sidebarCircleName);
-      });
-      this.elements.sidebarCircleName.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') this.handleCreateCircle(this.elements.sidebarCircleName);
-      });
-    }
 
     // Re-render circle UI whenever circles change
     if (this.circleManager) {
@@ -313,12 +303,6 @@ export class UIManager {
 	  // Get the tweet form element
 	  const tweetForm = document.getElementById('tweet-form');
 	  if (!tweetForm) return;
-	  
-	  // Create media container for the form
-	  const mediaContainer = document.createElement('div');
-	  mediaContainer.className = 'media-upload-container';
-	  mediaContainer.style.display = 'flex';
-	  mediaContainer.style.marginBottom = '10px';
 	  
 	  // Create the upload button
 	  const uploadButton = document.createElement('button');
@@ -384,18 +368,20 @@ export class UIManager {
 	  // Assemble preview container
 	  previewContainer.appendChild(previewImage);
 	  previewContainer.appendChild(clearButton);
-	  
-	  // Add to media container
-	  mediaContainer.appendChild(uploadButton);
-	  mediaContainer.appendChild(mediaInput);
-	  mediaContainer.appendChild(previewContainer);
-	  
-	  // FIX: Insert media container at the beginning of the tweet form
-	  // This ensures we don't need to find a specific reference node
-	  if (tweetForm.firstChild) {
-		tweetForm.insertBefore(mediaContainer, tweetForm.firstChild);
+
+	  // The image preview sits above the compose box; the hidden file input can
+	  // live anywhere in the form.
+	  tweetForm.insertBefore(mediaInput, tweetForm.firstChild);
+	  tweetForm.insertBefore(previewContainer, tweetForm.firstChild);
+
+	  // Place the upload button in the action row, to the LEFT of the Cast button.
+	  uploadButton.style.marginRight = '0';
+	  const actionsRow = tweetForm.querySelector('.tweet-form-actions');
+	  const castButton = document.getElementById('tweet-button');
+	  if (actionsRow && castButton) {
+		actionsRow.insertBefore(uploadButton, castButton);
 	  } else {
-		tweetForm.appendChild(mediaContainer);
+		tweetForm.insertBefore(uploadButton, tweetForm.firstChild);
 	  }
 	  
 	  // Store references to new elements
@@ -425,10 +411,11 @@ export class UIManager {
       return;
     }
     
-    // Validate file size (2MB max)
-    const maxSize = 2 * 1024 * 1024; // 2MB
+    // Large images are accepted and optimized client-side; only reject the
+    // truly huge ones that could exhaust memory while decoding.
+    const maxSize = 15 * 1024 * 1024; // 15MB
     if (file.size > maxSize) {
-      alert(`File is too large. Maximum size is ${maxSize / 1024 / 1024}MB.`);
+      alert(`Image is too large. Maximum size is ${maxSize / 1024 / 1024}MB. Try a smaller photo.`);
       return;
     }
     
