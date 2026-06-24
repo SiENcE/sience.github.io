@@ -124,6 +124,27 @@ export function handleFor(username, publicKeyB64) {
   return `${username}#${fingerprint(publicKeyB64)}`;
 }
 
+// ---- Reactions ("Spark") — signed so counts can't be forged ----
+const REACTION_PREFIX = 'spellcast-reaction-v1';
+
+function reactionBytes(f) {
+  return new TextEncoder().encode(JSON.stringify([
+    REACTION_PREFIX, f.reactorKey || '', f.tweetId || '', f.active ? 1 : 0, f.timestamp || 0
+  ]));
+}
+
+/** Verify a reaction signature against the reactor's public key. */
+export async function verifyReaction(reactorKeyB64, signatureB64, fields) {
+  const s = subtle();
+  if (!s || !reactorKeyB64 || !signatureB64) return false;
+  try {
+    const pub = await s.importKey('raw', b64ToBuf(reactorKeyB64), ALGO, true, ['verify']);
+    return await s.verify(SIGN_ALGO, pub, b64ToBuf(signatureB64), reactionBytes(fields));
+  } catch (err) {
+    return false;
+  }
+}
+
 /** Verify a signature (base64) over a message's signed fields. */
 export async function verifySignature(publicKeyB64, signatureB64, fields) {
   const s = subtle();
@@ -345,6 +366,18 @@ export class CryptoIdentity {
     }
     const identity = new CryptoIdentity(privateKey, parsed.publicKeyB64, encPrivateKey, parsed.encPublicKeyB64 || null);
     return { identity, username: parsed.username || '', peerId: parsed.peerId || '' };
+  }
+
+  /** Sign a reaction; returns a base64 signature (or null). */
+  async signReaction(fields) {
+    const s = subtle();
+    if (!s || !this.privateKey) return null;
+    try {
+      return bufToB64(await s.sign(SIGN_ALGO, this.privateKey, reactionBytes(fields)));
+    } catch (err) {
+      console.warn('Reaction signing error:', err);
+      return null;
+    }
   }
 
   /** Sign a message's signed fields; returns a base64 signature (or null). */

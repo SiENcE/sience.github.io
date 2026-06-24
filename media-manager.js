@@ -17,16 +17,25 @@ export class MediaManager {
     'image/webp'
   ];
   
-  static MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+  // Input ceiling: we accept large photos and shrink them client-side (see
+  // compressToTarget), so this only rejects truly huge files that could exhaust
+  // memory while decoding.
+  static MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+  // Target size of the *compressed* full image (length of the base64 data URL).
+  // The uploader keeps lowering quality/resolution until the output fits, so big
+  // images become sendable instead of being rejected.
+  static TARGET_FULL_BYTES = 600 * 1024; // ~600 KB encoded
   // Bound total stored media (P2 — mesh hardening). We cap the item COUNT rather
   // than summing bytes (which would require loading every full image): since each
-  // item is already size-capped (≤5MB from peers / ≤2MB own), a count cap bounds
-  // total storage cheaply via getAllKeys without scanning image data.
+  // item is already size-capped, a count cap bounds total storage cheaply via
+  // getAllKeys without scanning image data.
   static MAX_MEDIA_ITEMS = 500;
   static MAX_IMAGE_WIDTH = 1200; // Max width in pixels
   static MAX_IMAGE_HEIGHT = 1200; // Max height in pixels
   static THUMBNAIL_SIZE = 300; // Thumbnail size in pixels
   static COMPRESSION_QUALITY = 0.7; // JPEG/WebP compression quality (0-1)
+  static MIN_QUALITY = 0.35; // Don't compress below this quality
+  static MIN_DIMENSION = 480; // Don't shrink below this many pixels on the long edge
   
   constructor(storageManager) {
     this.storageManager = storageManager;
@@ -65,7 +74,7 @@ export class MediaManager {
     }
 
     if (file.size > MediaManager.MAX_FILE_SIZE) {
-      throw new Error(`File too large. Maximum size: ${MediaManager.MAX_FILE_SIZE / 1024 / 1024}MB`);
+      throw new Error(`Image too large (max ${MediaManager.MAX_FILE_SIZE / 1024 / 1024}MB). Try a smaller photo.`);
     }
 
     if (await this.isMediaStoreFull()) {
@@ -120,22 +129,18 @@ export class MediaManager {
         
         img.onload = () => {
           try {
-            // Resize full image if needed
-            const fullImage = this.resizeImage(
-              img, 
-              MediaManager.MAX_IMAGE_WIDTH, 
-              MediaManager.MAX_IMAGE_HEIGHT, 
-              MediaManager.COMPRESSION_QUALITY
-            );
-            
+            // Shrink the full image until it fits the transfer/storage target,
+            // so large photos become sendable instead of being rejected.
+            const fullImage = this.compressToTarget(img, MediaManager.TARGET_FULL_BYTES);
+
             // Create thumbnail
             const thumbnail = this.resizeImage(
-              img, 
-              MediaManager.THUMBNAIL_SIZE, 
-              MediaManager.THUMBNAIL_SIZE, 
+              img,
+              MediaManager.THUMBNAIL_SIZE,
+              MediaManager.THUMBNAIL_SIZE,
               MediaManager.COMPRESSION_QUALITY
             );
-            
+
             resolve({ fullImage, thumbnail });
           } catch (error) {
             reject(error);
@@ -196,6 +201,36 @@ export class MediaManager {
                     (img.src.startsWith('data:image/webp') ? 'image/webp' : 'image/jpeg'));
                     
     return canvas.toDataURL(mimeType, quality);
+  }
+
+  /**
+   * Encode the image to a data URL no larger than targetLen (base64 length),
+   * progressively lowering quality and then resolution. This lets a user attach
+   * a large photo — it gets reduced client-side rather than rejected.
+   * @param {HTMLImageElement} img
+   * @param {number} targetLen - target length of the data URL string
+   * @returns {string} base64 data URL
+   */
+  compressToTarget(img, targetLen) {
+    let maxDim = MediaManager.MAX_IMAGE_WIDTH;
+    let quality = MediaManager.COMPRESSION_QUALITY;
+    let out = this.resizeImage(img, maxDim, maxDim, quality);
+
+    let guard = 0;
+    while (out.length > targetLen && guard++ < 15) {
+      if (quality > MediaManager.MIN_QUALITY) {
+        // First try lowering quality at the current resolution.
+        quality = Math.max(MediaManager.MIN_QUALITY, quality - 0.1);
+      } else if (maxDim > MediaManager.MIN_DIMENSION) {
+        // Then drop resolution and reset quality for the next pass.
+        maxDim = Math.max(MediaManager.MIN_DIMENSION, Math.round(maxDim * 0.8));
+        quality = 0.6;
+      } else {
+        break; // at the floor — accept whatever we have
+      }
+      out = this.resizeImage(img, maxDim, maxDim, quality);
+    }
+    return out;
   }
   
   /**

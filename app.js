@@ -54,6 +54,7 @@ class SpellCastApp {
     await this.tweetManager.loadTweets();
     await this.tweetManager.loadMessageDistributionState();
     await this.tweetManager.loadNameRegistry();
+    await this.tweetManager.loadReactions();
     await this.peerManager.loadPeers();
     await this.circleManager.loadCircles();
 

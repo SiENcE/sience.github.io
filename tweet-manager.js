@@ -2,7 +2,7 @@
 
 import { StorageManager } from './storage-manager.js';
 import { RateLimiter } from './rate-limiter.js';
-import { verifySignature, sealForRecipients } from './crypto-identity.js';
+import { verifySignature, sealForRecipients, verifyReaction } from './crypto-identity.js';
 
 export class TweetManager {
 	constructor(userManager, peerManager, storageManager, mediaManager) {
@@ -50,6 +50,12 @@ export class TweetManager {
 		// as a possible impersonator. Loaded from storage in loadNameRegistry().
 		this.nameRegistry = {};
 
+		// Reactions ("Spark"): reactions[tweetId][reactorKey] = { name, active, ts, sig }.
+		// Last-writer-wins per (tweetId, reactorKey) by timestamp; count = active ones.
+		this.reactions = {};
+		this.MAX_REACTORS_PER_TWEET = 500;  // bound per-tweet reactor entries
+		this.MAX_REACTION_TWEETS = 2000;   // bound number of tweets we track reactions for
+
 		// Add event callbacks
 		this.onTweetsUpdated = null; // Add this callback for UI updates
 
@@ -59,6 +65,8 @@ export class TweetManager {
 		this.peerManager.registerMessageHandler('all_tweets', this.handleAllTweetsMessage.bind(this));
 		this.peerManager.registerMessageHandler('bulk_tweet_ack', this.handleBulkTweetAckMessage.bind(this));
 		this.peerManager.registerMessageHandler('sync_request', this.handleSyncRequest.bind(this));
+		this.peerManager.registerMessageHandler('reaction', this.handleReactionMessage.bind(this));
+		this.peerManager.registerMessageHandler('reactions', this.handleReactionsBulk.bind(this));
 
 		// Bind methods
 		this.loadTweets = this.loadTweets.bind(this);
@@ -76,6 +84,8 @@ export class TweetManager {
 		this.validateTweet = this.validateTweet.bind(this);
 		this.generateUniqueId = this.generateUniqueId.bind(this);
 		this.loadNameRegistry = this.loadNameRegistry.bind(this);
+		this.loadReactions = this.loadReactions.bind(this);
+		this.toggleReaction = this.toggleReaction.bind(this);
 
 		// On new peer connection, sync messages in both directions
 		this.peerManager.onPeerConnected((conn) => {
@@ -875,6 +885,142 @@ export class TweetManager {
 		}
 	}
 
+	/** Load persisted reactions from storage (call once at startup). */
+	async loadReactions() {
+		try {
+			this.reactions = await this.storageManager.loadReactions();
+		} catch (err) {
+			console.warn('Could not load reactions:', err);
+			this.reactions = {};
+		}
+	}
+
+	async saveReactions() {
+		try { await this.storageManager.saveReactions(this.reactions); } catch (_) {}
+	}
+
+	/**
+	 * Aggregate reaction state for a tweet, for rendering.
+	 * @returns {{count:number, mine:boolean}}
+	 */
+	getReactionState(tweetId) {
+		const byKey = this.reactions[tweetId];
+		if (!byKey) return { count: 0, mine: false };
+		const myKey = this.userManager.publicKey;
+		let count = 0, mine = false;
+		for (const k of Object.keys(byKey)) {
+			if (byKey[k] && byKey[k].active) {
+				count++;
+				if (myKey && k === myKey) mine = true;
+			}
+		}
+		return { count, mine };
+	}
+
+	/**
+	 * Toggle our own Spark on another user message, then broadcast it (signed).
+	 */
+	async toggleReaction(tweetId) {
+		const tweet = this.tweets.find(t => t.id === tweetId);
+		if (!tweet) return;
+		const myKey = this.userManager.publicKey;
+		const myName = this.userManager.username;
+		if (!myKey) return; // need an identity to react
+
+		// You cannot spark your own spell.
+		if (tweet.authorKey && tweet.authorKey === myKey) return;
+
+		const existing = this.reactions[tweetId] && this.reactions[tweetId][myKey];
+		const active = !(existing && existing.active);
+		const timestamp = Date.now();
+		const signature = await this.userManager.identity.signReaction({ reactorKey: myKey, tweetId, active, timestamp });
+
+		this.recordReaction({ tweetId, reactorKey: myKey, reactorName: myName, active, timestamp, signature });
+		await this.saveReactions();
+		// Only propagate signed reactions (peers require a valid signature).
+		if (signature) {
+			this.broadcastReaction({ tweetId, reactorKey: myKey, reactorName: myName, active, timestamp, signature });
+		}
+
+		if (typeof this.onTweetsUpdated === 'function') this.onTweetsUpdated();
+	}
+
+	/** Store a reaction record locally (last-writer-wins by timestamp). Returns true if state changed. */
+	recordReaction(r) {
+		if (!r || !r.tweetId || !r.reactorKey || typeof r.timestamp !== 'number') return false;
+		const isNewTweet = !this.reactions[r.tweetId];
+		if (isNewTweet && Object.keys(this.reactions).length >= this.MAX_REACTION_TWEETS) return false;
+		if (!this.reactions[r.tweetId]) this.reactions[r.tweetId] = {};
+		const byKey = this.reactions[r.tweetId];
+		const prev = byKey[r.reactorKey];
+		if (prev && prev.ts >= r.timestamp) return false; // stale
+		if (!prev && Object.keys(byKey).length >= this.MAX_REACTORS_PER_TWEET) return false; // cap
+		byKey[r.reactorKey] = { name: r.reactorName || '', active: !!r.active, ts: r.timestamp, sig: r.signature || null };
+		return true;
+	}
+
+	/** Broadcast a reaction to all connected peers. */
+	broadcastReaction(r) {
+		const msg = { type: 'reaction', tweetId: r.tweetId, reactorKey: r.reactorKey, reactorName: r.reactorName, active: r.active, timestamp: r.timestamp, signature: r.signature };
+		this.peerManager.getAllConnections().forEach(conn => {
+			try { conn.send(msg); } catch (_) {}
+		});
+	}
+
+	/** Handle an incoming reaction: verify, apply, relay onward. */
+	async handleReactionMessage(data, conn) {
+		if (!(await this.verifyReactionMsg(data))) { this.peerManager.recordPeerStrike(conn.peer); return; }
+		const changed = this.recordReaction(data);
+		if (!changed) return; // stale / duplicate — do not relay
+		await this.saveReactions();
+		// Relay the verified reaction to our other peers (skip the sender).
+		const fwd = { type: 'reaction', tweetId: data.tweetId, reactorKey: data.reactorKey, reactorName: data.reactorName, active: data.active, timestamp: data.timestamp, signature: data.signature };
+		this.peerManager.getAllConnections().forEach(c => {
+			if (c.peer === conn.peer) return;
+			try { c.send(fwd); } catch (_) {}
+		});
+		if (typeof this.onTweetsUpdated === 'function') this.onTweetsUpdated();
+	}
+
+	/** Bulk reactions received during sync. */
+	async handleReactionsBulk(data, conn) {
+		if (!Array.isArray(data.items)) { this.peerManager.recordPeerStrike(conn.peer); return; }
+		let changed = false;
+		for (const r of data.items.slice(0, 2000)) {
+			if (await this.verifyReactionMsg(r)) {
+				if (this.recordReaction(r)) changed = true;
+			}
+		}
+		if (changed) {
+			await this.saveReactions();
+			if (typeof this.onTweetsUpdated === 'function') this.onTweetsUpdated();
+		}
+	}
+
+	/** Validate + verify a reaction message signature. */
+	async verifyReactionMsg(r) {
+		if (!r || typeof r.tweetId !== 'string' || typeof r.reactorKey !== 'string' || typeof r.timestamp !== 'number') return false;
+		if (r.tweetId.length > 128 || r.reactorKey.length > this.MAX_KEY_B64) return false;
+		if (typeof r.signature !== 'string' || r.signature.length > this.MAX_KEY_B64) return false;
+		if (r.timestamp > Date.now() + 60000) return false;
+		return verifyReaction(r.reactorKey, r.signature, { reactorKey: r.reactorKey, tweetId: r.tweetId, active: !!r.active, timestamp: r.timestamp });
+	}
+
+	/** All reaction records we hold, as signed wire items (for sync). */
+	collectReactionItems(limit = 2000) {
+		const items = [];
+		for (const tweetId of Object.keys(this.reactions)) {
+			for (const reactorKey of Object.keys(this.reactions[tweetId])) {
+				const rec = this.reactions[tweetId][reactorKey];
+				if (!rec || !rec.sig) continue;
+				items.push({ tweetId, reactorKey, reactorName: rec.name, active: rec.active, timestamp: rec.ts, signature: rec.sig });
+				if (items.length >= limit) return items;
+			}
+		}
+		return items;
+	}
+
+
 	/**
 	 * Trust-on-first-use binding of a username to a public key. Only called for
 	 * tweets whose signature has already verified. The first verified key seen
@@ -1004,12 +1150,21 @@ export class TweetManager {
 		if (tweetsToSend.length === 0) {
 			console.log(`Peer ${conn.peer} is already up to date (${knownIds.size} tweets)`);
 			this.saveMessageDistributionState();
+			this.sendReactionsTo(conn);
 			return;
 		}
 
 		console.log(`Peer ${conn.peer} is missing ${tweetsToSend.length} tweets — sending them`);
 		this.sendTweetsToPeer(conn, tweetsToSend);
 		this.saveMessageDistributionState();
+		this.sendReactionsTo(conn);
+	}
+
+	/** Send all our (signed) reaction records to a peer during sync. */
+	sendReactionsTo(conn) {
+		const items = this.collectReactionItems();
+		if (items.length === 0) return;
+		try { conn.send({ type: 'reactions', items }); } catch (_) {}
 	}
 
 	/**

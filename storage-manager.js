@@ -11,7 +11,8 @@ export class StorageManager {
     UNSENT_TWEETS: 'p2p_unsent_tweets',
     CIRCLES: 'p2p_circles',
     IDENTITY: 'p2p_identity',       // signing keypair { privateKey: CryptoKey, publicKeyB64 }
-    NAME_REGISTRY: 'p2p_name_pins'  // TOFU pins: username -> first verified public key
+    NAME_REGISTRY: 'p2p_name_pins', // TOFU pins: username -> first verified public key
+    REACTIONS: 'p2p_reactions'      // tweetId -> { reactorKey -> { name, active, ts, sig } }
   };
 
   // Database configuration
@@ -327,6 +328,15 @@ export class StorageManager {
     return (await this.loadFromStorage(StorageManager.KEYS.NAME_REGISTRY)) || {};
   }
 
+  // ---- Reactions (tweetId -> reactorKey -> record) ----
+  async saveReactions(map) {
+    await this.saveToStorage(StorageManager.KEYS.REACTIONS, map);
+  }
+
+  async loadReactions() {
+    return (await this.loadFromStorage(StorageManager.KEYS.REACTIONS)) || {};
+  }
+
   // Clear all data (for account deletion)
   async clearAllData() {
     await this.deleteUserCredentials();
@@ -337,6 +347,7 @@ export class StorageManager {
     await this.removeFromStorage(StorageManager.KEYS.CIRCLES);
     await this.removeFromStorage(StorageManager.KEYS.IDENTITY);
     await this.removeFromStorage(StorageManager.KEYS.NAME_REGISTRY);
+    await this.removeFromStorage(StorageManager.KEYS.REACTIONS);
 
     console.log('All IndexedDB data cleared');
   }

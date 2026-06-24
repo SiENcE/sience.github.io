@@ -213,6 +213,45 @@ header h1 {
     font-weight: 600;
 }
 
+/* ---- ✨ Spark reaction ---- */
+.spark-button {
+    background: rgba(121, 75, 196, 0.10);
+    color: #794bc4;
+    border: 1px solid rgba(121, 75, 196, 0.30);
+    border-radius: 999px;
+    padding: 3px 12px;
+    font-size: 0.85em;
+    cursor: pointer;
+    box-shadow: none;
+    transition: transform 0.08s ease, background 0.15s ease;
+}
+
+.spark-button:hover {
+    background: rgba(121, 75, 196, 0.2);
+    filter: none;
+    box-shadow: none;
+}
+
+.spark-button:active {
+    transform: scale(1.15);
+}
+
+.spark-button.sparked {
+    background: rgba(232, 164, 0, 0.18);
+    color: #b07d00;
+    border-color: rgba(232, 164, 0, 0.5);
+    font-weight: 600;
+}
+
+.spark-button.spark-readonly {
+    cursor: default;
+    opacity: 0.85;
+}
+
+.spark-button.spark-readonly:hover {
+    background: rgba(121, 75, 196, 0.10);
+}
+
 /* ---- Identity backup (import on login) ---- */
 .login-import {
     margin-top: 18px;

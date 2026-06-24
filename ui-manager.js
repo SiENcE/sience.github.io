@@ -325,7 +325,7 @@ export class UIManager {
 	  uploadButton.type = 'button';
 	  uploadButton.className = 'media-upload-button';
 	  uploadButton.innerHTML = '<span class="icon">📷</span>';
-	  uploadButton.title = 'Add image or GIF';
+	  uploadButton.title = 'Add image or GIF (large photos are optimized automatically)';
 	  uploadButton.style.backgroundColor = '#1da1f2';
 	  uploadButton.style.color = 'white';
 	  uploadButton.style.border = 'none';
@@ -752,12 +752,16 @@ export class UIManager {
   }
 
   /**
-   * Decide whether a tweet should appear in the currently-selected circle view.
-   * "all" shows everything; a circle shows messages authored by its members
-   * (plus your own messages).
+   * Decide whether a tweet should appear in the currently-selected feed view.
+   * "All Peers" shows only public posts — narrow-cast (circle) messages are
+   * hidden there to avoid confusion and only appear inside their circle. A
+   * selected circle shows messages authored by its members (plus your own).
    */
   tweetMatchesActiveCircle(tweet) {
-    if (this.activeCircleId === 'all' || !this.circleManager) return true;
+    if (this.activeCircleId === 'all' || !this.circleManager) {
+      // Global feed = public posts only; circle (narrow-cast) posts live in their circle.
+      return !tweet.circle;
+    }
 
     const myPeerId = this.userManager.peerId;
     if (tweet.authorId && tweet.authorId === myPeerId) return true;
@@ -1015,6 +1019,25 @@ export class UIManager {
 
     const tweetActions = document.createElement('div');
     tweetActions.className = 'tweet-actions';
+
+    // ✨ Spark — cast a sparkle onto someone else's spell (a reaction). You can't
+    // spark your own; on your own posts the button just shows the count.
+    const myKey = this.userManager.publicKey;
+    const isOwn = isMine || !!(tweet.authorKey && myKey && tweet.authorKey === myKey);
+    const { count: sparkCount, mine: sparked } = this.tweetManager.getReactionState(tweet.id);
+
+    const sparkButton = document.createElement('button');
+    sparkButton.className = 'spark-button' + (sparked ? ' sparked' : '');
+    sparkButton.textContent = sparkCount > 0 ? `✨ ${sparkCount}` : '✨';
+    if (isOwn) {
+      sparkButton.classList.add('spark-readonly');
+      sparkButton.disabled = true;
+      sparkButton.title = sparkCount === 1 ? '1 spark received' : `${sparkCount} sparks received`;
+    } else {
+      sparkButton.title = sparked ? 'Remove your spark' : 'Spark this spell';
+      sparkButton.addEventListener('click', () => this.tweetManager.toggleReaction(tweet.id));
+    }
+    tweetActions.appendChild(sparkButton);
 
     // Only add delete button for user's own tweets
     if (isMine) {
