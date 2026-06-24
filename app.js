@@ -78,6 +78,9 @@ class SpellCastApp {
         this.uiManager.updateProfileInfo();
         this.uiManager.renderTweets();
         this.uiManager.updatePeersList();
+
+        // If we were opened via a scanned "?connect=" QR link, act on it now.
+        this.uiManager.consumePendingConnect();
       } catch (error) {
         console.error('Auto-login error:', error);
         // If auto-login fails, show the intro screen

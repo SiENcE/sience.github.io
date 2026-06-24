@@ -114,9 +114,12 @@
 
                 <div id="peers-container" style="display: none;">
                     <div id="connect-form">
-                        <label for="connect-id">Connect to a peer by ID:</label>
-                        <input type="text" id="connect-id" placeholder="Enter peer ID">
-                        <button id="connect-button">Connect</button>
+                        <label for="connect-id">Connect to a peer by ID or invite link:</label>
+                        <input type="text" id="connect-id" placeholder="Paste a peer ID or invite link">
+                        <div class="connect-actions">
+                            <button id="connect-button">Connect</button>
+                            <button id="scan-qr-button" type="button" title="Scan a friend's QR code with your camera">📷 Scan QR</button>
+                        </div>
                     </div>
                     <h3>Connected Peers</h3>
                     <div id="peers-list"></div>
@@ -138,6 +141,11 @@
                         <p><strong>Username:</strong> <span id="profile-username"></span></p>
                         <p><strong>Your Peer ID:</strong> <span id="profile-peerid"></span></p>
                         <div id="profile-qrcode" class="profile-qrcode"></div>
+                        <p class="hint">Have a friend scan this code with their phone camera to connect — it opens SpellCast directly. Or send them an invite link:</p>
+                        <div class="invite-actions">
+                            <button id="share-invite-button" type="button">Share invite link</button>
+                            <button id="copy-invite-button" type="button">Copy link</button>
+                        </div>
                     </div>
                     <div class="profile-actions">
                         <button id="export-identity-button">Export Identity Backup</button>

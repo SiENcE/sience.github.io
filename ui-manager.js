@@ -15,6 +15,14 @@ export class UIManager {
     // Currently selected circle for the feed view ('all' = everything)
     this.activeCircleId = 'all';
 
+    // A `?connect=<peerId>` deep link — set when this page was opened by scanning
+    // another user's QR code. We stash it now and act on it once the app UI is
+    // shown (after login), then strip it from the URL so a refresh doesn't repeat.
+    this.pendingConnectId = new URLSearchParams(location.search).get('connect');
+    if (this.pendingConnectId) {
+      history.replaceState(null, '', location.origin + location.pathname);
+    }
+
     // ---- Feed pagination / windowing state ----
     // The full message history lives in memory (loaded from IndexedDB, capped at
     // 1000). We never render all of it at once: we keep a bounded window of DOM
@@ -87,6 +95,9 @@ export class UIManager {
       loginPeerIdInput: document.getElementById('login-peerid'),
       tweetContentInput: document.getElementById('tweet-content'),
       connectIdInput: document.getElementById('connect-id'),
+      scanQrButton: document.getElementById('scan-qr-button'),
+      shareInviteButton: document.getElementById('share-invite-button'),
+      copyInviteButton: document.getElementById('copy-invite-button'),
 
       // Information displays
       peerIdDisplay: document.getElementById('peer-id'),
@@ -173,9 +184,10 @@ export class UIManager {
         this.elements.peerIdDisplay.textContent = peerId;
         this.elements.credentialsArea.style.display = 'block';
 
-        // Generate QR code
+        // Generate QR code (encodes a connect deep link, not the raw id, so a
+        // phone camera opens SpellCast instead of running a web search)
         new QRCode(this.elements.qrcode, {
-          text: peerId,
+          text: this.buildConnectUrl(peerId),
           width: 200,
           height: 200
         });
@@ -193,6 +205,7 @@ export class UIManager {
       // Render the feed (and any already-stored history) for the new session
       this.renderTweets();
       this.updatePeersList();
+      this.consumePendingConnect();
     });
 
     this.elements.loginContinueButton.addEventListener('click', async () => {
@@ -221,6 +234,7 @@ export class UIManager {
         this.renderTweets();
         this.updatePeersList();
         this.updateProfileInfo();
+        this.consumePendingConnect();
       } catch (error) {
         console.error('Login error:', error);
         alert(`Error logging in: ${error.message}`);
@@ -259,6 +273,16 @@ export class UIManager {
     }
 
     this.elements.connectButton.addEventListener('click', this.connectToPeer);
+
+    if (this.elements.scanQrButton) {
+      this.elements.scanQrButton.addEventListener('click', () => this.openQrScanner());
+    }
+    if (this.elements.shareInviteButton) {
+      this.elements.shareInviteButton.addEventListener('click', () => this.shareInvite());
+    }
+    if (this.elements.copyInviteButton) {
+      this.elements.copyInviteButton.addEventListener('click', () => this.copyInvite());
+    }
 
     this.elements.deleteAccountButton.addEventListener('click', this.deleteAccount.bind(this));
 
@@ -551,7 +575,7 @@ export class UIManager {
       this.elements.profileQrcode.innerHTML = '';
 
       new QRCode(this.elements.profileQrcode, {
-        text: peerId,
+        text: this.buildConnectUrl(peerId),
         width: 200,
         height: 200
       });
@@ -603,22 +627,211 @@ export class UIManager {
   }
 
   /**
-   * Connect to a peer by ID
+   * Connect to a peer using whatever is in the connect field — a raw peer ID or
+   * a pasted SpellCast invite link (we extract the id from either).
    */
   connectToPeer() {
-    const peerId = this.elements.connectIdInput.value.trim();
+    const peerId = this.extractPeerId(this.elements.connectIdInput.value);
     if (!peerId) {
       alert('Please enter a peer ID');
       return;
     }
+    this.connectToPeerId(peerId);
+    this.elements.connectIdInput.value = '';
+  }
 
+  /** Connect to a specific peer id (shared by manual connect, scan, and deep link). */
+  connectToPeerId(peerId) {
     try {
       this.peerManager.connectToPeer(peerId);
-      this.elements.connectIdInput.value = '';
     } catch (error) {
       console.error('Error connecting to peer:', error);
       alert(`Error connecting to peer: ${error.message}`);
     }
+  }
+
+  /**
+   * Build a deep-link URL that encodes a peer id. Scanning the QR of this URL
+   * with a phone camera opens SpellCast (which then auto-connects) instead of
+   * feeding a bare id to a search engine. Self-referential: it points back to
+   * wherever this app is served from.
+   */
+  buildConnectUrl(peerId) {
+    return `${location.origin}${location.pathname}?connect=${encodeURIComponent(peerId)}`;
+  }
+
+  /** Extract a peer id from scanned/pasted text — a connect URL or a raw id. */
+  extractPeerId(text) {
+    if (!text) return '';
+    const trimmed = String(text).trim();
+    try {
+      const url = new URL(trimmed);
+      const c = url.searchParams.get('connect');
+      if (c) return c.trim();
+    } catch (_) { /* not a URL — treat the whole thing as a raw id */ }
+    return trimmed;
+  }
+
+  /**
+   * Act on a `?connect=<peerId>` deep link captured at startup (from a scanned
+   * QR), once the user is logged in and the peer network is up.
+   */
+  consumePendingConnect() {
+    const raw = this.pendingConnectId;
+    if (!raw) return;
+    this.pendingConnectId = null;
+
+    const peerId = this.extractPeerId(raw);
+    if (!peerId || peerId === this.userManager.peerId) return;
+
+    if (confirm(`Connect to peer "${peerId}"?`)) {
+      this.activateTab('peers');
+      this.connectToPeerId(peerId);
+    }
+  }
+
+  /** Share an invite link via the OS share sheet (mobile), falling back to copy. */
+  shareInvite() {
+    const url = this.buildConnectUrl(this.userManager.peerId);
+    if (navigator.share) {
+      navigator.share({
+        title: 'Connect with me on SpellCast',
+        text: 'Add me on SpellCast — open this link to connect:',
+        url
+      }).catch(() => { /* user cancelled / unsupported */ });
+    } else {
+      this.copyInvite();
+    }
+  }
+
+  /** Copy the invite link to the clipboard (so it can be shared without typing). */
+  copyInvite() {
+    const url = this.buildConnectUrl(this.userManager.peerId);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url)
+        .then(() => alert('Invite link copied to clipboard.'))
+        .catch(() => window.prompt('Copy this invite link:', url));
+    } else {
+      window.prompt('Copy this invite link:', url);
+    }
+  }
+
+  /** Lazily load the locally-vendored jsQR decoder (served from our own origin). */
+  loadJsQR() {
+    if (window.jsQR) return Promise.resolve(window.jsQR);
+    if (this._jsQRPromise) return this._jsQRPromise;
+    this._jsQRPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'jsQR.min.js'; // same-origin → allowed by `script-src 'self'`
+      s.onload = () => window.jsQR ? resolve(window.jsQR) : reject(new Error('jsQR unavailable'));
+      s.onerror = () => reject(new Error('Failed to load QR decoder'));
+      document.head.appendChild(s);
+    });
+    return this._jsQRPromise;
+  }
+
+  /**
+   * Open an in-app QR scanner: stream the (rear) camera, decode any SpellCast QR,
+   * and connect to the peer it encodes. Uses the native BarcodeDetector when the
+   * browser has it, otherwise the vendored jsQR decoder.
+   */
+  async openQrScanner() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Camera scanning is not available in this browser. Use your phone camera to scan the QR (it opens SpellCast), or paste the peer ID.');
+      return;
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'qr-scanner-overlay';
+    const video = document.createElement('video');
+    video.className = 'qr-scanner-video';
+    video.setAttribute('playsinline', '');
+    video.muted = true;
+    const status = document.createElement('div');
+    status.className = 'qr-scanner-status';
+    status.textContent = 'Point your camera at a SpellCast QR code…';
+    const cancel = document.createElement('button');
+    cancel.className = 'qr-scanner-cancel';
+    cancel.textContent = 'Cancel';
+    overlay.appendChild(video);
+    overlay.appendChild(status);
+    overlay.appendChild(cancel);
+    document.body.appendChild(overlay);
+
+    let stream = null;
+    let stopped = false;
+    const cleanup = () => {
+      stopped = true;
+      if (stream) stream.getTracks().forEach(t => t.stop());
+      overlay.remove();
+    };
+    cancel.addEventListener('click', cleanup);
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      video.srcObject = stream;
+      await video.play();
+    } catch (err) {
+      console.error('Camera error:', err);
+      status.textContent = 'Could not access the camera — check the permission and that the page is served over HTTPS.';
+      setTimeout(cleanup, 3000);
+      return;
+    }
+
+    // Choose a decoder: native BarcodeDetector, else the vendored jsQR.
+    let detect = null;
+    if ('BarcodeDetector' in window) {
+      try {
+        const bd = new window.BarcodeDetector({ formats: ['qr_code'] });
+        detect = async () => {
+          const codes = await bd.detect(video);
+          return codes && codes.length ? codes[0].rawValue : null;
+        };
+      } catch (_) { detect = null; }
+    }
+    if (!detect) {
+      let jsQR;
+      try {
+        jsQR = await this.loadJsQR();
+      } catch (e) {
+        status.textContent = 'Could not load the QR decoder.';
+        setTimeout(cleanup, 3000);
+        return;
+      }
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      detect = async () => {
+        if (!video.videoWidth) return null;
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const res = jsQR(img.data, img.width, img.height);
+        return res ? res.data : null;
+      };
+    }
+
+    const tick = async () => {
+      if (stopped) return;
+      let value = null;
+      try { value = await detect(); } catch (_) { /* keep scanning */ }
+      if (value) {
+        const peerId = this.extractPeerId(value);
+        cleanup();
+        if (!peerId) return;
+        if (peerId === this.userManager.peerId) {
+          alert("That's your own QR code.");
+          return;
+        }
+        if (confirm(`Connect to peer "${peerId}"?`)) {
+          this.activateTab('peers');
+          this.connectToPeerId(peerId);
+        }
+        return;
+      }
+      setTimeout(tick, 120); // ~8 scans/sec; pauses naturally when the modal closes
+    };
+    setTimeout(tick, 120);
   }
 
   /**
@@ -730,6 +943,7 @@ export class UIManager {
       this.renderTweets();
       this.updatePeersList();
       this.updateProfileInfo();
+      this.consumePendingConnect();
 
       alert(`Welcome back, ${handleFor(username, identity.publicKeyB64)}. Your identity was restored.`);
     } catch (error) {

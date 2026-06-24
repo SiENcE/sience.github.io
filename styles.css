@@ -213,6 +213,66 @@ header h1 {
     font-weight: 600;
 }
 
+/* ---- Connect / invite / QR scanner ---- */
+.connect-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+#scan-qr-button {
+    background: rgba(29, 161, 242, 0.12);
+    color: #1da1f2;
+    border: 1px solid rgba(29, 161, 242, 0.35);
+}
+
+.invite-actions {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 8px;
+}
+
+.qr-scanner-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    background: rgba(0, 0, 0, 0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 20px;
+}
+
+.qr-scanner-video {
+    width: min(92vw, 420px);
+    height: min(92vw, 420px);
+    object-fit: cover;
+    border-radius: 16px;
+    background: #000;
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.15), 0 0 0 9999px rgba(0, 0, 0, 0.4);
+}
+
+.qr-scanner-status {
+    color: #fff;
+    font-size: 0.95em;
+    text-align: center;
+    max-width: 420px;
+}
+
+.qr-scanner-cancel {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    border-radius: 999px;
+    padding: 10px 28px;
+    font-size: 1em;
+    cursor: pointer;
+}
+
 /* ---- ✨ Spark reaction ---- */
 .spark-button {
     background: rgba(121, 75, 196, 0.10);
