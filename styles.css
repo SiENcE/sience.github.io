@@ -177,6 +177,42 @@ header h1 {
     height: 1px;
 }
 
+/* ---- Identity / trust indicators ---- */
+.tweet-fingerprint {
+    color: #8899a6;
+    font-weight: 400;
+    font-size: 0.85em;
+    margin-left: 2px;
+}
+
+.trust-badge {
+    font-size: 0.72em;
+    padding: 1px 7px;
+    border-radius: 999px;
+    margin-left: 6px;
+    white-space: nowrap;
+    cursor: help;
+}
+
+.trust-verified {
+    background: rgba(23, 191, 99, 0.12);
+    color: #17bf63;
+    border: 1px solid rgba(23, 191, 99, 0.35);
+}
+
+.trust-unverified {
+    background: rgba(136, 153, 166, 0.12);
+    color: #8899a6;
+    border: 1px solid rgba(136, 153, 166, 0.3);
+}
+
+.trust-conflict {
+    background: rgba(224, 36, 94, 0.14);
+    color: #e0245e;
+    border: 1px solid rgba(224, 36, 94, 0.4);
+    font-weight: 600;
+}
+
 /* Media-preview buttons set their own background inline — clear the gradient image */
 .media-upload-button,
 .clear-media-button {

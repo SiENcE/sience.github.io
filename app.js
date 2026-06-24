@@ -39,6 +39,10 @@ class SpellCastApp {
     // Check for saved credentials
     const hasCredentials = await this.userManager.checkSavedCredentials();
 
+    // Load (or, for legacy accounts, mint) the signing keypair before any
+    // message can be created, sent, or verified.
+    await this.userManager.ensureIdentity();
+
     // Setup event listeners and UI
     this.uiManager.setupEventListeners();
     this.peerManager.enhanceConnectivity();
@@ -49,6 +53,7 @@ class SpellCastApp {
     // overwrite stored history, and the feed could render empty on re-login.
     await this.tweetManager.loadTweets();
     await this.tweetManager.loadMessageDistributionState();
+    await this.tweetManager.loadNameRegistry();
     await this.peerManager.loadPeers();
     await this.circleManager.loadCircles();
 
@@ -60,6 +65,9 @@ class SpellCastApp {
       try {
         // Attempt to login to the peer network with saved credentials
         await this.peerManager.loginToPeer();
+
+        // Claim our own name->key binding so impersonators of us get flagged.
+        await this.tweetManager.pinOwnIdentity();
 
         // Show the app UI
         this.uiManager.elements.appContainer.style.display = 'block';

@@ -1,5 +1,7 @@
 // Manages user information and authentication
 
+import { CryptoIdentity } from './crypto-identity.js';
+
 export class UserManager {
   constructor(storageManager) {
     this.storageManager = storageManager;
@@ -8,12 +10,49 @@ export class UserManager {
     this.username = '';
     this.peerId = '';
 
+    // Cryptographic signing identity (the real, unforgeable identity).
+    this.identity = new CryptoIdentity(null, null);
+
     // Bind methods
     this.checkSavedCredentials = this.checkSavedCredentials.bind(this);
     this.saveCredentials = this.saveCredentials.bind(this);
     this.loginWithCredentials = this.loginWithCredentials.bind(this);
     this.deleteAccount = this.deleteAccount.bind(this);
     this.reset = this.reset.bind(this);
+    this.ensureIdentity = this.ensureIdentity.bind(this);
+  }
+
+  /** The user's public key (base64), or null if WebCrypto is unavailable. */
+  get publicKey() {
+    return this.identity ? this.identity.publicKeyB64 : null;
+  }
+
+  /**
+   * Load the signing keypair from storage, or generate + persist a fresh one.
+   * Existing (pre-P0) accounts have no key, so this transparently mints one the
+   * first time they run an upgraded build. Idempotent.
+   * @returns {Promise<CryptoIdentity>}
+   */
+  async ensureIdentity() {
+    if (this.identity && this.identity.available) return this.identity;
+
+    const stored = await this.storageManager.loadIdentity();
+    if (stored && stored.privateKey && stored.publicKeyB64) {
+      this.identity = new CryptoIdentity(stored.privateKey, stored.publicKeyB64);
+      return this.identity;
+    }
+
+    const fresh = await CryptoIdentity.generate();
+    this.identity = fresh;
+    if (fresh.available) {
+      await this.storageManager.saveIdentity({
+        privateKey: fresh.privateKey,
+        publicKeyB64: fresh.publicKeyB64
+      });
+    } else {
+      console.warn('WebCrypto unavailable — messages will be sent unsigned (use HTTPS or localhost).');
+    }
+    return this.identity;
   }
 
 	// In checkSavedCredentials()
@@ -63,6 +102,7 @@ export class UserManager {
   reset() {
     this.username = '';
     this.peerId = '';
+    this.identity = new CryptoIdentity(null, null);
   }
 
   /**

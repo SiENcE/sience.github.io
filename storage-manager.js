@@ -9,7 +9,9 @@ export class StorageManager {
     PEERS: 'p2p_saved_peers',
     TWEET_RECIPIENTS: 'p2p_tweet_recipients',
     UNSENT_TWEETS: 'p2p_unsent_tweets',
-    CIRCLES: 'p2p_circles'
+    CIRCLES: 'p2p_circles',
+    IDENTITY: 'p2p_identity',       // signing keypair { privateKey: CryptoKey, publicKeyB64 }
+    NAME_REGISTRY: 'p2p_name_pins'  // TOFU pins: username -> first verified public key
   };
 
   // Database configuration
@@ -300,9 +302,29 @@ export class StorageManager {
   async deleteUserCredentials() {
     this.deleteCookie(StorageManager.KEYS.USERNAME);
     this.deleteCookie(StorageManager.KEYS.PEER_ID);
-    
+
     await this.removeFromStorage(StorageManager.KEYS.USERNAME);
     await this.removeFromStorage(StorageManager.KEYS.PEER_ID);
+  }
+
+  // ---- Signing identity (keypair) ----
+  // The value contains a non-extractable CryptoKey, which IndexedDB persists via
+  // structured clone — the private key material never becomes script-readable.
+  async saveIdentity(identityRecord) {
+    await this.saveToStorage(StorageManager.KEYS.IDENTITY, identityRecord);
+  }
+
+  async loadIdentity() {
+    return this.loadFromStorage(StorageManager.KEYS.IDENTITY);
+  }
+
+  // ---- TOFU name registry (username -> first verified public key) ----
+  async saveNameRegistry(map) {
+    await this.saveToStorage(StorageManager.KEYS.NAME_REGISTRY, map);
+  }
+
+  async loadNameRegistry() {
+    return (await this.loadFromStorage(StorageManager.KEYS.NAME_REGISTRY)) || {};
   }
 
   // Clear all data (for account deletion)
@@ -313,6 +335,8 @@ export class StorageManager {
     await this.removeFromStorage(StorageManager.KEYS.TWEET_RECIPIENTS);
     await this.removeFromStorage(StorageManager.KEYS.UNSENT_TWEETS);
     await this.removeFromStorage(StorageManager.KEYS.CIRCLES);
+    await this.removeFromStorage(StorageManager.KEYS.IDENTITY);
+    await this.removeFromStorage(StorageManager.KEYS.NAME_REGISTRY);
 
     console.log('All IndexedDB data cleared');
   }

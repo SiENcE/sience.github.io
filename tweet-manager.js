@@ -2,6 +2,7 @@
 
 import { StorageManager } from './storage-manager.js';
 import { RateLimiter } from './rate-limiter.js';
+import { verifySignature } from './crypto-identity.js';
 
 export class TweetManager {
 	constructor(userManager, peerManager, storageManager, mediaManager) {
@@ -19,10 +20,16 @@ export class TweetManager {
 		this.MAX_THUMBNAIL_BYTES = 64 * 1024;      // Max inline thumbnail size (~64 KB)
 		this.MAX_FULLIMAGE_BYTES = 5 * 1024 * 1024; // Max full image accepted from a peer (~5 MB)
 		this.MAX_BULK_TWEETS = 500;      // Cap on tweets accepted in one all_tweets message
+		this.MAX_KEY_B64 = 256;          // Generous bound for a base64 public key / signature
 		this.VALID_TWEET_PROPS = [
 		  'id', 'username', 'content', 'timestamp', 'mediaId', 'mediaThumbnail', 'mediaType',
-		  'authorId', 'circle'
-		]; // Updated valid properties (authorId = author's peer ID, circle = audience name)
+		  'authorId', 'circle',
+		  // P0 identity fields:
+		  'authorKey',    // author's public key (base64) — the real, signed identity
+		  'signature',    // ECDSA signature over the canonical signed fields
+		  'verified',     // LOCAL-ONLY: did this tweet's signature verify? (never from wire)
+		  'nameConflict'  // LOCAL-ONLY: a different key already owns this username (TOFU)
+		]; // (authorId = author's peer ID, circle = audience name)
 
 		// Add rate limiter instance
 		this.rateLimiter = new RateLimiter();
@@ -35,6 +42,11 @@ export class TweetManager {
 		this.tweets = [];
 		this.tweetRecipients = {}; // Maps tweet IDs to arrays of peer IDs who have received it
 		this.unsentTweets = {};    // Maps peer IDs to arrays of tweet IDs that need to be sent
+
+		// TOFU name registry: username -> the first public key we saw verified
+		// using that name. A later *different* key using the same name is flagged
+		// as a possible impersonator. Loaded from storage in loadNameRegistry().
+		this.nameRegistry = {};
 
 		// Add event callbacks
 		this.onTweetsUpdated = null; // Add this callback for UI updates
@@ -61,6 +73,7 @@ export class TweetManager {
 		this.broadcastTweet = this.broadcastTweet.bind(this);
 		this.validateTweet = this.validateTweet.bind(this);
 		this.generateUniqueId = this.generateUniqueId.bind(this);
+		this.loadNameRegistry = this.loadNameRegistry.bind(this);
 
 		// On new peer connection, sync messages in both directions
 		this.peerManager.onPeerConnected((conn) => {
@@ -202,11 +215,21 @@ export class TweetManager {
 			? this.peerManager.getConnectedPeerIds().filter(id => targetPeerIds.includes(id))
 			: this.peerManager.getConnectedPeerIds();
 
+		// Sign the message with our private key so peers can verify it really
+		// came from this identity (and no relay tampered with it).
+		const authorKey = this.userManager.publicKey;
+		const signature = authorKey
+			? await this.userManager.identity.sign(
+				this.signedFields({ authorKey, username, content, timestamp, id: tweetId, mediaId, circle: circleName }))
+			: null;
+
 		// Add tweet locally (with author id and, for circle posts, the audience name)
-		this.addTweet(username, content, timestamp, connectedPeerIds, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName);
+		this.addTweet(username, content, timestamp, connectedPeerIds, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName,
+			{ authorKey, signature, verified: !!signature });
 
 		// Send to peers (awaits loading the full image for transfer)
-		await this.broadcastTweet(content, timestamp, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName, targetPeerIds);
+		await this.broadcastTweet(content, timestamp, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName, targetPeerIds,
+			{ authorKey, signature });
 
 		// Notify listeners
 		if (typeof this.onTweetsUpdated === 'function') {
@@ -228,7 +251,7 @@ export class TweetManager {
 	 * @param {string} [mediaType]
 	 * @returns {string} - Tweet ID
 	 */
-	  addTweet(username, content, timestamp, recipients = null, id = null, mediaId = null, mediaThumbnail = null, mediaType = null, authorId = null, circle = null) {
+	  addTweet(username, content, timestamp, recipients = null, id = null, mediaId = null, mediaThumbnail = null, mediaType = null, authorId = null, circle = null, identity = {}) {
 		const tweetId = id || this.generateUniqueId(username, content, timestamp);
 
 		// Check if we already have this tweet
@@ -258,6 +281,14 @@ export class TweetManager {
 		if (circle) {
 		  tweet.circle = circle;
 		}
+
+		// Identity: the signed public key + signature travel with the tweet (so we
+		// can relay them); verified/nameConflict are LOCAL trust flags computed by
+		// the caller (never taken from the wire).
+		if (identity.authorKey) tweet.authorKey = identity.authorKey;
+		if (identity.signature) tweet.signature = identity.signature;
+		tweet.verified = !!identity.verified;
+		if (identity.nameConflict) tweet.nameConflict = true;
 
 		// Validate tweet before adding
 		if (!this.validateTweet(tweet)) {
@@ -413,6 +444,11 @@ export class TweetManager {
 		if (tweet.circle) {
 			payload.circle = tweet.circle;
 		}
+
+		// Relay the original author's signature untouched so downstream peers can
+		// verify it against the original author's key (not ours).
+		if (tweet.authorKey) payload.authorKey = tweet.authorKey;
+		if (tweet.signature) payload.signature = tweet.signature;
 
 		if (tweet.mediaId) {
 			payload.mediaId = tweet.mediaId;
@@ -592,7 +628,7 @@ export class TweetManager {
 	 * @param {string} mediaThumbnail
 	 * @param {string} mediaType
 	 */
-	  async broadcastTweet(content, timestamp, tweetId, mediaId = null, mediaThumbnail = null, mediaType = null, authorId = null, circleName = null, targetPeerIds = null) {
+	  async broadcastTweet(content, timestamp, tweetId, mediaId = null, mediaThumbnail = null, mediaType = null, authorId = null, circleName = null, targetPeerIds = null, identity = {}) {
 		const { username } = this.userManager.getUserInfo();
 
 		const tweetData = {
@@ -606,6 +642,10 @@ export class TweetManager {
 		if (authorId) {
 		  tweetData.authorId = authorId;
 		}
+
+		// Carry the identity proof so receivers can verify authorship.
+		if (identity.authorKey) tweetData.authorKey = identity.authorKey;
+		if (identity.signature) tweetData.signature = identity.signature;
 		// Circle posts carry the audience name and are sent only to those peers;
 		// they are intentionally not multi-hop relayed or bulk-synced.
 		if (circleName) {
@@ -709,6 +749,15 @@ export class TweetManager {
 		if (tweet.circle !== undefined && typeof tweet.circle !== 'string') return false;
 		if (tweet.circle !== undefined && tweet.circle.length > this.MAX_CIRCLE_LENGTH) return false;
 
+		// Identity fields: public key + signature must be bounded strings if present
+		if (tweet.authorKey !== undefined &&
+			(typeof tweet.authorKey !== 'string' || tweet.authorKey.length > this.MAX_KEY_B64)) return false;
+		if (tweet.signature !== undefined &&
+			(typeof tweet.signature !== 'string' || tweet.signature.length > this.MAX_KEY_B64)) return false;
+		// verified / nameConflict are locally-derived booleans (never trusted from wire)
+		if (tweet.verified !== undefined && typeof tweet.verified !== 'boolean') return false;
+		if (tweet.nameConflict !== undefined && typeof tweet.nameConflict !== 'boolean') return false;
+
 		// Check for unexpected properties
 		const tweetProps = Object.keys(tweet);
 		for (const prop of tweetProps) {
@@ -721,6 +770,87 @@ export class TweetManager {
 
 		return true;
 	  }
+
+	/**
+	 * Extract the exact set of fields that are covered by a message signature.
+	 * Signer and verifier MUST agree on this — it is delegated to
+	 * crypto-identity's canonical encoder. Accepts either a stored tweet or a
+	 * raw wire payload.
+	 * @param {Object} t
+	 * @returns {Object}
+	 */
+	signedFields(t) {
+		return {
+			authorKey: t.authorKey || '',
+			username: t.username || '',
+			content: t.content || '',
+			timestamp: t.timestamp || 0,
+			id: t.id || '',
+			mediaId: t.mediaId || '',
+			circle: t.circle || ''
+		};
+	}
+
+	/** Load the TOFU name registry from storage (call once at startup). */
+	async loadNameRegistry() {
+		try {
+			this.nameRegistry = await this.storageManager.loadNameRegistry();
+		} catch (err) {
+			console.warn('Could not load name registry:', err);
+			this.nameRegistry = {};
+		}
+	}
+
+	/**
+	 * Trust-on-first-use binding of a username to a public key. Only called for
+	 * tweets whose signature has already verified. The first verified key seen
+	 * for a name "owns" it locally; a later, different key using the same name is
+	 * reported as a conflict (possible impersonator).
+	 * @param {string} username
+	 * @param {string} authorKey - verified public key (base64)
+	 * @returns {Promise<boolean>} - true if this is a name/key conflict
+	 */
+	async pinAndCheckName(username, authorKey) {
+		if (!username || !authorKey) return false;
+		const existing = this.nameRegistry[username];
+		if (!existing) {
+			this.nameRegistry[username] = authorKey;
+			try { await this.storageManager.saveNameRegistry(this.nameRegistry); } catch (_) {}
+			return false;
+		}
+		return existing !== authorKey;
+	}
+
+	/**
+	 * Claim our own username->key binding locally (if the name is still free), so
+	 * a message arriving under our name but signed by a *different* key is flagged
+	 * as an impersonator rather than silently trusted.
+	 */
+	async pinOwnIdentity() {
+		const { username } = this.userManager.getUserInfo();
+		const key = this.userManager.publicKey;
+		if (!username || !key) return;
+		if (!this.nameRegistry[username]) {
+			this.nameRegistry[username] = key;
+			try { await this.storageManager.saveNameRegistry(this.nameRegistry); } catch (_) {}
+		}
+	}
+
+	/**
+	 * Verify a received message's signature and resolve its trust state.
+	 * @param {Object} data - raw wire payload (has authorKey/signature or not)
+	 * @returns {Promise<{verified: boolean, nameConflict: boolean}>}
+	 */
+	async resolveTrust(data) {
+		if (!data.authorKey || !data.signature) {
+			// Unsigned (legacy / un-upgraded peer): accepted but never "verified".
+			return { verified: false, nameConflict: false };
+		}
+		const ok = await verifySignature(data.authorKey, data.signature, this.signedFields(data));
+		if (!ok) return { verified: false, nameConflict: false };
+		const nameConflict = await this.pinAndCheckName(data.username, data.authorKey);
+		return { verified: true, nameConflict };
+	}
 
 	/**
 	 * Generate a unique ID for a tweet.
@@ -865,13 +995,9 @@ export class TweetManager {
 		batches.forEach((batch, index) => {
 			setTimeout(async () => {
 				try {
-					// Attach the full image to any media tweets so the receiving
-					// peer can store it in its own IndexedDB (not just the thumbnail).
-					const enrichedTweets = await Promise.all(batch.map(async (tweet) => {
-						if (!tweet.mediaId) return tweet;
-						const fullImage = await this.getFullImageData(tweet.mediaId);
-						return fullImage ? { ...tweet, fullImage } : tweet;
-					}));
+					// Build sanitized wire payloads (carries the signature + full
+					// image; omits local-only trust flags like `verified`).
+					const enrichedTweets = await Promise.all(batch.map(tweet => this.buildTweetPayload(tweet)));
 
 					conn.send({
 						type: 'all_tweets',
@@ -943,9 +1069,20 @@ export class TweetManager {
 			}
 			if (data.authorId) tweetData.authorId = data.authorId;
 			if (data.circle) tweetData.circle = data.circle;
+			if (data.authorKey) tweetData.authorKey = data.authorKey;
+			if (data.signature) tweetData.signature = data.signature;
 
 			if (!this.validateTweet(tweetData)) {
 				console.error('Received invalid tweet from peer', conn.peer, data);
+				return;
+			}
+
+			// Verify the signature (if any) and resolve trust state. A *present*
+			// but invalid signature means the message was forged or tampered with
+			// — drop it outright rather than show a forgery.
+			const trust = await this.resolveTrust(data);
+			if (data.signature && !trust.verified) {
+				console.warn('Dropping tweet with invalid signature from peer', conn.peer);
 				return;
 			}
 
@@ -969,7 +1106,9 @@ export class TweetManager {
 				data.mediaThumbnail || null,
 				data.mediaType || null,
 				data.authorId || null,
-				data.circle || null
+				data.circle || null,
+				{ authorKey: data.authorKey || null, signature: data.signature || null,
+				  verified: trust.verified, nameConflict: trust.nameConflict }
 			);
 
 			// Mark as received from this peer
@@ -1068,10 +1207,19 @@ export class TweetManager {
 					}
 					if (tweet.authorId) cleanTweet.authorId = tweet.authorId;
 					if (tweet.circle) cleanTweet.circle = tweet.circle;
+					if (tweet.authorKey) cleanTweet.authorKey = tweet.authorKey;
+					if (tweet.signature) cleanTweet.signature = tweet.signature;
 
 					// Validate each tweet
 					if (!this.validateTweet(cleanTweet)) {
 						console.error('Skipping invalid tweet in bulk message:', tweet);
+						continue;
+					}
+
+					// Verify signature (if present); drop forged/tampered ones.
+					const trust = await this.resolveTrust(cleanTweet);
+					if (cleanTweet.signature && !trust.verified) {
+						console.warn('Skipping bulk tweet with invalid signature from peer', conn.peer);
 						continue;
 					}
 
@@ -1101,7 +1249,9 @@ export class TweetManager {
 						cleanTweet.mediaThumbnail || null,
 						cleanTweet.mediaType || null,
 						cleanTweet.authorId || null,
-						cleanTweet.circle || null
+						cleanTweet.circle || null,
+						{ authorKey: cleanTweet.authorKey || null, signature: cleanTweet.signature || null,
+						  verified: trust.verified, nameConflict: trust.nameConflict }
 					);
 
 					// Mark as received from this peer

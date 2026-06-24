@@ -1,6 +1,7 @@
 // Manages UI components, event listeners and display logic
 
 import { linkify, extractUrls, buildLinkPreview } from './link-preview.js';
+import { fingerprint, handleFor } from './crypto-identity.js';
 
 export class UIManager {
   constructor(userManager, peerManager, tweetManager, storageManager, mediaManager, circleManager) {
@@ -163,6 +164,10 @@ export class UIManager {
         // Initialize peer connection
         const peerId = await this.peerManager.initializePeer();
 
+        // Mint the signing keypair for this brand-new account.
+        await this.userManager.ensureIdentity();
+        await this.tweetManager.pinOwnIdentity();
+
         // Display the peer ID and QR code
         this.elements.peerIdDisplay.textContent = peerId;
         this.elements.credentialsArea.style.display = 'block';
@@ -201,6 +206,8 @@ export class UIManager {
       try {
         // Save credentials and login
         this.userManager.loginWithCredentials(username, peerId);
+        await this.userManager.ensureIdentity();
+        await this.tweetManager.pinOwnIdentity();
         await this.peerManager.loginToPeer();
 
         // Hide login screens, show app
@@ -536,7 +543,8 @@ export class UIManager {
    */
   updateProfileInfo() {
     const { username, peerId } = this.userManager.getUserInfo();
-    this.elements.profileUsername.textContent = username;
+    // Show the verifiable handle `name#fingerprint` rather than the bare name.
+    this.elements.profileUsername.textContent = handleFor(username, this.userManager.publicKey);
     this.elements.profilePeerId.textContent = peerId;
 
     // Generate QR code for profile if not already generated
@@ -836,7 +844,10 @@ export class UIManager {
     const tweetMain = document.createElement('div');
     tweetMain.className = 'tweet-main';
 
-    const avatar = this.createAvatar(tweet.username, isMine);
+    // Avatar shows the username's initial but its COLOR is seeded by the
+    // author's KEY when we have one, so two users with the same name still look
+    // different (and impersonators don't inherit a victim's avatar colour).
+    const avatar = this.createAvatar(tweet.username, isMine, tweet.authorKey || tweet.username);
     tweetMain.appendChild(avatar);
 
     const tweetBody = document.createElement('div');
@@ -848,7 +859,17 @@ export class UIManager {
     const tweetUser = document.createElement('div');
     tweetUser.className = 'tweet-user';
     tweetUser.textContent = tweet.username;
+    if (tweet.authorKey) {
+      // Append the short key fingerprint so the displayed handle is `name#abcd`.
+      const fp = document.createElement('span');
+      fp.className = 'tweet-fingerprint';
+      fp.textContent = `#${fingerprint(tweet.authorKey)}`;
+      tweetUser.appendChild(fp);
+    }
     tweetHeader.appendChild(tweetUser);
+
+    // Trust badge: verified ✓, impersonation ⚠, or unverified (legacy/unsigned).
+    tweetHeader.appendChild(this.buildTrustBadge(tweet, isMine));
 
     // Show the audience badge for circle (narrow-cast) messages
     if (tweet.circle) {
@@ -909,16 +930,48 @@ export class UIManager {
   }
 
   /**
+   * Build the trust badge shown next to a message author.
+   *  - nameConflict → a *different* key is using a name we already pinned to
+   *    someone else: a likely impersonator.
+   *  - verified → the signature checked out against the author's key.
+   *  - otherwise → unsigned / legacy message we cannot vouch for.
+   * @param {Object} tweet
+   * @param {boolean} isMine
+   * @returns {HTMLElement}
+   */
+  buildTrustBadge(tweet, isMine) {
+    const badge = document.createElement('span');
+    badge.classList.add('trust-badge');
+
+    if (tweet.nameConflict) {
+      badge.classList.add('trust-conflict');
+      badge.textContent = '⚠ impersonator?';
+      badge.title = 'A different key has already been seen using this username. '
+        + 'This message is signed by a DIFFERENT key — it may be an impersonator.';
+    } else if (tweet.verified) {
+      badge.classList.add('trust-verified');
+      badge.textContent = isMine ? '✓ you' : '✓ verified';
+      badge.title = 'Signature verified against this author\'s key.';
+    } else {
+      badge.classList.add('trust-unverified');
+      badge.textContent = 'unverified';
+      badge.title = 'This message is not signed (a legacy or un-upgraded peer); '
+        + 'its author cannot be cryptographically verified.';
+    }
+    return badge;
+  }
+
+  /**
    * Build a circular avatar element with the user's initial.
    * @param {string} name
    * @param {boolean} isSelf - your own avatar is rendered in the brand color
    * @returns {HTMLElement}
    */
-  createAvatar(name, isSelf = false) {
+  createAvatar(name, isSelf = false, colorSeed = null) {
     const avatar = document.createElement('div');
     avatar.className = 'avatar';
     avatar.textContent = this.getInitial(name);
-    avatar.style.backgroundColor = this.getAvatarColor(name, isSelf);
+    avatar.style.backgroundColor = this.getAvatarColor(colorSeed || name, isSelf);
     return avatar;
   }
 

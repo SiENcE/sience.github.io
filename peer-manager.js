@@ -556,7 +556,8 @@ export class PeerManager {
       if (!this.handshakeCompleted.has(conn.peer)) {
         conn.send({
           type: 'handshake',
-          username: this.userManager.username
+          username: this.userManager.username,
+          publicKey: this.userManager.publicKey
         });
       }
 
@@ -1032,7 +1033,12 @@ export class PeerManager {
     // Update the username of this peer
     const connectionIndex = this.connections.findIndex(c => c.peer === conn.peer);
     if (connectionIndex !== -1) {
-      this.connections[connectionIndex].metadata = { username: data.username };
+      // Note: handshake username/publicKey are self-asserted and used only for
+      // display. Authorship is trusted only via per-message signatures.
+      this.connections[connectionIndex].metadata = {
+        username: data.username,
+        publicKey: data.publicKey || null
+      };
       this.savePeers();
     }
 
@@ -1040,7 +1046,8 @@ export class PeerManager {
     if (!this.handshakeCompleted.has(conn.peer)) {
       conn.send({
         type: 'handshake',
-        username: this.userManager.username
+        username: this.userManager.username,
+        publicKey: this.userManager.publicKey
       });
       // Mark handshake as completed for this peer
       this.handshakeCompleted.add(conn.peer);
