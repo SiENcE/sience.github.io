@@ -9,6 +9,7 @@
 // name their own circles.
 
 import { StorageManager } from './storage-manager.js';
+import { randomToken } from './crypto-identity.js';
 
 export class CircleManager {
   constructor(storageManager) {
@@ -50,8 +51,7 @@ export class CircleManager {
    * being globally unique (a short random suffix is plenty for local ids).
    */
   generateId() {
-    const rand = Math.random().toString(36).slice(2, 8);
-    return `circle_${Date.now()}_${rand}`;
+    return `circle_${Date.now()}_${randomToken(6)}`;
   }
 
   getCircles() {

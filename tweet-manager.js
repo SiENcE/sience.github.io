@@ -20,6 +20,8 @@ export class TweetManager {
 		this.MAX_THUMBNAIL_BYTES = 64 * 1024;      // Max inline thumbnail size (~64 KB)
 		this.MAX_FULLIMAGE_BYTES = 5 * 1024 * 1024; // Max full image accepted from a peer (~5 MB)
 		this.MAX_BULK_TWEETS = 500;      // Cap on tweets accepted in one all_tweets message
+		this.MAX_RELAY_HOPS = 6;         // Max times a tweet is forwarded across the mesh
+		this.MAX_RELAY_FANOUT = 32;      // Max peers we relay a single tweet to at once
 		this.MAX_KEY_B64 = 256;          // Generous bound for a base64 public key / signature
 		this.VALID_TWEET_PROPS = [
 		  'id', 'username', 'content', 'timestamp', 'mediaId', 'mediaThumbnail', 'mediaType',
@@ -497,7 +499,7 @@ export class TweetManager {
 	 * @param {Object} tweet - The stored tweet object to relay
 	 * @param {string} fromPeerId - The peer we received this tweet from
 	 */
-	async relayTweet(tweet, fromPeerId) {
+	async relayTweet(tweet, fromPeerId, incomingHops = 0) {
 		const tweetId = tweet.id;
 
 		// Circle (narrow-cast) messages are delivered only to their audience and
@@ -506,14 +508,26 @@ export class TweetManager {
 			return;
 		}
 
+		// Hop limit: stop forwarding once a tweet has travelled MAX_RELAY_HOPS so a
+		// malicious injector cannot drive an unbounded broadcast storm. (Loops are
+		// already prevented by the per-tweet recipient tracking below.)
+		if (incomingHops >= this.MAX_RELAY_HOPS) {
+			return;
+		}
+
 		const relayData = await this.buildTweetPayload(tweet);
 		relayData.type = 'tweet';
+		relayData.hops = incomingHops + 1;
 
 		const connections = this.peerManager.getAllConnections();
 
+		let relayed = 0;
 		connections.forEach(conn => {
 			// Never echo back to the sender
 			if (conn.peer === fromPeerId) return;
+
+			// Fan-out cap: bound how many peers we forward a single tweet to.
+			if (relayed >= this.MAX_RELAY_FANOUT) return;
 
 			// Skip peers already known to have this tweet
 			if (this.tweetRecipients[tweetId] && this.tweetRecipients[tweetId].includes(conn.peer)) {
@@ -522,6 +536,7 @@ export class TweetManager {
 
 			try {
 				conn.send(relayData);
+				relayed++;
 
 				if (!this.tweetRecipients[tweetId]) {
 					this.tweetRecipients[tweetId] = [];
@@ -636,7 +651,8 @@ export class TweetManager {
 		  username: username,
 		  content: content,
 		  timestamp: timestamp,
-		  id: tweetId
+		  id: tweetId,
+		  hops: 0 // origin; incremented on each relay (see relayTweet)
 		};
 
 		if (authorId) {
@@ -1074,6 +1090,7 @@ export class TweetManager {
 
 			if (!this.validateTweet(tweetData)) {
 				console.error('Received invalid tweet from peer', conn.peer, data);
+				this.peerManager.recordPeerStrike(conn.peer);
 				return;
 			}
 
@@ -1083,6 +1100,7 @@ export class TweetManager {
 			const trust = await this.resolveTrust(data);
 			if (data.signature && !trust.verified) {
 				console.warn('Dropping tweet with invalid signature from peer', conn.peer);
+				this.peerManager.recordPeerStrike(conn.peer);
 				return;
 			}
 
@@ -1136,7 +1154,7 @@ export class TweetManager {
 			if (isNew) {
 				const storedTweet = this.tweets.find(t => t.id === tweetId);
 				if (storedTweet) {
-					await this.relayTweet(storedTweet, conn.peer);
+					await this.relayTweet(storedTweet, conn.peer, typeof data.hops === 'number' ? data.hops : 0);
 				}
 			}
 		} catch (error) {
@@ -1173,8 +1191,13 @@ export class TweetManager {
 			// Validate the tweets array
 			if (!Array.isArray(data.tweets)) {
 				console.error('Received invalid tweets array from peer', conn.peer);
+				this.peerManager.recordPeerStrike(conn.peer);
 				return;
 			}
+
+			// Track whether this message contained any abusive (invalid/forged)
+			// tweets, so we strike the peer once for the whole batch.
+			let suspicious = false;
 
 			// Cap how many tweets we will process from a single message so a
 			// malicious peer cannot pin the main thread with a giant array.
@@ -1213,6 +1236,7 @@ export class TweetManager {
 					// Validate each tweet
 					if (!this.validateTweet(cleanTweet)) {
 						console.error('Skipping invalid tweet in bulk message:', tweet);
+						suspicious = true;
 						continue;
 					}
 
@@ -1220,6 +1244,7 @@ export class TweetManager {
 					const trust = await this.resolveTrust(cleanTweet);
 					if (cleanTweet.signature && !trust.verified) {
 						console.warn('Skipping bulk tweet with invalid signature from peer', conn.peer);
+						suspicious = true;
 						continue;
 					}
 
@@ -1269,6 +1294,11 @@ export class TweetManager {
 				} catch (error) {
 					console.error('Error processing individual tweet in bulk message:', error);
 				}
+			}
+
+			// One strike for the whole batch if it carried abusive content.
+			if (suspicious) {
+				this.peerManager.recordPeerStrike(conn.peer);
 			}
 
 			// Send acknowledgment for all valid received tweets

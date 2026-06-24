@@ -2,6 +2,25 @@
 
 import { StorageManager } from './storage-manager.js';
 import { RateLimiter } from './rate-limiter.js';
+import { randomToken } from './crypto-identity.js';
+
+// ---------------------------------------------------------------------------
+// Optional self-hosted broker / TURN configuration (P2 — broker privacy).
+//
+// By default SpellCast uses the PeerJS *public cloud broker*, which can see
+// every peer id and who connects to whom (only message *payloads* are private).
+// To run your own broker (`npm i -g peer && peerjs --port 9000 --key mykey`) and
+// keep that metadata off third-party infrastructure, fill in CUSTOM_PEER_SERVER
+// below. Leave it null to use the public cloud broker.
+//
+//   const CUSTOM_PEER_SERVER = { host: 'peer.example.com', port: 443, path: '/', key: 'mykey', secure: true };
+//
+// CUSTOM_TURN_SERVERS adds authenticated TURN relays so peers behind symmetric
+// NAT can still connect (the app ships with STUN only). Example:
+//   const CUSTOM_TURN_SERVERS = [{ urls: 'turn:turn.example.com:3478', username: 'u', credential: 'p' }];
+// See docs/SELF-HOSTING.md.
+const CUSTOM_PEER_SERVER = null;
+const CUSTOM_TURN_SERVERS = [];
 
 export class PeerManager {
   constructor(userManager, storageManager) {
@@ -29,6 +48,14 @@ export class PeerManager {
     // Rate limiting constants
     this.CONNECT_MAX_ATTEMPTS = 5;    // Maximum connection attempts
     this.CONNECT_TIME_WINDOW_MS = 60000; // 1 minute window
+
+    // Inbound-message abuse resistance (P2 — mesh hardening)
+    this.INBOUND_MAX = 400;            // Max messages per peer per window...
+    this.INBOUND_WINDOW_MS = 10000;    // ...10s (generous; normal sync bursts are fine)
+    this.MAX_STRIKES = 10;             // Bad (invalid/forged/oversized) messages...
+    this.STRIKE_WINDOW_MS = 60000;     // ...within 60s before a peer is blocklisted
+    this.BLOCK_DURATION_MS = 5 * 60000; // Blocklist a misbehaving peer for 5 minutes
+    this.blockedPeers = {};            // peerId -> timestamp (ms) the block expires
 
     // Message handlers
     this.messageHandlers = {};
@@ -80,7 +107,7 @@ export class PeerManager {
 
         // Create a new peer with a random ID
         console.log('Attempting to create new peer with random ID...');
-        this.peer = new Peer(peerConfig);
+        this.peer = new Peer(this.applyCustomServer(peerConfig));
 
         // Setup event handlers
         this.peer.on('open', (id) => {
@@ -137,7 +164,7 @@ export class PeerManager {
           }
         };
 
-        this.peer = new Peer(fallbackConfig);
+        this.peer = new Peer(this.applyCustomServer(fallbackConfig));
 
         this.peer.on('open', (id) => {
           console.log('Fallback connection established with ID:', id);
@@ -205,7 +232,7 @@ export class PeerManager {
             }
           };
 
-          this.peer = new Peer(randomId, directConfig);
+          this.peer = new Peer(randomId, this.applyCustomServer(directConfig));
 
           this.peer.on('open', (id) => {
             console.log('Direct mode connection initialized with ID:', id);
@@ -248,12 +275,68 @@ export class PeerManager {
    * @returns {string} Random ID
    */
   generateLocalPeerId() {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = 'user-';
-    for (let i = 0; i < 16; i++) {
-      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    return 'user-' + randomToken(16); // CSPRNG-backed
+  }
+
+  /**
+   * Merge the optional self-hosted broker / TURN configuration into a PeerJS
+   * options object. A no-op when CUSTOM_PEER_SERVER is null and there are no
+   * custom TURN servers, so default (public-cloud) behaviour is unchanged.
+   * @param {Object} options - PeerJS options (may contain config.iceServers)
+   * @returns {Object} the same options object, mutated
+   */
+  applyCustomServer(options = {}) {
+    if (CUSTOM_TURN_SERVERS.length && options.config && Array.isArray(options.config.iceServers)) {
+      options.config.iceServers = options.config.iceServers.concat(CUSTOM_TURN_SERVERS);
     }
-    return result;
+    if (CUSTOM_PEER_SERVER) {
+      Object.assign(options, CUSTOM_PEER_SERVER); // host / port / path / key / secure
+    }
+    return options;
+  }
+
+  /** Whether a custom broker or TURN relay has been configured. */
+  hasCustomServer() {
+    return !!CUSTOM_PEER_SERVER || CUSTOM_TURN_SERVERS.length > 0;
+  }
+
+  // ---- Peer abuse resistance (P2 — mesh hardening) ----
+
+  /**
+   * Record a "strike" against a peer for sending an invalid / forged / oversized
+   * payload. Too many strikes inside the window get the peer blocklisted and
+   * disconnected. (Reuses RateLimiter: isAllowed() returns false once the strike
+   * budget is exhausted.)
+   * @param {string} peerId
+   */
+  recordPeerStrike(peerId) {
+    if (!peerId) return;
+    const withinBudget = this.rateLimiter.isAllowed('strike', peerId, this.MAX_STRIKES, this.STRIKE_WINDOW_MS);
+    if (!withinBudget) {
+      this.blocklistPeer(peerId);
+    }
+  }
+
+  /** Blocklist a peer for BLOCK_DURATION_MS and tear down its connection. */
+  blocklistPeer(peerId) {
+    if (!peerId) return;
+    this.blockedPeers[peerId] = Date.now() + this.BLOCK_DURATION_MS;
+    console.warn(`Blocklisted abusive peer ${peerId} for ${this.BLOCK_DURATION_MS / 60000} min.`);
+    const conn = this.connections.find(c => c.peer === peerId);
+    if (conn) {
+      try { this.disconnectPeer(conn); } catch (_) {}
+    }
+  }
+
+  /** Whether a peer is currently blocklisted (auto-expires). */
+  isPeerBlocked(peerId) {
+    const until = this.blockedPeers[peerId];
+    if (!until) return false;
+    if (Date.now() > until) {
+      delete this.blockedPeers[peerId];
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -275,8 +358,11 @@ export class PeerManager {
           this.peer.destroy();
         }
 
-        // Create new peer with saved ID
-        this.peer = new Peer(peerId);
+        // Create new peer with saved ID. Pass options only when a custom broker/
+        // TURN is configured, so default (public-cloud) behaviour is unchanged.
+        this.peer = this.hasCustomServer()
+          ? new Peer(peerId, this.applyCustomServer({ debug: 1, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], iceCandidatePoolSize: 10 } }))
+          : new Peer(peerId);
 
         this.peer.on('open', (id) => {
           console.log('Logged in with ID:', id);
@@ -431,7 +517,7 @@ export class PeerManager {
 
     // Create new peer with the original ID for consistent identity
     const { peerId } = this.userManager.getUserInfo();
-    this.peer = new Peer(peerId, fallbackConfig);
+    this.peer = new Peer(peerId, this.applyCustomServer(fallbackConfig));
 
     // Reconnect event handlers
     this.peer.on('open', (id) => {
@@ -575,10 +661,28 @@ export class PeerManager {
     });
 
     conn.on('data', (data) => {
+      // Drop everything from a peer we've blocklisted for abuse.
+      if (this.isPeerBlocked(conn.peer)) {
+        return;
+      }
+
+      // Per-peer inbound flood protection: one peer cannot pin our handlers.
+      if (!this.rateLimiter.isAllowed('inbound', conn.peer, this.INBOUND_MAX, this.INBOUND_WINDOW_MS)) {
+        console.warn(`Inbound rate limit exceeded for peer ${conn.peer}; dropping message.`);
+        this.recordPeerStrike(conn.peer);
+        return;
+      }
+
+      // Basic shape check before dispatch.
+      if (!data || typeof data !== 'object' || typeof data.type !== 'string') {
+        this.recordPeerStrike(conn.peer);
+        return;
+      }
+
       console.log('Received data:', data);
 
       // Route the message to the appropriate handler
-      if (data.type && this.messageHandlers[data.type]) {
+      if (this.messageHandlers[data.type]) {
         this.messageHandlers[data.type](data, conn);
       } else {
         console.warn(`No handler for message type: ${data.type}`);

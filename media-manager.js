@@ -2,6 +2,7 @@
 // Handles image processing, storage, and retrieval
 
 import { StorageManager } from './storage-manager.js';
+import { randomToken } from './crypto-identity.js';
 
 export class MediaManager {
   // Constants for validation and limits
@@ -17,6 +18,11 @@ export class MediaManager {
   ];
   
   static MAX_FILE_SIZE = 2 * 1024 * 1024; // 2MB
+  // Bound total stored media (P2 — mesh hardening). We cap the item COUNT rather
+  // than summing bytes (which would require loading every full image): since each
+  // item is already size-capped (≤5MB from peers / ≤2MB own), a count cap bounds
+  // total storage cheaply via getAllKeys without scanning image data.
+  static MAX_MEDIA_ITEMS = 500;
   static MAX_IMAGE_WIDTH = 1200; // Max width in pixels
   static MAX_IMAGE_HEIGHT = 1200; // Max height in pixels
   static THUMBNAIL_SIZE = 300; // Thumbnail size in pixels
@@ -62,9 +68,13 @@ export class MediaManager {
       throw new Error(`File too large. Maximum size: ${MediaManager.MAX_FILE_SIZE / 1024 / 1024}MB`);
     }
 
+    if (await this.isMediaStoreFull()) {
+      throw new Error('Local media storage is full. Use "Clean Up Storage" to free space, then try again.');
+    }
+
     try {
-      // Generate a unique ID for the media
-      const mediaId = `media_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Generate a unique ID for the media (CSPRNG suffix)
+      const mediaId = `media_${Date.now()}_${randomToken(9)}`;
 
       // Process the image (resize and create thumbnail)
       const { fullImage, thumbnail } = await this.processImage(file);
@@ -266,6 +276,21 @@ export class MediaManager {
   }
   
   /**
+   * Whether the media store has reached its item cap. Uses getAllKeys (cheap —
+   * does not deserialize image data) so it can be called on every store.
+   * @returns {Promise<boolean>}
+   */
+  async isMediaStoreFull() {
+    try {
+      const ids = await this.getAllMediaIds();
+      return ids.length >= MediaManager.MAX_MEDIA_ITEMS;
+    } catch (error) {
+      console.error('Error checking media store size:', error);
+      return false; // fail open — don't block legitimate posts on a count error
+    }
+  }
+
+  /**
    * Check whether media with the given ID already exists in IndexedDB
    * @param {string} id - ID of the media to check
    * @returns {Promise<boolean>} - Whether the media exists
@@ -298,6 +323,12 @@ export class MediaManager {
 
     // Don't overwrite media we already have
     if (await this.hasMedia(id)) return true;
+
+    // Refuse new peer media once the store is full — a peer cannot fill our disk.
+    if (await this.isMediaStoreFull()) {
+      console.warn('Media store full; refusing incoming media', id);
+      return false;
+    }
 
     return this.storeMedia(id, {
       type: payload.type || MediaManager.MEDIA_TYPES.IMAGE,

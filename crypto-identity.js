@@ -42,6 +42,28 @@ export function cryptoAvailable() {
   return !!subtle();
 }
 
+/**
+ * A random alphanumeric token from a CSPRNG (falls back to Math.random only if
+ * getRandomValues is somehow unavailable). Used for local de-dup ids (peer/media/
+ * circle) where Math.random previously risked predictable/colliding ids.
+ * @param {number} nChars
+ * @returns {string}
+ */
+export function randomToken(nChars = 16) {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const n = Math.max(1, nChars);
+  let bytes;
+  if (globalThis.crypto && globalThis.crypto.getRandomValues) {
+    bytes = globalThis.crypto.getRandomValues(new Uint8Array(n));
+  } else {
+    bytes = new Uint8Array(n);
+    for (let i = 0; i < n; i++) bytes[i] = Math.floor(Math.random() * 256);
+  }
+  let out = '';
+  for (let i = 0; i < n; i++) out += alphabet[bytes[i] % alphabet.length];
+  return out;
+}
+
 // ---- base64 <-> ArrayBuffer helpers ----
 function bufToB64(buf) {
   const bytes = new Uint8Array(buf);

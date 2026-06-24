@@ -2,6 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <!--
+      Content-Security-Policy (defence-in-depth behind the SRI'd CDN tags and the
+      XSS-safe DOM rendering). The key protection is `script-src` WITHOUT
+      'unsafe-inline'/'unsafe-eval' — PeerJS 1.5 no longer needs eval — so injected
+      markup cannot execute script.
+        - img-src allows https: + data: because link previews legitimately load
+          remote favicons/thumbnails and message media is inline data: URIs.
+        - connect-src allows https:/wss: for the PeerJS signalling broker (WebRTC
+          ICE/STUN/TURN is not governed by CSP).
+        - style-src keeps 'unsafe-inline' for the few static inline styles and the
+          third-party QR widget; this is low-risk since scripts are locked down.
+      Note: frame-ancestors / clickjacking protection must be set as a real HTTP
+      header (X-Frame-Options / frame-ancestors) at deploy time — it is ignored in
+      a <meta> CSP.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https: wss:">
+    <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpellCast</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"
