@@ -727,12 +727,9 @@ export class UIManager {
         throw new Error('Backup is missing the username or peer ID.');
       }
 
-      // Adopt the restored identity + credentials and persist them.
+      // Adopt the restored identity + credentials and persist them (both keypairs).
       this.userManager.identity = identity;
-      await this.storageManager.saveIdentity({
-        privateKey: identity.privateKey,
-        publicKeyB64: identity.publicKeyB64
-      });
+      await this.userManager.persistIdentity();
       await this.userManager.loginWithCredentials(username, peerId);
       await this.tweetManager.pinOwnIdentity();
 

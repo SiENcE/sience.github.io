@@ -2,7 +2,7 @@
 
 import { StorageManager } from './storage-manager.js';
 import { RateLimiter } from './rate-limiter.js';
-import { verifySignature } from './crypto-identity.js';
+import { verifySignature, sealForRecipients } from './crypto-identity.js';
 
 export class TweetManager {
 	constructor(userManager, peerManager, storageManager, mediaManager) {
@@ -670,25 +670,80 @@ export class TweetManager {
 
 		// Add media data if present, including the full image so receiving peers
 		// can persist it in their own IndexedDB (not just the thumbnail).
+		const fullImage = mediaId ? await this.getFullImageData(mediaId) : null;
 		if (mediaId) {
-		  tweetData.mediaId = mediaId;
-		  tweetData.mediaThumbnail = mediaThumbnail;
-		  tweetData.mediaType = mediaType;
-
-		  const fullImage = await this.getFullImageData(mediaId);
-		  if (fullImage) {
-			tweetData.fullImage = fullImage;
-		  }
+			tweetData.mediaId = mediaId;
+			tweetData.mediaThumbnail = mediaThumbnail;
+			tweetData.mediaType = mediaType;
+			if (fullImage) {
+				tweetData.fullImage = fullImage;
+			}
 		}
 
-		// Send to all connected peers, or only the targeted circle members
+		// Determine target connections (all peers, or just the circle members).
 		const allConnections = this.peerManager.getAllConnections();
 		const connections = targetPeerIds
-		  ? allConnections.filter(conn => targetPeerIds.includes(conn.peer))
-		  : allConnections;
+			? allConnections.filter(conn => targetPeerIds.includes(conn.peer))
+			: allConnections;
+
+		// ---- Confidentiality for circle posts (P3) ----
+		// Circle (narrow-cast) posts are sealed to each recipient's encryption key,
+		// so the broker / any intermediary / a wrong-identity peer holding the peer
+		// id cannot read them. Public posts are sent in the clear (they are meant to
+		// propagate across the whole mesh). Peers without an enc key (legacy) are
+		// skipped for an encrypted post.
+		let encByPeer = null; // Map<peerId, sealedEnvelope> when encrypting
+		if (circleName && connections.length > 0) {
+			const recipients = connections
+				.map(conn => ({ peer: conn.peer, encKey: this.peerManager.getPeerEncKey(conn.peer) }))
+				.filter(r => r.encKey);
+
+			if (recipients.length > 0) {
+				const plaintext = JSON.stringify({
+					content: content || '',
+					mediaId: mediaId || null,
+					mediaThumbnail: mediaThumbnail || null,
+					mediaType: mediaType || null,
+					fullImage: fullImage || null
+				});
+				// One sealed envelope per recipient (addressed to that one key), so a peer
+				// only ever receives a blob it alone can open.
+				encByPeer = new Map();
+				for (const r of recipients) {
+					const sealed = await sealForRecipients(plaintext, [r.encKey]);
+					if (sealed) encByPeer.set(r.peer, sealed);
+				}
+				const skipped = connections.filter(c => !encByPeer.has(c.peer)).map(c => c.peer);
+				if (skipped.length) {
+					console.warn('Encrypted circle post: skipping peers without an encryption key:', skipped);
+				}
+			} else {
+				console.warn('Circle post sent in cleartext: no recipient has an encryption key (legacy peers).');
+			}
+		}
+
 		connections.forEach(conn => {
+			let payload = tweetData;
+			if (encByPeer) {
+				// Encrypted circle post: send a sealed envelope (no cleartext body) and
+				// skip peers we could not seal for.
+				if (!encByPeer.has(conn.peer)) return;
+				payload = {
+					type: 'tweet',
+					id: tweetId,
+					timestamp: timestamp,
+					username: username,
+					hops: 0,
+					circle: circleName,
+					enc: encByPeer.get(conn.peer)
+				};
+				if (authorId) payload.authorId = authorId;
+				if (identity.authorKey) payload.authorKey = identity.authorKey;
+				if (identity.signature) payload.signature = identity.signature;
+			}
+
 			try {
-				conn.send(tweetData);
+				conn.send(payload);
 
 				// Mark as sent to this peer
 				if (this.tweetRecipients[tweetId] && !this.tweetRecipients[tweetId].includes(conn.peer)) {
@@ -702,12 +757,15 @@ export class TweetManager {
 			} catch (error) {
 				console.error(`Failed to send tweet to peer ${conn.peer}:`, error);
 
-				// Add to unsent tweets for this peer
-				if (!this.unsentTweets[conn.peer]) {
-					this.unsentTweets[conn.peer] = [];
-				}
-				if (!this.unsentTweets[conn.peer].includes(tweetId)) {
-					this.unsentTweets[conn.peer].push(tweetId);
+				// Circle posts are best-effort live delivery only — never queue them for
+				// resend (a resend path would re-emit them in cleartext).
+				if (!circleName) {
+					if (!this.unsentTweets[conn.peer]) {
+						this.unsentTweets[conn.peer] = [];
+					}
+					if (!this.unsentTweets[conn.peer].includes(tweetId)) {
+						this.unsentTweets[conn.peer].push(tweetId);
+					}
 				}
 			}
 		});
@@ -981,7 +1039,9 @@ export class TweetManager {
 			return;
 		}
 
-		const tweetsToSend = this.tweets.filter(tweet => unsentTweetIds.includes(tweet.id));
+		// Never include circle (narrow-cast) posts: they are end-to-end encrypted
+		// per-recipient and must not be re-emitted in cleartext via the bulk path.
+		const tweetsToSend = this.tweets.filter(tweet => !tweet.circle && unsentTweetIds.includes(tweet.id));
 		this.sendTweetsToPeer(conn, tweetsToSend);
 	}
 
@@ -1069,6 +1129,27 @@ export class TweetManager {
 	 */
 	async handleTweetMessage(data, conn) {
 		try {
+			// Decrypt sealed circle posts (P3) before processing. The decrypted
+			// payload supplies the plaintext content/media; the cleartext signature
+			// is then verified against that plaintext, exactly as for a public post.
+			if (data.enc) {
+				const identity = this.userManager.identity;
+				if (!identity || !identity.canDecrypt) return; // no decryption key
+				const plaintext = await identity.openSealed(data.enc);
+				if (plaintext === null) return; // not addressed to us / undecryptable
+				let payload;
+				try { payload = JSON.parse(plaintext); } catch (_) { return; }
+				data = {
+					...data,
+					content: payload.content || '',
+					mediaId: payload.mediaId || undefined,
+					mediaThumbnail: payload.mediaThumbnail || undefined,
+					mediaType: payload.mediaType || undefined,
+					fullImage: payload.fullImage || undefined
+				};
+				delete data.enc;
+			}
+
 			// Validate the tweet data
 			const tweetData = {
 				username: data.username,

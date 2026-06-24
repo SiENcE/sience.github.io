@@ -643,7 +643,8 @@ export class PeerManager {
         conn.send({
           type: 'handshake',
           username: this.userManager.username,
-          publicKey: this.userManager.publicKey
+          publicKey: this.userManager.publicKey,
+          encPublicKey: this.userManager.encPublicKey
         });
       }
 
@@ -1093,6 +1094,16 @@ export class PeerManager {
   }
 
   /**
+   * Get a connected peer's encryption (ECDH) public key, learned via handshake.
+   * @param {string} peerId
+   * @returns {string|null} base64 enc public key, or null if unknown
+   */
+  getPeerEncKey(peerId) {
+    const conn = this.connections.find(c => c.peer === peerId);
+    return (conn && conn.metadata && conn.metadata.encPublicKey) || null;
+  }
+
+  /**
    * Get all peer connections
    * @returns {Array} Array of connection objects
    */
@@ -1141,7 +1152,8 @@ export class PeerManager {
       // display. Authorship is trusted only via per-message signatures.
       this.connections[connectionIndex].metadata = {
         username: data.username,
-        publicKey: data.publicKey || null
+        publicKey: data.publicKey || null,
+        encPublicKey: data.encPublicKey || null
       };
       this.savePeers();
     }
@@ -1151,7 +1163,8 @@ export class PeerManager {
       conn.send({
         type: 'handshake',
         username: this.userManager.username,
-        publicKey: this.userManager.publicKey
+        publicKey: this.userManager.publicKey,
+        encPublicKey: this.userManager.encPublicKey
       });
       // Mark handshake as completed for this peer
       this.handshakeCompleted.add(conn.peer);

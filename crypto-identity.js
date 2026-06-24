@@ -17,6 +17,7 @@
 
 const ALGO = { name: 'ECDSA', namedCurve: 'P-256' };
 const SIGN_ALGO = { name: 'ECDSA', hash: 'SHA-256' };
+const ECDH_ALGO = { name: 'ECDH', namedCurve: 'P-256' };
 const SIGNED_PREFIX = 'spellcast-tweet-v1';
 const PBKDF2_ITERATIONS = 250000;
 
@@ -136,33 +137,127 @@ export async function verifySignature(publicKeyB64, signatureB64, fields) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Message confidentiality for circle (narrow-cast) posts (P3).
+//
+// Circle posts are encrypted to each recipient's *encryption* public key (an
+// ECDH P-256 key, separate from the ECDSA signing key) using a multi-recipient
+// sealed box: one random AES-GCM content key encrypts the payload once, and that
+// content key is wrapped per recipient via ephemeral-static ECDH (ECIES). An
+// ephemeral sender key per message gives forward secrecy. Because each message
+// is sealed to the *current* member set, there is no long-lived group key to
+// rotate — removing a member simply excludes them from future messages.
+// ---------------------------------------------------------------------------
+
+/** Derive an AES-GCM key from an ECDH shared secret (SHA-256 as a simple KDF). */
+async function deriveSharedAesKey(privKey, peerEcdhPubB64) {
+  const s = subtle();
+  const peerPub = await s.importKey('raw', b64ToBuf(peerEcdhPubB64), ECDH_ALGO, false, []);
+  const bits = await s.deriveBits({ name: 'ECDH', public: peerPub }, privKey, 256);
+  const keyBytes = await s.digest('SHA-256', bits);
+  return s.importKey('raw', keyBytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+/** Stable short id of a recipient's enc public key, used to index wrapped keys. */
+async function recipientKeyId(encPubB64) {
+  const s = subtle();
+  const h = await s.digest('SHA-256', new TextEncoder().encode('spellcast-rcpt|' + encPubB64));
+  const bytes = new Uint8Array(h).slice(0, 8);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 /**
- * A user's own signing identity. Holds the non-extractable private CryptoKey
- * plus the exported public key (base64) used as the identity everywhere.
+ * Seal a plaintext string for a set of recipient ECDH public keys.
+ * @param {string} plaintext
+ * @param {string[]} recipientEncPubB64s
+ * @returns {Promise<Object|null>} envelope { v, epk, iv, ct, keys } or null
+ */
+export async function sealForRecipients(plaintext, recipientEncPubB64s) {
+  const s = subtle();
+  if (!s) return null;
+  const recipients = (recipientEncPubB64s || []).filter(Boolean);
+  if (recipients.length === 0) return null;
+
+  // Ephemeral sender keypair (forward secrecy) + random content key.
+  const eph = await s.generateKey(ECDH_ALGO, true, ['deriveBits']);
+  const epkB64 = bufToB64(await s.exportKey('raw', eph.publicKey));
+  const cekRaw = globalThis.crypto.getRandomValues(new Uint8Array(32));
+  const cek = await s.importKey('raw', cekRaw, { name: 'AES-GCM' }, false, ['encrypt']);
+
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+  const ct = await s.encrypt({ name: 'AES-GCM', iv }, cek, new TextEncoder().encode(plaintext));
+
+  const keys = {};
+  for (const rpub of recipients) {
+    try {
+      const wrapKey = await deriveSharedAesKey(eph.privateKey, rpub);
+      const wiv = globalThis.crypto.getRandomValues(new Uint8Array(12));
+      const wct = await s.encrypt({ name: 'AES-GCM', iv: wiv }, wrapKey, cekRaw);
+      keys[await recipientKeyId(rpub)] = { iv: bufToB64(wiv), ct: bufToB64(wct) };
+    } catch (err) {
+      console.warn('seal: skipping a recipient (bad enc key?)', err);
+    }
+  }
+  if (Object.keys(keys).length === 0) return null;
+  return { v: 1, epk: epkB64, iv: bufToB64(iv), ct: bufToB64(ct), keys };
+}
+
+/**
+ * A user's own identity: an ECDSA signing keypair (the identity used everywhere)
+ * plus an ECDH encryption keypair (for receiving sealed circle posts). Private
+ * keys are CryptoKeys held in IndexedDB; public keys are base64 raw exports.
  */
 export class CryptoIdentity {
-  constructor(privateKey, publicKeyB64) {
-    this.privateKey = privateKey;     // non-extractable CryptoKey, or null
-    this.publicKeyB64 = publicKeyB64; // base64 of the raw public key, or null
+  constructor(privateKey, publicKeyB64, encPrivateKey = null, encPublicKeyB64 = null) {
+    this.privateKey = privateKey;         // ECDSA signing private CryptoKey, or null
+    this.publicKeyB64 = publicKeyB64;     // base64 raw ECDSA public key, or null
+    this.encPrivateKey = encPrivateKey;   // ECDH private CryptoKey (decryption), or null
+    this.encPublicKeyB64 = encPublicKeyB64; // base64 raw ECDH public key, or null
   }
 
   get available() {
     return !!(this.privateKey && this.publicKeyB64);
   }
 
+  /** Whether this identity can receive encrypted (sealed) circle posts. */
+  get canDecrypt() {
+    return !!(this.encPrivateKey && this.encPublicKeyB64);
+  }
+
   /**
-   * Generate a fresh keypair. The private key is generated **extractable** so it
-   * can be exported into a passphrase-encrypted backup file (account
-   * portability). The residual risk — XSS could in principle export it — is
-   * accepted in exchange for the user being able to recover/move their account;
-   * the backup file itself is always encrypted (see exportEncrypted).
+   * Generate a fresh identity: an ECDSA signing keypair *and* an ECDH encryption
+   * keypair. Both private keys are generated **extractable** so they can go into
+   * a passphrase-encrypted backup file (account portability). The residual risk —
+   * XSS could in principle export them — is accepted in exchange for recoverable
+   * accounts; the backup file itself is always encrypted (see exportEncrypted).
    */
   static async generate() {
     const s = subtle();
     if (!s) return new CryptoIdentity(null, null);
     const pair = await s.generateKey(ALGO, true, ['sign', 'verify']);
+    const encPair = await s.generateKey(ECDH_ALGO, true, ['deriveBits']);
     const publicKeyB64 = bufToB64(await s.exportKey('raw', pair.publicKey));
-    return new CryptoIdentity(pair.privateKey, publicKeyB64);
+    const encPublicKeyB64 = bufToB64(await s.exportKey('raw', encPair.publicKey));
+    return new CryptoIdentity(pair.privateKey, publicKeyB64, encPair.privateKey, encPublicKeyB64);
+  }
+
+  /** Decrypt a sealed circle-post envelope addressed to us; null if not for us. */
+  async openSealed(envelope) {
+    const s = subtle();
+    if (!s || !this.encPrivateKey || !envelope || !envelope.keys) return null;
+    try {
+      const id = await recipientKeyId(this.encPublicKeyB64);
+      const entry = envelope.keys[id];
+      if (!entry) return null; // we are not a recipient
+      const wrapKey = await deriveSharedAesKey(this.encPrivateKey, envelope.epk);
+      const cekRaw = await s.decrypt({ name: 'AES-GCM', iv: b64ToBuf(entry.iv) }, wrapKey, b64ToBuf(entry.ct));
+      const cek = await s.importKey('raw', cekRaw, { name: 'AES-GCM' }, false, ['decrypt']);
+      const plain = await s.decrypt({ name: 'AES-GCM', iv: b64ToBuf(envelope.iv) }, cek, b64ToBuf(envelope.ct));
+      return new TextDecoder().decode(plain);
+    } catch (err) {
+      console.warn('Failed to open sealed circle post:', err);
+      return null;
+    }
   }
 
   /**
@@ -180,9 +275,10 @@ export class CryptoIdentity {
     if (!this.privateKey) throw new Error('No identity to export.');
     if (!passphrase) throw new Error('A passphrase is required.');
 
-    let jwk;
+    let jwk, encJwk = null;
     try {
       jwk = await s.exportKey('jwk', this.privateKey);
+      if (this.encPrivateKey) encJwk = await s.exportKey('jwk', this.encPrivateKey);
     } catch (err) {
       throw new Error('This identity predates backup support and cannot be exported. '
         + '(It was created with a non-extractable key.)');
@@ -192,7 +288,9 @@ export class CryptoIdentity {
       username: meta.username || '',
       peerId: meta.peerId || '',
       publicKeyB64: this.publicKeyB64,
-      privateKeyJwk: jwk
+      privateKeyJwk: jwk,
+      encPublicKeyB64: this.encPublicKeyB64 || null,
+      encPrivateKeyJwk: encJwk
     }));
 
     const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
@@ -241,7 +339,11 @@ export class CryptoIdentity {
 
     const parsed = JSON.parse(new TextDecoder().decode(plainBuf));
     const privateKey = await s.importKey('jwk', parsed.privateKeyJwk, ALGO, true, ['sign']);
-    const identity = new CryptoIdentity(privateKey, parsed.publicKeyB64);
+    let encPrivateKey = null;
+    if (parsed.encPrivateKeyJwk) {
+      encPrivateKey = await s.importKey('jwk', parsed.encPrivateKeyJwk, ECDH_ALGO, true, ['deriveBits']);
+    }
+    const identity = new CryptoIdentity(privateKey, parsed.publicKeyB64, encPrivateKey, parsed.encPublicKeyB64 || null);
     return { identity, username: parsed.username || '', peerId: parsed.peerId || '' };
   }
 

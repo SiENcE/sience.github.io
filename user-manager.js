@@ -22,9 +22,25 @@ export class UserManager {
     this.ensureIdentity = this.ensureIdentity.bind(this);
   }
 
-  /** The user's public key (base64), or null if WebCrypto is unavailable. */
+  /** Persist the current identity (both keypairs) to storage. */
+  async persistIdentity() {
+    if (!this.identity || !this.identity.available) return;
+    await this.storageManager.saveIdentity({
+      privateKey: this.identity.privateKey,
+      publicKeyB64: this.identity.publicKeyB64,
+      encPrivateKey: this.identity.encPrivateKey || null,
+      encPublicKeyB64: this.identity.encPublicKeyB64 || null
+    });
+  }
+
+  /** The user's signing public key (base64), or null if WebCrypto is unavailable. */
   get publicKey() {
     return this.identity ? this.identity.publicKeyB64 : null;
+  }
+
+  /** The user's encryption (ECDH) public key (base64), for sealed circle posts. */
+  get encPublicKey() {
+    return this.identity ? this.identity.encPublicKeyB64 : null;
   }
 
   /**
@@ -38,17 +54,27 @@ export class UserManager {
 
     const stored = await this.storageManager.loadIdentity();
     if (stored && stored.privateKey && stored.publicKeyB64) {
-      this.identity = new CryptoIdentity(stored.privateKey, stored.publicKeyB64);
+      this.identity = new CryptoIdentity(
+        stored.privateKey, stored.publicKeyB64,
+        stored.encPrivateKey || null, stored.encPublicKeyB64 || null
+      );
+      // Legacy identities (pre-P3) have no encryption key — mint one so the user
+      // can receive sealed circle posts, and persist it alongside the rest.
+      if (!this.identity.canDecrypt) {
+        const fresh = await CryptoIdentity.generate();
+        if (fresh.canDecrypt) {
+          this.identity.encPrivateKey = fresh.encPrivateKey;
+          this.identity.encPublicKeyB64 = fresh.encPublicKeyB64;
+          await this.persistIdentity();
+        }
+      }
       return this.identity;
     }
 
     const fresh = await CryptoIdentity.generate();
     this.identity = fresh;
     if (fresh.available) {
-      await this.storageManager.saveIdentity({
-        privateKey: fresh.privateKey,
-        publicKeyB64: fresh.publicKeyB64
-      });
+      await this.persistIdentity();
     } else {
       console.warn('WebCrypto unavailable — messages will be sent unsigned (use HTTPS or localhost).');
     }
