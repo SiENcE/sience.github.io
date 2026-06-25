@@ -11,7 +11,7 @@
 // WebCrypto implementation (Ed25519 support is still uneven). The private key is
 // generated non-extractable and stored as a structured-cloned CryptoKey in
 // IndexedDB, so it can sign but can never be read out of the key store by script
-// (e.g. via XSS). That also means it cannot be exported for backup — account
+// (e.g. via XSS). That also means it cannot be exported for backup — credentials
 // portability (a passphrase-encrypted export / mnemonic) is the separate P1
 // task on the roadmap.
 
@@ -248,9 +248,10 @@ export class CryptoIdentity {
   /**
    * Generate a fresh identity: an ECDSA signing keypair *and* an ECDH encryption
    * keypair. Both private keys are generated **extractable** so they can go into
-   * a passphrase-encrypted backup file (account portability). The residual risk —
-   * XSS could in principle export them — is accepted in exchange for recoverable
-   * accounts; the backup file itself is always encrypted (see exportEncrypted).
+   * a passphrase-encrypted backup file (credentials portability). The residual
+   * risk — XSS could in principle export them — is accepted in exchange for
+   * recoverable credentials; the backup file itself is always encrypted (see
+   * exportEncrypted).
    */
   static async generate() {
     const s = subtle();
@@ -293,7 +294,7 @@ export class CryptoIdentity {
   async exportEncrypted(passphrase, meta = {}) {
     const s = subtle();
     if (!s) throw new Error('WebCrypto unavailable (need HTTPS or localhost).');
-    if (!this.privateKey) throw new Error('No identity to export.');
+    if (!this.privateKey) throw new Error('No credentials to export.');
     if (!passphrase) throw new Error('A passphrase is required.');
 
     let jwk, encJwk = null;
@@ -301,8 +302,8 @@ export class CryptoIdentity {
       jwk = await s.exportKey('jwk', this.privateKey);
       if (this.encPrivateKey) encJwk = await s.exportKey('jwk', this.encPrivateKey);
     } catch (err) {
-      throw new Error('This identity predates backup support and cannot be exported. '
-        + '(It was created with a non-extractable key.)');
+      throw new Error('These credentials predate backup support and cannot be exported. '
+        + '(They were created with a non-extractable key.)');
     }
 
     const payload = new TextEncoder().encode(JSON.stringify({
@@ -343,7 +344,7 @@ export class CryptoIdentity {
     const s = subtle();
     if (!s) throw new Error('WebCrypto unavailable (need HTTPS or localhost).');
     if (!envelope || envelope.type !== 'spellcast-identity-backup') {
-      throw new Error('Not a SpellCast identity backup file.');
+      throw new Error('Not a SpellCast credential backup file.');
     }
     if (!passphrase) throw new Error('A passphrase is required.');
 

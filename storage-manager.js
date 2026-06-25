@@ -337,7 +337,7 @@ export class StorageManager {
     return (await this.loadFromStorage(StorageManager.KEYS.REACTIONS)) || {};
   }
 
-  // Clear all data (for account deletion)
+  // Clear all data (for credentials deletion)
   async clearAllData() {
     await this.deleteUserCredentials();
     await this.removeFromStorage(StorageManager.KEYS.TWEETS);

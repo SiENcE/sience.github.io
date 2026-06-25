@@ -39,7 +39,7 @@ class SpellCastApp {
     // Check for saved credentials
     const hasCredentials = await this.userManager.checkSavedCredentials();
 
-    // Load (or, for legacy accounts, mint) the signing keypair before any
+    // Load (or, for legacy credentials, mint) the signing keypair before any
     // message can be created, sent, or verified.
     await this.userManager.ensureIdentity();
 

@@ -38,12 +38,12 @@
         <h2>Welcome to SpellCast</h2>
         <p>A decentralized, peer-to-peer Twitter clone that works directly in your browser!</p>
         <p>No servers, no tracking, just peer-to-peer communication.</p>
-        <button id="create-button">Create New Account</button>
-        <button id="login-button">Login with Key</button>
+        <button id="create-button">Create New Credentials</button>
+        <button id="login-button">Login with Credentials</button>
     </div>
 
     <div id="setup-container" class="container">
-        <h2>Create Your Account</h2>
+        <h2>Create Your Credentials</h2>
         <div>
             <label for="username">Choose a username:</label>
             <input type="text" id="username" placeholder="Enter username">
@@ -71,9 +71,9 @@
         <button id="login-continue-button">Login</button>
 
         <div class="login-import">
-            <p class="hint">Have an identity backup file? Restore your account (key + username + peer ID):</p>
+            <p class="hint">Have a credential backup file? Restore your credentials (key + username + peer ID):</p>
             <input type="file" id="import-identity-file" accept="application/json,.json">
-            <button id="import-identity-button">Import Identity Backup</button>
+            <button id="import-identity-button">Import Credential Backup</button>
         </div>
     </div>
 
@@ -148,12 +148,12 @@
                         </div>
                     </div>
                     <div class="profile-actions">
-                        <button id="export-identity-button">Export Identity Backup</button>
+                        <button id="export-identity-button">Export Credential Backup</button>
                         <button id="cleanup-storage-button">Clean Up Storage</button>
                         <button id="delete-all-messages-button" class="danger-button">Delete All Messages</button>
-                        <button id="delete-account-button" class="danger-button">Delete Account</button>
+                        <button id="delete-credentials-button" class="danger-button">Delete Credentials</button>
                     </div>
-                    <p class="hint">Export a passphrase-encrypted backup of your identity (signing key). Keep it safe — it is the only way to recover or move this account to another device.</p>
+                    <p class="hint">Export a passphrase-encrypted backup of your identity (signing key). Keep it safe — it is the only way to recover or move these credentials to another device.</p>
                 </div>
             </div>
         </div>

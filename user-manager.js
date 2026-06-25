@@ -17,7 +17,7 @@ export class UserManager {
     this.checkSavedCredentials = this.checkSavedCredentials.bind(this);
     this.saveCredentials = this.saveCredentials.bind(this);
     this.loginWithCredentials = this.loginWithCredentials.bind(this);
-    this.deleteAccount = this.deleteAccount.bind(this);
+    this.deleteCredentials = this.deleteCredentials.bind(this);
     this.reset = this.reset.bind(this);
     this.ensureIdentity = this.ensureIdentity.bind(this);
   }
@@ -45,7 +45,7 @@ export class UserManager {
 
   /**
    * Load the signing keypair from storage, or generate + persist a fresh one.
-   * Existing (pre-P0) accounts have no key, so this transparently mints one the
+   * Existing (pre-P0) credentials have no key, so this transparently mints one the
    * first time they run an upgraded build. Idempotent.
    * @returns {Promise<CryptoIdentity>}
    */
@@ -112,8 +112,8 @@ export class UserManager {
 	  await this.storageManager.saveUserCredentials(username, peerId);
 	}
 
-	// In deleteAccount()
-	async deleteAccount(onComplete) {
+	// Delete the user's credentials and all stored data from this device.
+	async deleteCredentials(onComplete) {
 	  this.reset();
 	  await this.storageManager.clearAllData();
 	  

@@ -82,7 +82,7 @@ export class UIManager {
       loginContinueButton: document.getElementById('login-continue-button'),
       tweetButton: document.getElementById('tweet-button'),
       connectButton: document.getElementById('connect-button'),
-      deleteAccountButton: document.getElementById('delete-account-button'),
+      deleteCredentialsButton: document.getElementById('delete-credentials-button'),
       deleteAllMessagesButton: document.getElementById('delete-all-messages-button'),
       cleanupStorageButton: document.getElementById('cleanup-storage-button'),
       exportIdentityButton: document.getElementById('export-identity-button'),
@@ -176,7 +176,7 @@ export class UIManager {
         // Initialize peer connection
         const peerId = await this.peerManager.initializePeer();
 
-        // Mint the signing keypair for this brand-new account.
+        // Mint the signing keypair for these brand-new credentials.
         await this.userManager.ensureIdentity();
         await this.tweetManager.pinOwnIdentity();
 
@@ -284,9 +284,9 @@ export class UIManager {
       this.elements.copyInviteButton.addEventListener('click', () => this.copyInvite());
     }
 
-    this.elements.deleteAccountButton.addEventListener('click', this.deleteAccount.bind(this));
+    this.elements.deleteCredentialsButton.addEventListener('click', this.deleteCredentials.bind(this));
 
-    // Identity backup: export from the profile, import from the login screen.
+    // Credential backup: export from the profile, import from the login screen.
     if (this.elements.exportIdentityButton) {
       this.elements.exportIdentityButton.addEventListener('click', this.exportIdentity.bind(this));
     }
@@ -835,36 +835,37 @@ export class UIManager {
   }
 
   /**
-   * Delete user account
+   * Delete the user's credentials (identity keys + saved data) from this device.
    */
-  deleteAccount() {
-    if (confirm('Are you sure you want to delete your account? This will disconnect you from all peers and remove your saved credentials.')) {
+  deleteCredentials() {
+    if (confirm('Are you sure you want to delete your credentials? This disconnects you from all peers and erases your saved identity, messages, and data on this device.')) {
       // Close all connections
       const connections = this.peerManager.getAllConnections();
       connections.forEach(conn => {
         this.peerManager.disconnectPeer(conn);
       });
 
-      // Delete account through user manager
-      this.userManager.deleteAccount(() => {
+      // Delete credentials and stored data through the user manager
+      this.userManager.deleteCredentials(() => {
         // Reset UI
         this.showIntroScreen();
-        alert('Your account has been deleted successfully.');
+        alert('Your credentials have been deleted successfully.');
       });
     }
   }
 
   /**
-   * Export the user's signing identity as a passphrase-encrypted backup file.
+   * Export the user's credentials (identity keypairs) as a passphrase-encrypted
+   * backup file.
    */
   async exportIdentity() {
     if (!this.userManager.publicKey) {
-      alert('No exportable identity is available. (WebCrypto needs HTTPS or localhost.)');
+      alert('No exportable credentials are available. (WebCrypto needs HTTPS or localhost.)');
       return;
     }
 
-    const passphrase = prompt('Choose a passphrase to encrypt your identity backup.\n'
-      + 'You will need this exact passphrase to restore the account. There is no way to recover it.');
+    const passphrase = prompt('Choose a passphrase to encrypt your credential backup.\n'
+      + 'You will need this exact passphrase to restore your credentials. There is no way to recover it.');
     if (passphrase === null) return; // cancelled
     if (passphrase.length < 6) {
       alert('Please use a passphrase of at least 6 characters.');
@@ -884,29 +885,29 @@ export class UIManager {
       const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      const safeName = (username || 'identity').replace(/[^a-z0-9_-]/gi, '_');
+      const safeName = (username || 'credentials').replace(/[^a-z0-9_-]/gi, '_');
       a.href = url;
-      a.download = `spellcast-identity-${safeName}.json`;
+      a.download = `spellcast-credentials-${safeName}.json`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
 
-      alert('Identity backup downloaded. Store it somewhere safe — anyone with the file AND the passphrase can post as you.');
+      alert('Credential backup downloaded. Store it somewhere safe — anyone with the file AND the passphrase can post as you.');
     } catch (error) {
-      console.error('Identity export failed:', error);
-      alert(`Could not export identity: ${error.message}`);
+      console.error('Credential export failed:', error);
+      alert(`Could not export credentials: ${error.message}`);
     }
   }
 
   /**
-   * Restore an identity from a backup file on the login screen, then log in.
+   * Restore credentials from a backup file on the login screen, then log in.
    */
   async importIdentity() {
     const fileInput = this.elements.importIdentityFile;
     const file = fileInput && fileInput.files && fileInput.files[0];
     if (!file) {
-      alert('Please choose an identity backup file first.');
+      alert('Please choose a credential backup file first.');
       return;
     }
 
@@ -914,11 +915,11 @@ export class UIManager {
     try {
       envelope = JSON.parse(await file.text());
     } catch (error) {
-      alert('That file is not a valid identity backup (could not parse JSON).');
+      alert('That file is not a valid credential backup (could not parse JSON).');
       return;
     }
 
-    const passphrase = prompt('Enter the passphrase for this identity backup:');
+    const passphrase = prompt('Enter the passphrase for this credential backup:');
     if (passphrase === null) return;
 
     try {
@@ -927,7 +928,7 @@ export class UIManager {
         throw new Error('Backup is missing the username or peer ID.');
       }
 
-      // Adopt the restored identity + credentials and persist them (both keypairs).
+      // Adopt the restored credentials (both keypairs) and persist them.
       this.userManager.identity = identity;
       await this.userManager.persistIdentity();
       await this.userManager.loginWithCredentials(username, peerId);
@@ -945,10 +946,10 @@ export class UIManager {
       this.updateProfileInfo();
       this.consumePendingConnect();
 
-      alert(`Welcome back, ${handleFor(username, identity.publicKeyB64)}. Your identity was restored.`);
+      alert(`Welcome back, ${handleFor(username, identity.publicKeyB64)}. Your credentials were restored.`);
     } catch (error) {
-      console.error('Identity import failed:', error);
-      alert(`Could not import identity: ${error.message}`);
+      console.error('Credential import failed:', error);
+      alert(`Could not import credentials: ${error.message}`);
     }
   }
 
