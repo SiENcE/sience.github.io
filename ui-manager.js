@@ -1902,13 +1902,15 @@ export class UIManager {
       const connection = connections.find(conn => conn.peer === peerId);
       const savedPeer = savedPeers.find(peer => peer.peerId === peerId);
 
-      // Get peer info from either connection or saved peers
-      const peerStatus = this.peerManager.peerStatus[peerId] || 'offline';
+      // A peer is "online" only while we hold a live connection to them. A stale
+      // persisted status must never render as online — otherwise the list shows
+      // "Online" with Connect/Remove buttons while the header (driven by the
+      // actual connection count) correctly says "Not connected to any peers".
       const peerInfo = {
         peerId: peerId,
         username: connection?.metadata?.username || savedPeer?.username || 'Unknown user',
         publicKey: connection?.metadata?.publicKey || savedPeer?.publicKey || null,
-        status: isConnected ? 'online' : peerStatus,
+        status: isConnected ? 'online' : 'offline',
         lastSeen: this.peerManager.lastSeen[peerId] || 0,
         connectionQuality: this.peerManager.peerConnectionQuality[peerId] || 'unknown'
       };

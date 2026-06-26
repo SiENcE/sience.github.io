@@ -1082,9 +1082,12 @@ export class PeerManager {
 	  if (peers) {
 		this.savedPeers = peers.filter(peer => !this.isPeerRemoved(peer.peerId));
 
-		// Restore peer status information
+		// Restore peer status information. Status is deliberately NOT restored from
+		// storage: at load time we hold zero connections, so every known peer is
+		// offline until one actually reconnects (which flips it to 'online'). A
+		// persisted 'online' would otherwise show a phantom-online peer.
 		this.savedPeers.forEach(peer => {
-		  this.peerStatus[peer.peerId] = peer.status || 'offline';
+		  this.peerStatus[peer.peerId] = 'offline';
 		  this.lastSeen[peer.peerId] = peer.lastSeen || 0;
 		  this.peerConnectionQuality[peer.peerId] = peer.connectionQuality || 'unknown';
 		});
