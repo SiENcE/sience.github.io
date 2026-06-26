@@ -55,7 +55,13 @@ export class PeerManager {
     this.MAX_STRIKES = 10;             // Bad (invalid/forged/oversized) messages...
     this.STRIKE_WINDOW_MS = 60000;     // ...within 60s before a peer is blocklisted
     this.BLOCK_DURATION_MS = 5 * 60000; // Blocklist a misbehaving peer for 5 minutes
-    this.blockedPeers = {};            // peerId -> timestamp (ms) the block expires
+    this.blockedPeers = {};            // peerId -> timestamp (ms) the block expires (abuse, auto-expiring)
+
+    // User-initiated removals. Unlike blockedPeers (temporary, abuse-driven), this
+    // is a PERSISTENT blocklist: a peer the user explicitly removed must never be
+    // reconnected to, accepted from, or sent to again — until the user deliberately
+    // connects to them anew. Loaded from / saved to storage so removal survives login.
+    this.removedPeers = new Set();
 
     // Message handlers
     this.messageHandlers = {};
@@ -339,6 +345,45 @@ export class PeerManager {
     return true;
   }
 
+  // ---- User-initiated peer removal (persistent blocklist) ----
+
+  /** Whether the user has explicitly removed this peer (persists across logins). */
+  isPeerRemoved(peerId) {
+    return this.removedPeers.has(peerId);
+  }
+
+  /** Load the persistent removed-peers blocklist from storage. */
+  async loadRemovedPeers() {
+    try {
+      const list = await this.storageManager.loadFromStorage(StorageManager.KEYS.REMOVED_PEERS);
+      if (Array.isArray(list)) {
+        this.removedPeers = new Set(list);
+      }
+    } catch (e) {
+      console.error('Error loading removed peers:', e);
+    }
+  }
+
+  /** Persist the removed-peers blocklist to storage. */
+  async saveRemovedPeers() {
+    try {
+      await this.storageManager.saveToStorage(StorageManager.KEYS.REMOVED_PEERS, [...this.removedPeers]);
+    } catch (e) {
+      console.error('Error saving removed peers:', e);
+    }
+  }
+
+  /**
+   * Clear a peer from the removed blocklist. Called when the user deliberately
+   * connects to a peer again, so an explicit re-add overrides a prior removal.
+   * @param {string} peerId
+   */
+  unremovePeer(peerId) {
+    if (this.removedPeers.delete(peerId)) {
+      this.saveRemovedPeers();
+    }
+  }
+
   /**
    * Login with an existing peer ID
    * @returns {Promise} Promise that resolves when login is successful
@@ -549,6 +594,10 @@ export class PeerManager {
       throw new Error('Cannot connect to yourself');
     }
 
+    // An explicit, user-initiated connect is a deliberate re-add: clear any prior
+    // removal so the persistent blocklist doesn't immediately reject this peer.
+    this.unremovePeer(peerId);
+
     // Check rate limiting for connection attempts
     const isAllowed = this.rateLimiter.isAllowed(
       'connect',
@@ -598,6 +647,16 @@ export class PeerManager {
   }
 
   handleConnection(conn) {
+    // Refuse any connection involving a peer the user explicitly removed. This
+    // covers BOTH directions: an incoming connection the removed peer opened to
+    // us, and a stray outgoing attempt. Explicit re-adds clear the removal first
+    // (see connectToPeer), so this only fires for genuinely-removed peers.
+    if (this.isPeerRemoved(conn.peer)) {
+      console.log(`Refusing connection with removed peer: ${conn.peer}`);
+      try { conn.close(); } catch (_) {}
+      return;
+    }
+
     // Check if already connected to this peer
     const existingConnIndex = this.connections.findIndex(existingConn => existingConn.peer === conn.peer);
 
@@ -662,8 +721,10 @@ export class PeerManager {
     });
 
     conn.on('data', (data) => {
-      // Drop everything from a peer we've blocklisted for abuse.
-      if (this.isPeerBlocked(conn.peer)) {
+      // Drop everything from a peer the user removed, or one we've blocklisted
+      // for abuse. (handleConnection rejects removed peers up front; this guards
+      // any message already in flight when the removal happened.)
+      if (this.isPeerRemoved(conn.peer) || this.isPeerBlocked(conn.peer)) {
         return;
       }
 
@@ -1011,13 +1072,18 @@ export class PeerManager {
    * Load saved peers from storage
    */
 	async loadPeers() {
+	  // Always load the persistent removed-peers blocklist first, so the filter
+	  // below can drop any removed peer that lingers in the saved list (e.g. from
+	  // a pre-removal state) and never restore it into the active maps.
+	  await this.loadRemovedPeers();
+
 	  const peers = await this.storageManager.loadFromStorage(StorageManager.KEYS.PEERS);
-	  
+
 	  if (peers) {
-		this.savedPeers = peers;
-		
+		this.savedPeers = peers.filter(peer => !this.isPeerRemoved(peer.peerId));
+
 		// Restore peer status information
-		peers.forEach(peer => {
+		this.savedPeers.forEach(peer => {
 		  this.peerStatus[peer.peerId] = peer.status || 'offline';
 		  this.lastSeen[peer.peerId] = peer.lastSeen || 0;
 		  this.peerConnectionQuality[peer.peerId] = peer.connectionQuality || 'unknown';
@@ -1030,14 +1096,20 @@ export class PeerManager {
    */
 	async savePeers() {
 	  try {
-		// Extract peer info including status
-		const peersToSave = Object.keys(this.peerStatus).map(peerId => {
+		// Extract peer info including status. Removed peers are excluded so a
+		// transient status entry can never resurrect them in storage.
+		const peersToSave = Object.keys(this.peerStatus)
+		  .filter(peerId => !this.isPeerRemoved(peerId))
+		  .map(peerId => {
 		  const connection = this.connections.find(conn => conn.peer === peerId);
+		  const saved = this.savedPeers.find(p => p.peerId === peerId);
 		  return {
 			peerId: peerId,
-			username: connection?.metadata?.username ||
-			  this.savedPeers.find(p => p.peerId === peerId)?.username ||
-			  'Unknown user',
+			username: connection?.metadata?.username || saved?.username || 'Unknown user',
+			// Persist the peer's signing key (learned at handshake) so the UI can
+			// show the verifiable `name#fingerprint` handle even while they're
+			// offline, instead of leaking the raw peer ID / network address.
+			publicKey: connection?.metadata?.publicKey || saved?.publicKey || null,
 			status: this.peerStatus[peerId] || 'unknown',
 			lastSeen: this.lastSeen[peerId] || Date.now(),
 			connectionQuality: this.peerConnectionQuality[peerId] || 'unknown'
@@ -1063,6 +1135,10 @@ export class PeerManager {
 
     this.savedPeers.forEach(peerInfo => {
       try {
+        // Never auto-reconnect to a peer the user removed.
+        if (this.isPeerRemoved(peerInfo.peerId)) {
+          return;
+        }
         if (peerInfo.peerId !== this.userManager.peerId) { // Don't connect to self
           // Check if already connected
           if (this.connections.some(conn => conn.peer === peerInfo.peerId)) {
@@ -1116,10 +1192,25 @@ export class PeerManager {
    * @param {string} peerId - The ID of the peer to remove
    */
   removeOfflinePeer(peerId) {
-    // Remove from saved peers
-    this.savedPeers = this.savedPeers.filter(peer => peer.peerId !== peerId);
+    if (!peerId) return;
 
-    // Remove from status tracking
+    // Record the removal permanently FIRST, so the persistent blocklist is in
+    // place before we tear anything down — this is what stops the peer from
+    // reconnecting (to us, or us to them) and re-appearing after the next login.
+    this.removedPeers.add(peerId);
+    this.saveRemovedPeers();
+
+    // Close any live connection to this peer (handles the case where the peer
+    // came back online and reconnected before removal).
+    const conn = this.connections.find(c => c.peer === peerId);
+    if (conn) {
+      try { conn.close(); } catch (_) {}
+    }
+    this.connections = this.connections.filter(c => c.peer !== peerId);
+
+    // Remove from saved peers and all in-memory tracking.
+    this.savedPeers = this.savedPeers.filter(peer => peer.peerId !== peerId);
+    this.handshakeCompleted.delete(peerId);
     delete this.peerStatus[peerId];
     delete this.lastSeen[peerId];
     delete this.peerConnectionQuality[peerId];
@@ -1127,7 +1218,13 @@ export class PeerManager {
     // Save updated peers list
     this.savePeers();
 
-    this.updateStatus(`Removed peer ${peerId} from saved peers`);
+    // Refresh the peer list / status UI.
+    this.notifyPeerDisconnectionCallbacks(peerId);
+    if (typeof this.onPeersUpdated === 'function') {
+      this.onPeersUpdated();
+    }
+
+    this.updateStatus(`Removed peer ${peerId}`);
   }
 
   /**

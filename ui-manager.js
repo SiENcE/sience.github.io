@@ -1907,6 +1907,7 @@ export class UIManager {
       const peerInfo = {
         peerId: peerId,
         username: connection?.metadata?.username || savedPeer?.username || 'Unknown user',
+        publicKey: connection?.metadata?.publicKey || savedPeer?.publicKey || null,
         status: isConnected ? 'online' : peerStatus,
         lastSeen: this.peerManager.lastSeen[peerId] || 0,
         connectionQuality: this.peerManager.peerConnectionQuality[peerId] || 'unknown'
@@ -1977,16 +1978,12 @@ export class UIManager {
     // Create info container
     const peerInfoContainer = document.createElement('div');
 
-    // Add username and peer ID
+    // Show the verifiable handle `name#fingerprint` (same identity shown on
+    // posts and the profile) rather than the raw peer ID. The raw ID is also a
+    // login credential, so we don't surface other people's IDs in the UI.
     const nameElement = document.createElement('div');
     nameElement.className = 'peer-name';
-    nameElement.textContent = peerInfo.username;
-
-    const idElement = document.createElement('div');
-    idElement.className = 'peer-id';
-    idElement.textContent = peerInfo.peerId;
-    idElement.style.fontSize = '0.8em';
-    idElement.style.color = 'var(--text-muted)';
+    nameElement.textContent = handleFor(peerInfo.username, peerInfo.publicKey);
 
     // Add last seen info for offline peers
     const lastSeenElement = document.createElement('div');
@@ -2059,7 +2056,6 @@ export class UIManager {
 
     // Assemble the peer element
     peerInfoContainer.appendChild(nameElement);
-    peerInfoContainer.appendChild(idElement);
     peerInfoContainer.appendChild(statusElement);
     peerInfoContainer.appendChild(lastSeenElement);
 

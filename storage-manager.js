@@ -12,7 +12,8 @@ export class StorageManager {
     CIRCLES: 'p2p_circles',
     IDENTITY: 'p2p_identity',       // signing keypair { privateKey: CryptoKey, publicKeyB64 }
     NAME_REGISTRY: 'p2p_name_pins', // TOFU pins: username -> first verified public key
-    REACTIONS: 'p2p_reactions'      // tweetId -> { reactorKey -> { name, active, ts, sig } }
+    REACTIONS: 'p2p_reactions',     // tweetId -> { reactorKey -> { name, active, ts, sig } }
+    REMOVED_PEERS: 'p2p_removed_peers' // peerIds the user explicitly removed (persistent blocklist)
   };
 
   // Database configuration
