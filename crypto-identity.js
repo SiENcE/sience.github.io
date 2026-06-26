@@ -80,6 +80,34 @@ function b64ToBuf(b64) {
   return bytes.buffer;
 }
 
+/** base64url (no padding) of a byte array — the encoding JWK uses for x/y/d. */
+function bytesToB64url(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+/**
+ * Rebuild a P-256 private-key JWK from the compact backup form: the raw 65-byte
+ * uncompressed public key (0x04 ‖ X ‖ Y) gives x/y, and the stored scalar gives d.
+ * Lets the backup carry just the scalar + public key instead of a full JWK.
+ * @param {string} rawPubB64 - base64 of the raw uncompressed public key
+ * @param {string} dB64url - the private scalar as base64url (JWK 'd')
+ * @param {string[]} keyOps - e.g. ['sign'] or ['deriveBits']
+ */
+function jwkFromRaw(rawPubB64, dB64url, keyOps) {
+  const raw = new Uint8Array(b64ToBuf(rawPubB64));
+  if (raw.length !== 65 || raw[0] !== 0x04) {
+    throw new Error('Unexpected public key format in backup.');
+  }
+  return {
+    kty: 'EC', crv: 'P-256',
+    x: bytesToB64url(raw.slice(1, 33)),
+    y: bytesToB64url(raw.slice(33, 65)),
+    d: dB64url, key_ops: keyOps, ext: true
+  };
+}
+
 /**
  * Canonical byte representation of the *signed* fields of a message. Both the
  * signer and the verifier MUST build this identically, so it is a fixed-order
@@ -306,13 +334,17 @@ export class CryptoIdentity {
         + '(They were created with a non-extractable key.)');
     }
 
+    // Compact form (v2): store only the private scalars (jwk.d) plus the raw
+    // public keys; x/y are reconstructed on import (jwkFromRaw). This is ~3x
+    // smaller than embedding full JWKs, so the encrypted backup fits comfortably
+    // in a single, low-density QR code for device-to-device transfer.
     const payload = new TextEncoder().encode(JSON.stringify({
-      username: meta.username || '',
-      peerId: meta.peerId || '',
-      publicKeyB64: this.publicKeyB64,
-      privateKeyJwk: jwk,
-      encPublicKeyB64: this.encPublicKeyB64 || null,
-      encPrivateKeyJwk: encJwk
+      u: meta.username || '',
+      p: meta.peerId || '',
+      pk: this.publicKeyB64,
+      d: jwk.d,
+      epk: this.encPublicKeyB64 || null,
+      ed: encJwk ? encJwk.d : null
     }));
 
     const salt = globalThis.crypto.getRandomValues(new Uint8Array(16));
@@ -322,7 +354,7 @@ export class CryptoIdentity {
 
     return {
       type: 'spellcast-identity-backup',
-      v: 1,
+      v: 2,
       kdf: 'PBKDF2-SHA256',
       iterations: PBKDF2_ITERATIONS,
       salt: bufToB64(salt),
@@ -360,6 +392,18 @@ export class CryptoIdentity {
     }
 
     const parsed = JSON.parse(new TextDecoder().decode(plainBuf));
+
+    // v2 (compact): scalars + raw public keys. v1 (legacy file backups): full JWKs.
+    if (envelope.v >= 2 || parsed.d) {
+      const privateKey = await s.importKey('jwk', jwkFromRaw(parsed.pk, parsed.d, ['sign']), ALGO, true, ['sign']);
+      let encPrivateKey = null;
+      if (parsed.ed && parsed.epk) {
+        encPrivateKey = await s.importKey('jwk', jwkFromRaw(parsed.epk, parsed.ed, ['deriveBits']), ECDH_ALGO, true, ['deriveBits']);
+      }
+      const identity = new CryptoIdentity(privateKey, parsed.pk, encPrivateKey, parsed.epk || null);
+      return { identity, username: parsed.u || '', peerId: parsed.p || '' };
+    }
+
     const privateKey = await s.importKey('jwk', parsed.privateKeyJwk, ALGO, true, ['sign']);
     let encPrivateKey = null;
     if (parsed.encPrivateKeyJwk) {

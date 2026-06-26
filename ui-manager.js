@@ -86,8 +86,10 @@ export class UIManager {
       deleteAllMessagesButton: document.getElementById('delete-all-messages-button'),
       cleanupStorageButton: document.getElementById('cleanup-storage-button'),
       exportIdentityButton: document.getElementById('export-identity-button'),
+      showBackupQrButton: document.getElementById('show-backup-qr-button'),
       importIdentityButton: document.getElementById('import-identity-button'),
       importIdentityFile: document.getElementById('import-identity-file'),
+      scanBackupQrButton: document.getElementById('scan-backup-qr-button'),
 
       // Inputs
       usernameInput: document.getElementById('username'),
@@ -292,6 +294,13 @@ export class UIManager {
     }
     if (this.elements.importIdentityButton) {
       this.elements.importIdentityButton.addEventListener('click', this.importIdentity.bind(this));
+    }
+    // QR transfer of the encrypted backup: show on the profile, scan on login.
+    if (this.elements.showBackupQrButton) {
+      this.elements.showBackupQrButton.addEventListener('click', this.showBackupQr.bind(this));
+    }
+    if (this.elements.scanBackupQrButton) {
+      this.elements.scanBackupQrButton.addEventListener('click', this.scanBackupQr.bind(this));
     }
 
     // Status and connection quality update listeners
@@ -740,8 +749,33 @@ export class UIManager {
    * browser has it, otherwise the vendored jsQR decoder.
    */
   async openQrScanner() {
+    await this._runQrScanner('Point your camera at a SpellCast QR code…', (value, cleanup) => {
+      const peerId = this.extractPeerId(value);
+      cleanup();
+      if (!peerId) return true; // decoded something, but not a connect QR — stop anyway
+      if (peerId === this.userManager.peerId) {
+        alert("That's your own QR code.");
+      } else if (confirm(`Connect to peer "${peerId}"?`)) {
+        this.activateTab('peers');
+        this.connectToPeerId(peerId);
+      }
+      return true;
+    });
+  }
+
+  /**
+   * Generic camera-QR loop shared by the connect scanner and the backup scanner.
+   * Streams the rear camera, decodes with the native BarcodeDetector (or the
+   * vendored jsQR), and calls `onValue(decodedString, cleanup)` for each decode.
+   * `onValue` returns truthy to stop scanning (it must call `cleanup` itself
+   * before any async work) or falsy to ignore this code and keep scanning — so a
+   * scanner can wait for the *right kind* of QR and skip unrelated ones.
+   * @param {string} promptText
+   * @param {(value: string, cleanup: () => void) => boolean | Promise<boolean>} onValue
+   */
+  async _runQrScanner(promptText, onValue) {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      alert('Camera scanning is not available in this browser. Use your phone camera to scan the QR (it opens SpellCast), or paste the peer ID.');
+      alert('Camera scanning is not available in this browser. Use your phone camera to scan the QR, or use the file-based backup instead.');
       return;
     }
 
@@ -753,7 +787,7 @@ export class UIManager {
     video.muted = true;
     const status = document.createElement('div');
     status.className = 'qr-scanner-status';
-    status.textContent = 'Point your camera at a SpellCast QR code…';
+    status.textContent = promptText;
     const cancel = document.createElement('button');
     cancel.className = 'qr-scanner-cancel';
     cancel.textContent = 'Cancel';
@@ -820,22 +854,93 @@ export class UIManager {
       let value = null;
       try { value = await detect(); } catch (_) { /* keep scanning */ }
       if (value) {
-        const peerId = this.extractPeerId(value);
-        cleanup();
-        if (!peerId) return;
-        if (peerId === this.userManager.peerId) {
-          alert("That's your own QR code.");
-          return;
-        }
-        if (confirm(`Connect to peer "${peerId}"?`)) {
-          this.activateTab('peers');
-          this.connectToPeerId(peerId);
-        }
-        return;
+        let consumed = false;
+        try { consumed = await onValue(value, cleanup); } catch (_) { consumed = false; }
+        if (consumed) return; // onValue handled it (and called cleanup)
       }
       setTimeout(tick, 120); // ~8 scans/sec; pauses naturally when the modal closes
     };
     setTimeout(tick, 120);
+  }
+
+  /**
+   * Login-screen flow: scan a "Backup QR" shown by another device, then restore.
+   * Ignores any non-backup QR (e.g. a connect URL) so the user can keep scanning.
+   */
+  async scanBackupQr() {
+    await this._runQrScanner('Point your camera at a SpellCast Backup QR…', async (value, cleanup) => {
+      let envelope;
+      try { envelope = JSON.parse(value); } catch (_) { return false; }
+      if (!envelope || envelope.type !== 'spellcast-identity-backup') return false;
+      cleanup();
+      await this.restoreFromBackupEnvelope(envelope);
+      return true;
+    });
+  }
+
+  /**
+   * Profile flow: passphrase-encrypt the identity and show it as a QR for a
+   * device-to-device move. Reuses the same encrypted backup as the file export.
+   */
+  async showBackupQr() {
+    if (!this.userManager.publicKey) {
+      alert('No exportable credentials are available. (WebCrypto needs HTTPS or localhost.)');
+      return;
+    }
+    const passphrase = prompt('Choose a passphrase to encrypt this backup QR.\n'
+      + 'You will enter this same passphrase on the other device to restore.');
+    if (passphrase === null) return;
+    if (passphrase.length < 6) {
+      alert('Please use a passphrase of at least 6 characters.');
+      return;
+    }
+    const confirmPass = prompt('Re-enter the passphrase to confirm:');
+    if (confirmPass === null) return;
+    if (confirmPass !== passphrase) {
+      alert('Passphrases did not match. Nothing was shown.');
+      return;
+    }
+    try {
+      const { username, peerId } = this.userManager.getUserInfo();
+      const envelope = await this.userManager.identity.exportEncrypted(passphrase, { username, peerId });
+      this.renderBackupQrOverlay(JSON.stringify(envelope));
+    } catch (error) {
+      console.error('Backup QR creation failed:', error);
+      alert(`Could not create a backup QR: ${error.message}`);
+    }
+  }
+
+  /** Render an encrypted-backup string as a QR code in a dismissable overlay. */
+  renderBackupQrOverlay(text) {
+    const overlay = document.createElement('div');
+    overlay.className = 'qr-scanner-overlay';
+
+    const status = document.createElement('div');
+    status.className = 'qr-scanner-status';
+    status.textContent = 'On your other device: Login → Scan Backup QR, then enter your passphrase. '
+      + 'Anyone with this QR AND the passphrase can post as you, so keep it private.';
+
+    const codeBox = document.createElement('div');
+    codeBox.className = 'qr-backup-code';
+
+    const close = document.createElement('button');
+    close.className = 'qr-scanner-cancel';
+    close.textContent = 'Close';
+    close.addEventListener('click', () => overlay.remove());
+
+    overlay.appendChild(status);
+    overlay.appendChild(codeBox);
+    overlay.appendChild(close);
+    document.body.appendChild(overlay);
+
+    // Level M keeps capacity ample for the ~700-byte compact backup while staying
+    // dense enough to scan screen-to-screen.
+    new QRCode(codeBox, {
+      text,
+      width: 320,
+      height: 320,
+      correctLevel: QRCode.CorrectLevel.M
+    });
   }
 
   /**
@@ -922,7 +1027,16 @@ export class UIManager {
       alert('That file is not a valid credential backup (could not parse JSON).');
       return;
     }
+    await this.restoreFromBackupEnvelope(envelope);
+  }
 
+  /**
+   * Decrypt a credential-backup envelope (from a file or a scanned Backup QR),
+   * adopt the restored credentials, and log straight in. Shared by the file
+   * import and the QR scanner so both behave identically.
+   * @param {Object} envelope - parsed backup envelope
+   */
+  async restoreFromBackupEnvelope(envelope) {
     const passphrase = prompt('Enter the passphrase for this credential backup:');
     if (passphrase === null) return;
 

@@ -701,6 +701,18 @@ h4,
     cursor: pointer;
 }
 
+/* White card behind a shown Backup QR (QR modules are dark on light). */
+.qr-backup-code {
+    background: #fff;
+    padding: 16px;
+    border-radius: 16px;
+    line-height: 0;
+}
+.qr-backup-code img,
+.qr-backup-code canvas {
+    display: block;
+}
+
 /* ---- ✨ Spark reaction ---- */
 .spark-button {
     display: inline-flex;
