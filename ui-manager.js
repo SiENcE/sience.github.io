@@ -334,10 +334,10 @@ export class UIManager {
 	  uploadButton.className = 'media-upload-button';
 	  uploadButton.innerHTML = '<span class="icon">📷</span>';
 	  uploadButton.title = 'Add image or GIF (large photos are optimized automatically)';
-	  uploadButton.style.backgroundColor = '#1da1f2';
-	  uploadButton.style.color = 'white';
+	  uploadButton.style.backgroundColor = 'var(--accent)';
+	  uploadButton.style.color = 'var(--on-accent)';
 	  uploadButton.style.border = 'none';
-	  uploadButton.style.borderRadius = '50%';
+	  uploadButton.style.borderRadius = 'var(--radius-btn)'; // follow the active theme's button shape
 	  uploadButton.style.width = '36px';
 	  uploadButton.style.height = '36px';
 	  uploadButton.style.marginRight = '10px';
@@ -501,6 +501,10 @@ export class UIManager {
       // Create the tweet with optional media, targeting the selected circle
       await this.tweetManager.createTweet(content, this.pendingMediaFile, circle);
 
+      // A little gold burst at the Cast button to make casting feel like, well, a spell.
+      const castBtn = document.getElementById('tweet-button');
+      if (castBtn) this.spawnSparkles(castBtn, { count: 12 });
+
       // Jump the feed back to the top so the user sees their own new message.
       this.resetFeedPaging();
 
@@ -593,7 +597,7 @@ export class UIManager {
       this.charCountElement = document.createElement('div');
       this.charCountElement.className = 'char-count';
       this.charCountElement.style.textAlign = 'right';
-      this.charCountElement.style.color = '#657786';
+      this.charCountElement.style.color = 'var(--text-muted)';
       this.charCountElement.style.fontSize = '0.9em';
       this.charCountElement.style.marginTop = '5px';
 
@@ -614,11 +618,11 @@ export class UIManager {
 
       // Change color when approaching limit
       if (remaining < 0) {
-        this.charCountElement.style.color = '#e0245e'; // Red
+        this.charCountElement.style.color = 'var(--danger)'; // Over limit
       } else if (remaining < 20) {
-        this.charCountElement.style.color = '#ffad1f'; // Yellow/Orange
+        this.charCountElement.style.color = '#ffad1f'; // Approaching limit (amber, theme-neutral)
       } else {
-        this.charCountElement.style.color = '#657786'; // Default gray
+        this.charCountElement.style.color = 'var(--text-muted)'; // Default
       }
     });
 
@@ -1016,6 +1020,13 @@ export class UIManager {
     const tweets = this.tweetManager.getAllTweets().filter(t => this.tweetMatchesActiveCircle(t));
     const total = tweets.length;
 
+    // Track which message ids we've already shown, so only genuinely new arrivals
+    // play the "materialize" animation — not every re-render, pagination step, or
+    // circle switch. Seeded from the full known history on the first render.
+    if (!this.seenTweetIds) {
+      this.seenTweetIds = new Set(this.tweetManager.getAllTweets().map(t => t.id));
+    }
+
     if (total === 0) {
       this.disconnectFeedObserver();
       const noTweets = document.createElement('p');
@@ -1050,7 +1061,13 @@ export class UIManager {
     }
 
     for (let i = start; i < end; i++) {
-      tweetsContainer.appendChild(this.buildTweetElement(tweets[i], myName));
+      const t = tweets[i];
+      const el = this.buildTweetElement(t, myName);
+      if (!this.seenTweetIds.has(t.id)) {
+        el.classList.add('tweet--new'); // first appearance → materialize once
+        this.seenTweetIds.add(t.id);
+      }
+      tweetsContainer.appendChild(el);
     }
 
     // Footer: either "Load more" (older rows remain locally), or — when the
@@ -1237,7 +1254,10 @@ export class UIManager {
       sparkButton.title = sparkCount === 1 ? '1 spark received' : `${sparkCount} sparks received`;
     } else {
       sparkButton.title = sparked ? 'Remove your spark' : 'Spark this spell';
-      sparkButton.addEventListener('click', () => this.tweetManager.toggleReaction(tweet.id));
+      sparkButton.addEventListener('click', (e) => {
+        if (!sparked) this.spawnSparkles(e.currentTarget, { count: 6 }); // burst only when adding
+        this.tweetManager.toggleReaction(tweet.id);
+      });
     }
     tweetActions.appendChild(sparkButton);
 
@@ -1314,14 +1334,50 @@ export class UIManager {
   }
 
   getAvatarColor(name, isSelf = false) {
-    if (isSelf) return '#1da1f2';
-    const palette = ['#794bc4', '#e0245e', '#17bf63', '#f45d22', '#e8a400', '#9b59b6', '#00b5ad', '#5a6acd'];
+    // Fixed brand teal (not the theme's --accent, which is too light in dark mode
+    // for the tile's white letter to stay legible).
+    if (isSelf) return '#0e7c86';
+    // Deterministic per-identity ink colors for the letter tiles (warm jewel tones
+    // that read on both light parchment and dark surfaces).
+    const palette = ['#794bc4', '#c4385a', '#2f9e6f', '#d2602a', '#c79100', '#8e44ad', '#0e8f9b', '#4d5bb8'];
     let hash = 0;
     const str = name || '';
     for (let i = 0; i < str.length; i++) {
       hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
     }
     return palette[hash % palette.length];
+  }
+
+  /**
+   * Emit a short-lived burst of ✨ particles radiating from an element's center.
+   * Particles are fixed-positioned on <body> (so card overflow can't clip them)
+   * and self-remove when their animation ends. No-op for reduced-motion users.
+   * @param {HTMLElement} el - element to burst from (e.g. the Cast / Spark button)
+   * @param {{count?: number}} [opts]
+   */
+  spawnSparkles(el, opts = {}) {
+    if (!el) return;
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const count = opts.count || 6;
+
+    for (let i = 0; i < count; i++) {
+      const p = document.createElement('span');
+      p.className = 'sparkle-particle';
+      p.textContent = '✨';
+      const angle = (Math.PI * 2 * i) / count + (Math.random() * 0.6 - 0.3);
+      const dist = 16 + Math.random() * 22;
+      p.style.left = `${cx}px`;
+      p.style.top = `${cy}px`;
+      p.style.fontSize = `${10 + Math.random() * 9}px`;
+      p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+      p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+      p.addEventListener('animationend', () => p.remove());
+      document.body.appendChild(p);
+    }
   }
 
   /**
@@ -1625,8 +1681,8 @@ export class UIManager {
       const placeholder = document.createElement('div');
       placeholder.className = 'media-placeholder';
       placeholder.textContent = 'Loading media...';
-      placeholder.style.backgroundColor = '#f0f0f0';
-      placeholder.style.color = '#666';
+      placeholder.style.backgroundColor = 'var(--surface-3)';
+      placeholder.style.color = 'var(--text-muted)';
       placeholder.style.padding = '20px';
       placeholder.style.borderRadius = '8px';
       placeholder.style.textAlign = 'center';
@@ -1930,13 +1986,13 @@ export class UIManager {
     idElement.className = 'peer-id';
     idElement.textContent = peerInfo.peerId;
     idElement.style.fontSize = '0.8em';
-    idElement.style.color = '#657786';
+    idElement.style.color = 'var(--text-muted)';
 
     // Add last seen info for offline peers
     const lastSeenElement = document.createElement('div');
     lastSeenElement.className = 'peer-last-seen';
     lastSeenElement.style.fontSize = '0.8em';
-    lastSeenElement.style.color = '#657786';
+    lastSeenElement.style.color = 'var(--text-muted)';
 
     if (peerInfo.status === 'online') {
       lastSeenElement.textContent = 'Currently online';
