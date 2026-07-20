@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Christopeit Treadmill & YouTube</title>
+
+<style>
+    /* --- Globale Styles & Dark Dashboard --- */
+    :root {
+        --bg-main: #121418;
+        --bg-panel: #1e2229;
+        --accent-green: #00e676;
+        --accent-blue: #2979ff;
+        --accent-red: #ff3d00;
+        --accent-orange: #ff9100;
+        --accent-purple: #b388ff;
+        --text-main: #ffffff;
+        --text-muted: #8b92a5;
+    }
+
+    body {
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        background-color: var(--bg-main);
+        color: var(--text-main);
+        margin: 0;
+        padding: 20px;
+        box-sizing: border-box;
+    }
+
+    * { box-sizing: border-box; }
+
+    .container { max-width: 1000px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+    /* --- Header --- */
+    header {
+        display: flex; justify-content: space-between; align-items: center;
+        background: var(--bg-panel); padding: 15px 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+    }
+    h1 { margin: 0; font-size: 24px; color: var(--text-main); }
+    .status-badge { display: flex; align-items: center; gap: 10px; font-weight: bold; }
+    .status-dot { width: 12px; height: 12px; border-radius: 50%; background-color: var(--accent-red); box-shadow: 0 0 8px var(--accent-red); }
+    .btn-connect { background-color: var(--accent-blue); color: white; border: none; padding: 10px 20px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; }
+    .btn-connect:active { transform: scale(0.95); }
+
+    /* --- Stats Grid --- */
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+    .stat-card { background: var(--bg-panel); border-radius: 12px; padding: 20px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    .stat-card.main-speed { grid-column: span 2; background: linear-gradient(145deg, #1e2229 0%, #15181d 100%); border: 1px solid #2c323c; }
+    .stat-label { font-size: 14px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
+    .stat-value { font-size: 32px; font-weight: 800; margin: 0; }
+    .stat-value.speed { font-size: 64px; color: var(--accent-green); text-shadow: 0 0 15px rgba(0,230,118,0.3); }
+    .unit { font-size: 16px; color: var(--text-muted); font-weight: normal; }
+
+    /* --- Panels --- */
+    .panel { background: var(--bg-panel); border-radius: 12px; padding: 25px; box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+    
+    .action-buttons { display: flex; flex-wrap: wrap; gap: 15px; justify-content: center; }
+    .btn-action { flex: 1; min-width: 120px; border: none; padding: 15px; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; color: white; }
+    .btn-action:active { transform: scale(0.95); }
+    .btn-control { background-color: var(--accent-orange); }
+    .btn-start   { background-color: var(--accent-green); color: #000; }
+    .btn-pause   { background-color: var(--accent-blue); }
+    .btn-stop    { background-color: var(--accent-red); }
+
+    /* --- Speed Slider --- */
+    .speed-control-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .target-speed-display { font-size: 36px; font-weight: bold; color: var(--text-main); }
+    .speed-slider { width: 100%; appearance: none; height: 12px; background: #2c323c; border-radius: 6px; outline: none; margin: 20px 0; }
+    .speed-slider::-webkit-slider-thumb { appearance: none; width: 32px; height: 32px; border-radius: 50%; background: var(--accent-green); cursor: pointer; box-shadow: 0 0 10px rgba(0, 230, 118, 0.5); }
+    .fine-tune-buttons { display: flex; justify-content: center; gap: 10px; flex-wrap: wrap; }
+    .btn-tune { background-color: #2c323c; color: white; border: 1px solid #3d4554; padding: 12px 24px; border-radius: 8px; font-size: 20px; font-weight: bold; cursor: pointer; }
+    .btn-tune:active { transform: scale(0.95); }
+
+    /* --- YouTube Video Panel --- */
+    .video-settings { display: flex; gap: 15px; margin-bottom: 15px; flex-wrap: wrap; }
+    .video-settings input { flex: 1; min-width: 150px; background: #121418; border: 1px solid #3d4554; color: white; padding: 10px; border-radius: 6px; font-size: 16px; }
+    .video-settings button { background: var(--accent-blue); color: white; border: none; padding: 10px 20px; border-radius: 6px; font-size: 16px; cursor: pointer; }
+    .video-container { position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; background: #000; }
+    .video-container iframe { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+    .video-rate-badge { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 4px; font-size: 14px; color: var(--accent-green); font-weight: bold; z-index: 10; pointer-events: none;}
+
+    /* --- Tracking & Highscore Layout --- */
+    .tracking-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    
+    .history-list { max-height: 400px; overflow-y: auto; padding-right: 5px; }
+    .history-list::-webkit-scrollbar { width: 6px; }
+    .history-list::-webkit-scrollbar-thumb { background: #3d4554; border-radius: 3px; }
+    
+    .run-item { background: #2c323c; padding: 15px; border-radius: 8px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border-left: 4px solid var(--accent-green); }
+    .run-item-left { display: flex; flex-direction: column; gap: 4px; }
+    .run-date { font-size: 12px; color: var(--text-muted); }
+    .run-main-stat { font-size: 20px; font-weight: bold; color: white; }
+    .run-sub-stat { font-size: 13px; color: #a0aabf; }
+    
+    .hs-card { background: #2c323c; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+    .hs-title { font-size: 16px; color: var(--accent-orange); margin-bottom: 10px; border-bottom: 1px solid #3d4554; padding-bottom: 5px; font-weight: bold; }
+    .hs-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 15px; }
+    .hs-val { font-weight: bold; color: white; }
+    .hs-val.top { color: var(--accent-purple); }
+
+    /* --- Console --- */
+    .console-panel { background: #0d0f12; border-radius: 12px; padding: 15px; font-family: monospace; font-size: 13px; color: #a0aabf; height: 120px; overflow-y: auto; border: 1px solid #1e2229; }
+    .log-time { color: #5c677d; margin-right: 10px; }
+
+    @media (max-width: 768px) { 
+        .stat-card.main-speed { grid-column: span 1; } 
+        header { flex-direction: column; gap: 15px; }
+        .tracking-grid { grid-template-columns: 1fr; } 
+    }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>Christopeit Control</h1>
+        <div class="status-badge">
+            <div id="statusDot" class="status-dot"></div>
+            <span id="statusText">Nicht verbunden</span>
+        </div>
+        <button id="btnConnect" class="btn-connect">🟢 Verbinden</button>
+    </header>
+
+    <div class="stats-grid">
+        <div class="stat-card main-speed">
+            <div class="stat-label">Live-Geschwindigkeit</div>
+            <div class="stat-value speed" id="liveSpeed">0.0<span class="unit"> km/h</span></div>
+        </div>
+        <div class="stat-card"><div class="stat-label">Distanz</div><div class="stat-value" id="valDist">0.00<span class="unit"> km</span></div></div>
+        <div class="stat-card"><div class="stat-label">Zeit</div><div class="stat-value" id="valTime">00:00</div></div>
+        <div class="stat-card"><div class="stat-label">Kalorien</div><div class="stat-value" id="valKcal">0<span class="unit"> kcal</span></div></div>
+        <div class="stat-card"><div class="stat-label">Puls (HR)</div><div class="stat-value" id="valHr">--<span class="unit"> bpm</span></div></div>
+    </div>
+
+    <!-- YouTube Kino Modus -->
+    <div class="panel">
+        <div class="stat-label" style="margin-bottom:15px;">Kino Modus (Virtual Run)</div>
+        <div class="video-settings">
+            <input type="text" id="ytVideoId" placeholder="YouTube Video ID" value="KiEN4HxM4ic">
+            <input type="number" id="baseSpeed" placeholder="Basis-Geschw. des Videos" value="10.0" step="0.5">
+            <button onclick="loadYouTubeVideo()">Video laden</button>
+        </div>
+        <div class="video-container" id="playerContainer">
+            <div id="videoRate" class="video-rate-badge">1.00x Speed</div>
+            <div id="ytPlayer"></div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="stat-label" style="margin-bottom:15px; text-align:center;">Laufband Kontrolle</div>
+        <div class="action-buttons">
+            <button class="btn-action btn-control" onclick="requestControl()">🔓 Kontrolle anfordern</button>
+            <button class="btn-action btn-start" onclick="startSequence()">▶️ Start</button>
+            <button class="btn-action btn-pause" onclick="pauseTreadmill()">⏸ Pause</button>
+            <button class="btn-action btn-stop" onclick="stopTreadmill()">⏹ Stop (Speichern)</button>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="speed-control-header">
+            <div class="stat-label">Ziel-Geschwindigkeit</div>
+            <div class="target-speed-display" id="targetSpeedText">5.0 km/h</div>
+        </div>
+        <input type="range" id="speedSlider" class="speed-slider" min="0.8" max="16.0" step="0.1" value="5.0">
+        <div class="fine-tune-buttons">
+            <button class="btn-tune" onclick="changeSpeed(-0.5)">-0.5</button>
+            <button class="btn-tune" onclick="changeSpeed(-0.1)">-0.1</button>
+            <button class="btn-tune" onclick="changeSpeed(0.1)">+0.1</button>
+            <button class="btn-tune" onclick="changeSpeed(0.5)">+0.5</button>
+        </div>
+    </div>
+
+    <!-- NEU: Historie & Highscores -->
+    <div class="tracking-grid">
+        <div class="panel">
+            <div class="stat-label" style="display:flex; justify-content:space-between;">
+                Meine Läufe
+                <span id="recordingIndicator" style="color:var(--accent-green); display:none;">⏺ Aufzeichnung läuft...</span>
+            </div>
+            <div class="history-list" id="historyContainer">
+                <!-- Läufe werden hier per JS eingefügt -->
+            </div>
+        </div>
+        
+        <div class="panel">
+            <div class="stat-label">Highscores & Statistiken</div>
+            <div id="highscoreContainer">
+                <!-- Highscores werden hier per JS eingefügt -->
+            </div>
+        </div>
+    </div>
+
+    <div class="console-panel" id="consoleOutput"></div>
+</div>
+
+<!-- Offizielle YouTube IFrame API -->
+<script src="https://www.youtube.com/iframe_api"></script>
+<script>
+    // --- 1. DATENSPEICHER & AUFZEICHNUNG LOGIK ---
+    let runHistory = JSON.parse(localStorage.getItem('treadmillRuns')) || [];
+    let activeRun = { isRecording: false, startTime: null, maxDist: 0, maxKcal: 0, maxTimeSec: 0 };
+
+    function formatTimeStr(sec) {
+        let mins = Math.floor(sec / 60).toString().padStart(2, '0');
+        let secs = (sec % 60).toString().padStart(2, '0');
+        return `${mins}:${secs}`;
+    }
+
+    function checkRunRecording(liveDistKm, liveKcal, liveTimeSec) {
+        // Starte Aufzeichnung, sobald sich das Band bewegt (Distanz > 0)
+        if (liveDistKm > 0 && !activeRun.isRecording) {
+            activeRun.isRecording = true;
+            activeRun.startTime = new Date().toISOString();
+            document.getElementById('recordingIndicator').style.display = 'block';
+            log("⏺ Neue Aufzeichnung gestartet.");
+        }
+
+        // Aktualisiere Werte, solange die Aufzeichnung läuft
+        if (activeRun.isRecording) {
+            // Spezielle Logik: Wenn das Laufband zurücksetzt (Distanz plötzlich 0), aber wir vorher schon gelaufen sind -> Speichern!
+            if (liveDistKm === 0 && activeRun.maxDist > 0.05) {
+                saveRun();
+            } else {
+                activeRun.maxDist = liveDistKm;
+                activeRun.maxKcal = liveKcal;
+                activeRun.maxTimeSec = liveTimeSec;
+            }
+        }
+    }
+
+    function saveRun() {
+        if (!activeRun.isRecording || activeRun.maxDist < 0.05) {
+            // Verwerfen, wenn Lauf kürzer als 50m
+            resetRunState();
+            return;
+        }
+
+        const newRun = {
+            id: Date.now(),
+            date: activeRun.startTime,
+            distance: activeRun.maxDist,
+            kcal: activeRun.maxKcal,
+            timeSec: activeRun.maxTimeSec
+        };
+
+        runHistory.push(newRun);
+        localStorage.setItem('treadmillRuns', JSON.stringify(runHistory));
+        log(`💾 Lauf gespeichert: ${newRun.distance.toFixed(2)} km in ${formatTimeStr(newRun.timeSec)}`);
+        
+        resetRunState();
+        renderStats();
+    }
+
+    function resetRunState() {
+        activeRun = { isRecording: false, startTime: null, maxDist: 0, maxKcal: 0, maxTimeSec: 0 };
+        document.getElementById('recordingIndicator').style.display = 'none';
+    }
+
+    // --- 2. RENDER LOGIK FÜR HISTORIE UND HIGHSCORES ---
+    function isSameDay(d1, d2) { return d1.getDate() === d2.getDate() && d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear(); }
+    function isSameMonth(d1, d2) { return d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear(); }
+    function isSameWeek(d1, d2) {
+        // Berechnet, ob d1 in der gleichen Kalenderwoche wie d2 liegt (Wochenstart: Montag)
+        let day1 = d1.getDay() || 7; let day2 = d2.getDay() || 7;
+        let monday1 = new Date(d1); monday1.setDate(d1.getDate() - day1 + 1); monday1.setHours(0,0,0,0);
+        let monday2 = new Date(d2); monday2.setDate(d2.getDate() - day2 + 1); monday2.setHours(0,0,0,0);
+        return monday1.getTime() === monday2.getTime();
+    }
+
+    function renderStats() {
+        // HISTORIE RENDERN (die letzten 20 Läufe absteigend)
+        const histContainer = document.getElementById('historyContainer');
+        histContainer.innerHTML = '';
+        const reversedHistory = [...runHistory].reverse().slice(0, 20);
+        
+        if(reversedHistory.length === 0) {
+            histContainer.innerHTML = '<div style="color:var(--text-muted); text-align:center; margin-top:20px;">Noch keine Läufe aufgezeichnet. Start das Laufband!</div>';
+        }
+
+        reversedHistory.forEach(run => {
+            let d = new Date(run.date);
+            let dateStr = d.toLocaleDateString('de-DE') + ' ' + d.toLocaleTimeString('de-DE', {hour: '2-digit', minute:'2-digit'});
+            let html = `
+                <div class="run-item">
+                    <div class="run-item-left">
+                        <div class="run-date">${dateStr}</div>
+                        <div class="run-main-stat">${run.distance.toFixed(2)} km</div>
+                    </div>
+                    <div class="run-item-right" style="text-align:right;">
+                        <div class="run-sub-stat">${formatTimeStr(run.timeSec)} Min.</div>
+                        <div class="run-sub-stat" style="color:var(--accent-orange);">${run.kcal} kcal</div>
+                    </div>
+                </div>`;
+            histContainer.innerHTML += html;
+        });
+
+        // HIGHSCORES RENDERN
+        const today = new Date();
+        let stats = {
+            today: { dist: 0, best: 0 },
+            week: { dist: 0, best: 0 },
+            month: { dist: 0, best: 0 }
+        };
+
+        runHistory.forEach(run => {
+            let rDate = new Date(run.date);
+            if (isSameDay(rDate, today)) {
+                stats.today.dist += run.distance;
+                if (run.distance > stats.today.best) stats.today.best = run.distance;
+            }
+            if (isSameWeek(rDate, today)) {
+                stats.week.dist += run.distance;
+                if (run.distance > stats.week.best) stats.week.best = run.distance;
+            }
+            if (isSameMonth(rDate, today)) {
+                stats.month.dist += run.distance;
+                if (run.distance > stats.month.best) stats.month.best = run.distance;
+            }
+        });
+
+        const hsContainer = document.getElementById('highscoreContainer');
+        hsContainer.innerHTML = `
+            <div class="hs-card">
+                <div class="hs-title">Heute</div>
+                <div class="hs-row"><span>Gesamtdistanz:</span> <span class="hs-val">${stats.today.dist.toFixed(2)} km</span></div>
+                <div class="hs-row"><span>Längster Lauf:</span> <span class="hs-val top">${stats.today.best.toFixed(2)} km</span></div>
+            </div>
+            <div class="hs-card">
+                <div class="hs-title">Diese Woche</div>
+                <div class="hs-row"><span>Gesamtdistanz:</span> <span class="hs-val">${stats.week.dist.toFixed(2)} km</span></div>
+                <div class="hs-row"><span>Längster Lauf:</span> <span class="hs-val top">${stats.week.best.toFixed(2)} km</span></div>
+            </div>
+            <div class="hs-card">
+                <div class="hs-title">Dieser Monat</div>
+                <div class="hs-row"><span>Gesamtdistanz:</span> <span class="hs-val">${stats.month.dist.toFixed(2)} km</span></div>
+                <div class="hs-row"><span>Längster Lauf:</span> <span class="hs-val top">${stats.month.best.toFixed(2)} km</span></div>
+            </div>
+        `;
+    }
+
+    // --- YouTube & Standard UI Init ---
+    let player;
+    function onYouTubeIframeAPIReady() { loadYouTubeVideo(); }
+    function loadYouTubeVideo() {
+        const videoId = document.getElementById('ytVideoId').value;
+        if (player && player.loadVideoById) { player.loadVideoById(videoId); } 
+        else {
+            player = new YT.Player('ytPlayer', {
+                height: '100%', width: '100%', videoId: videoId,
+                playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0 }
+            });
+        }
+    }
+
+    function updateVideoPlaybackRate(liveSpeedKmh) {
+        if (!player || !player.setPlaybackRate) return;
+        let baseSpeed = parseFloat(document.getElementById('baseSpeed').value) || 10.0;
+        if (liveSpeedKmh < 0.1) {
+            if(player.getPlayerState() === YT.PlayerState.PLAYING) player.pauseVideo();
+            document.getElementById('videoRate').innerText = "PAUSIERT";
+            return;
+        }
+        if (player.getPlayerState() !== YT.PlayerState.PLAYING) player.playVideo();
+        let rate = liveSpeedKmh / baseSpeed;
+        if (rate < 0.25) rate = 0.25; if (rate > 2.0) rate = 2.0;
+        player.setPlaybackRate(rate);
+        document.getElementById('videoRate').innerText = `${rate.toFixed(2)}x Speed`;
+    }
+
+    // --- BLE FTMS Logik ---
+    let bluetoothDevice, controlPointChar, treadmillDataChar;
+    const elStatusDot = document.getElementById('statusDot');
+    const elStatusText = document.getElementById('statusText');
+    const elLiveSpeed = document.getElementById('liveSpeed');
+    const elConsole = document.getElementById('consoleOutput');
+
+    window.onload = () => {
+        const savedSpeed = localStorage.getItem('lastTreadmillSpeed');
+        if (savedSpeed) {
+            document.getElementById('speedSlider').value = savedSpeed;
+            document.getElementById('targetSpeedText').innerText = parseFloat(savedSpeed).toFixed(1) + " km/h";
+        }
+        renderStats(); // Historie beim Start laden!
+        log("System bereit.");
+    };
+
+    function log(msg) {
+        const now = new Date();
+        const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+        elConsole.innerHTML += `<div><span class="log-time">[${timeStr}]</span> ${msg}</div>`;
+        elConsole.scrollTop = elConsole.scrollHeight;
+    }
+
+    document.getElementById('btnConnect').addEventListener('click', async () => {
+        try {
+            bluetoothDevice = await navigator.bluetooth.requestDevice({ filters: [{ services: ['fitness_machine'] }] });
+            bluetoothDevice.addEventListener('gattserverdisconnected', () => {
+                updateStatus("Getrennt", "var(--accent-red)");
+                saveRun(); // Bei Abbruch auch speichern!
+                log("Verbindung verloren.");
+            });
+            await connectToDevice(bluetoothDevice);
+        } catch (error) { log(`Fehler: ${error}`); }
+    });
+
+    async function connectToDevice(device) {
+        updateStatus("Verbinde...", "#ff9100");
+        const server = await device.gatt.connect();
+        const service = await server.getPrimaryService('fitness_machine');
+        treadmillDataChar = await service.getCharacteristic('00002acd-0000-1000-8000-00805f9b34fb');
+        controlPointChar = await service.getCharacteristic('00002ad9-0000-1000-8000-00805f9b34fb');
+
+        await controlPointChar.startNotifications();
+        await treadmillDataChar.startNotifications();
+        treadmillDataChar.addEventListener('characteristicvaluechanged', handleTreadmillData);
+
+        updateStatus("Verbunden", "var(--accent-green)");
+        log("FTMS bereit.");
+    }
+
+    function updateStatus(text, color) {
+        elStatusText.innerText = text;
+        elStatusDot.style.backgroundColor = color;
+        elStatusDot.style.boxShadow = `0 0 8px ${color}`;
+    }
+
+    function delay(ms) { return new Promise(resolve => setTimeout(resolve, ms)); }
+
+    function handleTreadmillData(event) {
+        const value = event.target.value;
+        const flags = value.getUint16(0, true);
+        let pos = 2;
+
+        let liveSpeedKmh = value.getUint16(pos, true) / 100;
+        elLiveSpeed.innerHTML = `${liveSpeedKmh.toFixed(1)}<span class="unit"> km/h</span>`;
+        pos += 2;
+
+        updateVideoPlaybackRate(liveSpeedKmh);
+
+        let liveDistKm = 0;
+        let liveKcal = 0;
+        let liveTimeSec = 0;
+
+        if (flags & (1 << 1)) pos += 2; 
+        if (flags & (1 << 2)) { 
+            let distMeters = value.getUint8(pos) | (value.getUint8(pos+1) << 8) | (value.getUint8(pos+2) << 16);
+            liveDistKm = distMeters / 1000;
+            document.getElementById('valDist').innerHTML = `${liveDistKm.toFixed(2)}<span class="unit"> km</span>`;
+            pos += 3;
+        }
+        if (flags & (1 << 3)) pos += 4; 
+        if (flags & (1 << 4)) pos += 4; 
+        if (flags & (1 << 5)) pos += 1; 
+        if (flags & (1 << 6)) pos += 1; 
+        if (flags & (1 << 7)) { 
+            liveKcal = value.getUint16(pos, true);
+            document.getElementById('valKcal').innerHTML = `${liveKcal}<span class="unit"> kcal</span>`;
+            pos += 5; 
+        }
+        if (flags & (1 << 8)) { 
+            document.getElementById('valHr').innerHTML = `${value.getUint8(pos)}<span class="unit"> bpm</span>`;
+            pos += 1;
+        }
+        if (flags & (1 << 9)) pos += 1; 
+        if (flags & (1 << 10)) { 
+            liveTimeSec = value.getUint16(pos, true);
+            document.getElementById('valTime').innerText = formatTimeStr(liveTimeSec);
+        }
+
+        // AUFZEICHNUNG PRÜFEN UND UPDATEN
+        checkRunRecording(liveDistKm, liveKcal, liveTimeSec);
+    }
+
+    async function sendFTMSCommand(cmdArray, logMsg) {
+        if (!controlPointChar) return;
+        try {
+            if(logMsg) log(logMsg);
+            await controlPointChar.writeValue(new Uint8Array(cmdArray));
+        } catch (e) { log(`Fehler: ${e}`); }
+    }
+
+    async function requestControl() { await sendFTMSCommand([0x00], "-> Request Control"); }
+    async function pauseTreadmill() { await sendFTMSCommand([0x08, 0x02], "-> Pause"); }
+    
+    async function stopTreadmill() { 
+        await sendFTMSCommand([0x08, 0x01], "-> Stop"); 
+        // WICHTIG: Manueller Klick auf Stop speichert sofort ab!
+        saveRun();
+    }
+
+    async function sendTargetSpeed(speed) {
+        const s = Math.round(speed * 100);
+        await sendFTMSCommand([0x02, s & 255, (s >> 8) & 255], `-> Setze Speed: ${speed.toFixed(1)}`);
+    }
+
+    async function startSequence() {
+        if (!controlPointChar) { alert("Nicht verbunden!"); return; }
+        await requestControl(); await delay(500);
+        await sendFTMSCommand([0x07], "-> Start"); await delay(2000);
+        await sendTargetSpeed(1.0); await delay(2500);
+        
+        const targetSpeed = parseFloat(document.getElementById('speedSlider').value);
+        if (targetSpeed !== 1.0) await sendTargetSpeed(targetSpeed);
+    }
+
+    function updateTargetSpeedUI(val) {
+        let speed = parseFloat(val);
+        if (speed < 0.8) speed = 0.8;
+        if (speed > 16.0) speed = 16.0;
+        document.getElementById('speedSlider').value = speed;
+        document.getElementById('targetSpeedText').innerText = speed.toFixed(1) + " km/h";
+        localStorage.setItem('lastTreadmillSpeed', speed);
+        return speed;
+    }
+
+    async function changeSpeed(delta) {
+        let newSpeed = updateTargetSpeedUI(parseFloat(document.getElementById('speedSlider').value) + delta);
+        await sendTargetSpeed(newSpeed);
+    }
+
+    document.getElementById('speedSlider').addEventListener('input', (e) => document.getElementById('targetSpeedText').innerText = parseFloat(e.target.value).toFixed(1) + " km/h");
+    document.getElementById('speedSlider').addEventListener('change', async (e) => await sendTargetSpeed(updateTargetSpeedUI(e.target.value)));
+
+</script>
+
+</body>
+</html>
