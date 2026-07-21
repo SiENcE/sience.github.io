@@ -1,176 +1,397 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <!--
-      Content-Security-Policy (defence-in-depth behind the SRI'd CDN tags and the
-      XSS-safe DOM rendering). The key protection is `script-src` WITHOUT
-      'unsafe-inline'/'unsafe-eval' — PeerJS 1.5 no longer needs eval — so injected
-      markup cannot execute script.
-        - img-src allows https: + data: because link previews legitimately load
-          remote favicons/thumbnails and message media is inline data: URIs.
-        - connect-src allows https:/wss: for the PeerJS signalling broker (WebRTC
-          ICE/STUN/TURN is not governed by CSP).
-        - style-src keeps 'unsafe-inline' for the few static inline styles and the
-          third-party QR widget; this is low-risk since scripts are locked down.
-      Note: frame-ancestors / clickjacking protection must be set as a real HTTP
-      header (X-Frame-Options / frame-ancestors) at deploy time — it is ignored in
-      a <meta> CSP.
-    -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'none'; object-src 'none'; form-action 'none'; script-src 'self' https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self'; connect-src 'self' https: wss:">
-    <meta name="referrer" content="no-referrer">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpellCast</title>
-    <!-- Theme bootstrap: must run before paint to avoid a flash of the wrong theme -->
-    <script src="theme.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"
-            integrity="sha512-XEKeWX+mI3Ov+tg2evDlVQFzVOIp4T8J3cNcCEPaEUGpxJV3eZaN8rHuvnFPvQpGJBHPmrozJDMpm2xcDvtmyQ=="
-            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
-            integrity="sha512-CNgIRecGo7nphbeZ04Sc13ka07paqdeTu0WR1IM4kNcpmBAUSHSQX0FslNhTDadL4O5SAGapGt4FodqL8My0mA=="
-            crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-	<link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <header>
-        <h1>✨ SpellCast</h1>
-        <select id="theme-picker" class="theme-picker" aria-label="Choose a theme">
-            <option value="hex">★ Hex</option>
-            <option value="clean">Clean · light</option>
-            <option value="clean-dark">Clean · dark</option>
-            <option value="brutalist">Retro</option>
-            <option value="terminal">Terminal</option>
-        </select>
-    </header>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Home of SiENcE</title>
 
-    <div id="intro-container" class="container" style="display: none;">
-        <h2>Welcome to SpellCast</h2>
-        <p>A decentralized, peer-to-peer Twitter clone that works directly in your browser!</p>
-        <p>No servers, no tracking, just peer-to-peer communication.</p>
-        <button id="create-button">Create New Credentials</button>
-        <button id="login-button">Login with Credentials</button>
-    </div>
+        <!--
+            ┌─ hey, you read the source. good.
+            │
+            │  there's a raytracer hidden in this page. a real one —
+            │  ray/sphere intersection, shadows, recursive reflections,
+            │  supersampling. no libraries, no canvas tricks. ~3 KB of math.
+            │
+            │  type  t r a c e  anywhere.
+            └─
+        -->
 
-    <div id="setup-container" class="container">
-        <h2>Create Your Credentials</h2>
-        <div>
-            <label for="username">Choose a username:</label>
-            <input type="text" id="username" placeholder="Enter username">
-        </div>
-        <button id="generate-button">Generate Your Credentials</button>
-        <div id="credentials" style="display: none;">
-            <p>Your peer ID (keep this private!):</p>
-            <code id="peer-id"></code>
-            <div id="qrcode"></div>
-            <p>Scan this QR code with another device to connect, or share your peer ID securely.</p>
-            <button id="continue-button">Continue to App</button>
-        </div>
-    </div>
+        <style>
+            *,
+            *::before,
+            *::after {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+            body {
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: #09090b;
+                color: #a1a1aa;
+                font-family:
+                    ui-monospace, "JetBrains Mono", "Fira Code", monospace;
+                font-size: 1rem;
+            }
+            a {
+                color: #e4e4e7;
+                text-decoration: none;
+                border-bottom: 1px solid #3f3f46;
+                padding-bottom: 1px;
+                transition:
+                    color 0.2s,
+                    border-color 0.2s;
+            }
+            a:hover {
+                color: #ffffff;
+                border-color: #a1a1aa;
+            }
+            .card {
+                text-align: center;
+                display: flex;
+                flex-direction: column;
+                gap: 1.5rem;
+            }
+            .name {
+                font-size: 1.5rem;
+                font-weight: 600;
+                color: #e4e4e7;
+                letter-spacing: 0.05em;
+            }
+            .links {
+                display: flex;
+                flex-direction: column;
+                gap: 0.75rem;
+                align-items: center;
+            }
+            .hint {
+                margin-top: 0.5rem;
+                color: #1f1f23;
+                font-size: 0.72rem;
+                letter-spacing: 0.05em;
+                user-select: none;
+            }
 
-    <div id="login-container" class="container">
-        <h2>Login</h2>
-        <div>
-            <label for="login-username">Username:</label>
-            <input type="text" id="login-username" placeholder="Enter username">
+            /* ── raytracer overlay ───────────────────────────── */
+            #rt {
+                position: fixed;
+                inset: 0;
+                background: #000;
+                display: none;
+                z-index: 50;
+                opacity: 0;
+                transition: opacity 0.4s ease;
+            }
+            #rt.on {
+                display: flex;
+                opacity: 1;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+            }
+            #rt canvas {
+                max-width: 92vw;
+                max-height: 78vh;
+                box-shadow: 0 0 80px rgba(0, 0, 0, 0.9);
+                border: 1px solid #18181b;
+            }
+            #rt .bar {
+                margin-top: 1rem;
+                color: #3f3f46;
+                font-size: 0.8rem;
+                letter-spacing: 0.1em;
+                display: flex;
+                gap: 1.5rem;
+                align-items: center;
+            }
+            #rt .bar a {
+                cursor: pointer;
+            }
+            #rt .prog {
+                width: 9rem;
+                height: 2px;
+                background: #18181b;
+                overflow: hidden;
+            }
+            #rt .prog i {
+                display: block;
+                height: 100%;
+                width: 0;
+                background: #a1a1aa;
+                transition: width 0.1s linear;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="card">
+            <div class="name">Home of SiENcE</div>
+            <div class="links">
+                <div>
+                    <a
+                        href="https://github.com/SiENcE"
+                        target="_blank"
+                        rel="noopener"
+                        >github.com/SiENcE</a
+                    >
+                </div>
+                <div>
+                    <a
+                        href="https://github.com/SiENcE/mosaik8"
+                        target="_blank"
+                        rel="noopener"
+                        ><b>Mosaik8</b> - high-level language/framework for 8bit (GB, GBC, SMS, GG, NES, Lynx, PCe, ...)</a
+                    >
+                </div>
+                <div>
+                    <a
+                        href="https://github.com/SiENcE/luis"
+                        target="_blank"
+                        rel="noopener"
+                        ><b>Luis</b> - is a flexible graphical user interface on top of Löve2D</a
+                    >
+                </div>
+                <div>
+                    <a href="/treadmillian/"
+                        ><b>Treadmillian</b> - free app to control your treadmill in chrome (PC/Android/Mac/..) with video support</a
+                    >
+                </div>
+            </div>
+            <div class="hint">type a word.</div>
         </div>
-        <div>
-            <label for="login-peerid">Peer ID:</label>
-            <input type="text" id="login-peerid" placeholder="Enter your peer ID">
-        </div>
-        <button id="login-continue-button">Login</button>
 
-        <div class="login-import">
-            <p class="hint">Have a credential backup file? Restore your credentials (key + username + peer ID):</p>
-            <input type="file" id="import-identity-file" accept="application/json,.json">
-            <button id="import-identity-button">Import Credential Backup</button>
-            <button id="scan-backup-qr-button" type="button">Scan Backup QR</button>
-        </div>
-    </div>
-
-    <div id="app-container" class="container">
-        <div class="user-info">
-            <p class="user-greeting">Logged in as <span id="current-user"></span></p>
-            <div class="status-pill">
-                <div id="connection-quality" class="unknown"></div>
-                <span id="status">Not connected to any peers</span>
+        <!-- the hidden bit -->
+        <div id="rt" aria-hidden="true">
+            <canvas id="rtc" width="640" height="400"></canvas>
+            <div class="bar">
+                <span id="rtinfo">tracing&hellip;</span>
+                <span class="prog"><i id="rtbar"></i></span>
+                <a id="rtclose">esc</a>
             </div>
         </div>
 
-        <div class="app-body">
-            <aside id="circles-sidebar">
-                <h3>Circles</h3>
-                <div id="circles-sidebar-list"></div>
-            </aside>
+        <script>
+            "use strict";
 
-            <div class="app-main">
-                <div class="tab-container">
-                    <div class="tab active" id="feed-tab">Feed</div>
-                    <div class="tab" id="peers-tab">Connect</div>
-                    <div class="tab" id="circles-tab">Circles</div>
-                    <div class="tab" id="profile-tab">Profile</div>
-                </div>
+            /* ============================================================
+               A small but real recursive ray tracer.
 
-                <div id="feed-container">
-                    <div id="feed-heading"></div>
-                    <div id="tweet-form">
-                        <textarea id="tweet-content" placeholder="Cast your spell..." rows="3"></textarea>
-                        <div class="tweet-form-actions">
-                            <span id="cast-target" class="cast-target">Casting to: All Peers</span>
-                            <button id="tweet-button">Cast</button>
-                        </div>
-                    </div>
-                    <div id="tweets-container"></div>
-                </div>
+               - ray / sphere analytic intersection
+               - ray / plane (procedural checker floor)
+               - Lambert diffuse + Blinn-Phong specular
+               - hard shadows via shadow rays
+               - recursive mirror reflections (bounded depth)
+               - 2x2 supersampling, gamma-correct output
+               - rendered in non-blocking row chunks
 
-                <div id="peers-container" style="display: none;">
-                    <div id="connect-form">
-                        <label for="connect-id">Connect to a peer by ID or invite link:</label>
-                        <input type="text" id="connect-id" placeholder="Paste a peer ID or invite link">
-                        <div class="connect-actions">
-                            <button id="connect-button">Connect</button>
-                            <button id="scan-qr-button" type="button" title="Scan a friend's QR code with your camera">📷 Scan QR</button>
-                        </div>
-                    </div>
-                    <h3>Connected Peers</h3>
-                    <div id="peers-list"></div>
-                </div>
+               No libraries. ~3 KB of math.
+               ============================================================ */
 
-                <div id="circles-container" style="display: none;">
-                    <div id="create-circle-form">
-                        <label for="new-circle-name">Create a new circle:</label>
-                        <input type="text" id="new-circle-name" placeholder="Circle name">
-                        <button id="create-circle-button">Create</button>
-                        <p class="hint">Group your peers into circles to filter your feed and send messages to specific groups.</p>
-                    </div>
-                    <div id="circles-manage-list"></div>
-                </div>
+            // --- minimal vec3 ----------------------------------------
+            const V = (x, y, z) => ({ x, y, z });
+            const add = (a, b) => V(a.x + b.x, a.y + b.y, a.z + b.z);
+            const sub = (a, b) => V(a.x - b.x, a.y - b.y, a.z - b.z);
+            const mul = (a, s) => V(a.x * s, a.y * s, a.z * s);
+            const had = (a, b) => V(a.x * b.x, a.y * b.y, a.z * b.z);
+            const dot = (a, b) => a.x * b.x + a.y * b.y + a.z * b.z;
+            const len = (a) => Math.sqrt(dot(a, a));
+            const norm = (a) => mul(a, 1 / len(a));
+            const reflect = (d, n) => sub(d, mul(n, 2 * dot(d, n)));
 
-                <div id="profile-container" style="display: none;">
-                    <h3>Your Profile</h3>
-                    <div class="profile-info">
-                        <p><strong>Username:</strong> <span id="profile-username"></span></p>
-                        <p><strong>Your Peer ID:</strong> <span id="profile-peerid"></span></p>
-                        <div id="profile-qrcode" class="profile-qrcode"></div>
-                        <p class="hint">Have a friend scan this code with their phone camera to connect — it opens SpellCast directly. Or send them an invite link:</p>
-                        <div class="invite-actions">
-                            <button id="share-invite-button" type="button">Share invite link</button>
-                            <button id="copy-invite-button" type="button">Copy link</button>
-                        </div>
-                    </div>
-                    <div class="profile-actions">
-                        <button id="export-identity-button">Export Credential Backup</button>
-                        <button id="show-backup-qr-button">Show Backup QR</button>
-                        <button id="cleanup-storage-button">Clean Up Storage</button>
-                        <button id="delete-all-messages-button" class="danger-button">Delete All Messages</button>
-                        <button id="delete-credentials-button" class="danger-button">Delete Credentials</button>
-                    </div>
-                    <p class="hint">Export a passphrase-encrypted backup of your identity (signing key). Keep it safe — it is the only way to recover or move these credentials to another device.</p>
-                </div>
-            </div>
-        </div>
-    </div>
+            // --- scene -----------------------------------------------
+            const spheres = [
+                { c: V(-1.1, 0.0, -1.0), r: 0.5, col: V(0.95, 0.35, 0.35), spec: 0.35, mir: 0.0 },
+                { c: V(0.0, -0.05, -1.4), r: 0.55, col: V(0.85, 0.85, 0.9), spec: 0.9, mir: 0.85 },
+                { c: V(1.1, 0.0, -1.0), r: 0.5, col: V(0.4, 0.55, 0.95), spec: 0.4, mir: 0.15 },
+                { c: V(0.0, -100.5, -1.0), r: 100.0, plane: true, mir: 0.25 }, // big sphere = "floor"
+            ];
+            const light = V(2.0, 3.5, 0.5);
+            const lightCol = V(1.0, 0.98, 0.92);
+            const ambient = 0.06;
+            const MAXD = 4;
+            const EPS = 1e-4;
 
-    <!-- Reference to external JavaScript file -->
-    <script type="module" src="app.js"></script>
-</body>
+            function checker(p, scale) {
+                const s =
+                    (Math.floor(p.x * scale) + Math.floor(p.z * scale)) & 1;
+                return s ? V(0.16, 0.16, 0.18) : V(0.62, 0.62, 0.66);
+            }
+
+            function hit(ro, rd) {
+                let best = null,
+                    bt = Infinity;
+                for (const s of spheres) {
+                    const oc = sub(ro, s.c);
+                    const b = dot(oc, rd);
+                    const c = dot(oc, oc) - s.r * s.r;
+                    const disc = b * b - c;
+                    if (disc < 0) continue;
+                    const sq = Math.sqrt(disc);
+                    let t = -b - sq;
+                    if (t < EPS) t = -b + sq;
+                    if (t < EPS || t >= bt) continue;
+                    bt = t;
+                    const p = add(ro, mul(rd, t));
+                    const n = norm(sub(p, s.c));
+                    const col = s.plane ? checker(p, 1.4) : s.col;
+                    const spec = s.plane ? 0.1 : s.spec;
+                    best = { t, p, n, col, spec, mir: s.mir };
+                }
+                return best;
+            }
+
+            function inShadow(p, n) {
+                const ld = norm(sub(light, p));
+                const o = add(p, mul(n, EPS * 10));
+                const distL = len(sub(light, p));
+                for (const s of spheres) {
+                    const oc = sub(o, s.c);
+                    const b = dot(oc, ld);
+                    const c = dot(oc, oc) - s.r * s.r;
+                    const disc = b * b - c;
+                    if (disc < 0) continue;
+                    const t = -b - Math.sqrt(disc);
+                    if (t > EPS && t < distL) return true;
+                }
+                return false;
+            }
+
+            function trace(ro, rd, depth) {
+                const h = hit(ro, rd);
+                if (!h) {
+                    // sky gradient
+                    const t = 0.5 * (norm(rd).y + 1.0);
+                    return add(
+                        mul(V(0.04, 0.05, 0.07), 1 - t),
+                        mul(V(0.18, 0.26, 0.42), t),
+                    );
+                }
+                let c = mul(h.col, ambient);
+                if (!inShadow(h.p, h.n)) {
+                    const ld = norm(sub(light, h.p));
+                    const diff = Math.max(0, dot(h.n, ld));
+                    c = add(c, mul(had(h.col, lightCol), diff));
+                    const vd = norm(mul(rd, -1));
+                    const half = norm(add(ld, vd));
+                    const sp = Math.pow(Math.max(0, dot(h.n, half)), 64);
+                    c = add(c, mul(lightCol, sp * h.spec));
+                }
+                if (h.mir > 0 && depth < MAXD) {
+                    const rdir = norm(reflect(rd, h.n));
+                    const ro2 = add(h.p, mul(h.n, EPS * 10));
+                    const rc = trace(ro2, rdir, depth + 1);
+                    c = add(mul(c, 1 - h.mir), mul(rc, h.mir));
+                }
+                return c;
+            }
+
+            // --- non-blocking renderer -------------------------------
+            const canvas = document.getElementById("rtc");
+            const ctx = canvas.getContext("2d");
+            const W = canvas.width,
+                H = canvas.height;
+            const AA = 2; // supersample grid (AA x AA)
+            const camO = V(0, 0.35, 1.4);
+            const fov = 1.15; // ~66deg
+            let img, row, running = false, t0 = 0;
+
+            function camRay(px, py) {
+                const aspect = W / H;
+                const dir = V(px * aspect * fov, py * fov, -1);
+                return norm(dir);
+            }
+
+            function startRender() {
+                img = ctx.createImageData(W, H);
+                row = 0;
+                running = true;
+                t0 = performance.now();
+                requestAnimationFrame(renderChunk);
+            }
+
+            function renderChunk() {
+                if (!running) return;
+                const budget = 16; // ms per frame
+                const start = performance.now();
+                const inv = 1 / AA;
+                while (row < H && performance.now() - start < budget) {
+                    for (let x = 0; x < W; x++) {
+                        let r = 0, g = 0, b = 0;
+                        for (let sy = 0; sy < AA; sy++) {
+                            for (let sx = 0; sx < AA; sx++) {
+                                const px =
+                                    ((x + (sx + 0.5) * inv) / W) * 2 - 1;
+                                const py =
+                                    1 - ((row + (sy + 0.5) * inv) / H) * 2;
+                                const rd = camRay(px, py);
+                                const col = trace(camO, rd, 0);
+                                r += col.x;
+                                g += col.y;
+                                b += col.z;
+                            }
+                        }
+                        const k = 1 / (AA * AA);
+                        const i = (row * W + x) * 4;
+                        // gamma 2.2 + clamp
+                        img.data[i] = 255 * Math.min(1, Math.sqrt(r * k));
+                        img.data[i + 1] = 255 * Math.min(1, Math.sqrt(g * k));
+                        img.data[i + 2] = 255 * Math.min(1, Math.sqrt(b * k));
+                        img.data[i + 3] = 255;
+                    }
+                    row++;
+                }
+                ctx.putImageData(img, 0, 0);
+                const pct = Math.round((row / H) * 100);
+                document.getElementById("rtbar").style.width = pct + "%";
+                if (row < H) {
+                    requestAnimationFrame(renderChunk);
+                } else {
+                    running = false;
+                    const ms = Math.round(performance.now() - t0);
+                    const rays = W * H * AA * AA;
+                    document.getElementById("rtinfo").textContent =
+                        rays.toLocaleString() +
+                        " primary rays · " +
+                        ms +
+                        " ms · recursive depth " +
+                        MAXD;
+                    document.getElementById("rtbar").style.width = "100%";
+                }
+            }
+
+            // --- the hidden trigger ----------------------------------
+            const overlay = document.getElementById("rt");
+            let buf = "";
+            const SECRET = "trace";
+
+            function open() {
+                overlay.classList.add("on");
+                overlay.setAttribute("aria-hidden", "false");
+                document.getElementById("rtinfo").textContent = "tracing…";
+                document.getElementById("rtbar").style.width = "0%";
+                startRender();
+            }
+            function close() {
+                running = false;
+                overlay.classList.remove("on");
+                overlay.setAttribute("aria-hidden", "true");
+            }
+
+            window.addEventListener("keydown", (e) => {
+                if (e.key === "Escape") return close();
+                if (overlay.classList.contains("on")) return;
+                if (e.key.length !== 1) return;
+                buf = (buf + e.key.toLowerCase()).slice(-SECRET.length);
+                if (buf === SECRET) {
+                    buf = "";
+                    open();
+                }
+            });
+            document.getElementById("rtclose").addEventListener("click", close);
+            overlay.addEventListener("click", (e) => {
+                if (e.target === overlay) close();
+            });
+        </script>
+    </body>
 </html>
