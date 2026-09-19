@@ -110,6 +110,38 @@
   }
 
   /*
+   * Bricht `text` an den Leerzeichen um, so dass keine Zeile breiter
+   * wird als `maxFontPx` Fontpixel. Weil jede Glyphe gleich breit ist,
+   * reicht dafuer eine Zeichenzahl -- kein Nachmessen Wort fuer Wort.
+   *
+   * Ein Wort, das allein schon nicht passt, wird hart getrennt: eine
+   * haessliche Trennung ist immer noch besser als eine Zeile, die aus
+   * dem Bildschirm laeuft.
+   */
+  function wrap(text, maxFontPx, tracking) {
+    var t = (tracking === undefined) ? 1 : tracking;
+    var proZeile = Math.max(1, Math.floor((maxFontPx + t) / (GW + t)));
+    var zeilen = [];
+
+    String(text).split(/\s+/).forEach(function (wort) {
+      if (!wort) return;
+      while (wort.length > proZeile) {
+        zeilen.push(wort.slice(0, proZeile));
+        wort = wort.slice(proZeile);
+      }
+      if (!wort.length) return;
+      var letzte = zeilen.length - 1;
+      if (letzte >= 0 && zeilen[letzte].length + 1 + wort.length <= proZeile) {
+        zeilen[letzte] += ' ' + wort;
+      } else {
+        zeilen.push(wort);
+      }
+    });
+
+    return zeilen.length ? zeilen : [''];
+  }
+
+  /*
    * Zeichnet `text` in ein frisches Canvas.
    *   scale     Bildschirmpixel pro Fontpixel        (Vorgabe 3)
    *   color     Farbe der gesetzten Pixel            (Vorgabe Gold)
@@ -177,6 +209,12 @@
     cv.className = 'pf' + (opts.className ? ' ' + opts.className : '');
     cv.setAttribute('role', 'img');
     cv.setAttribute('aria-label', opts.label !== undefined ? opts.label : text);
+
+    /* Das Canvas merkt sich, woraus es entstanden ist. Auf engen
+     * Bildschirmen wird eine Zeile spaeter neu gesetzt, und dazu
+     * braucht es die Vorlage -- aus Pixeln liest sie niemand zurueck. */
+    cv.pfText = text;
+    cv.pfOpts = opts;
     return cv;
   }
 
@@ -193,6 +231,7 @@
     render: render,
     write: write,
     measure: measure,
+    wrap: wrap,
     GLYPHS: GLYPHS,
     UMLAUT: UMLAUT,
     CELL_W: GW,

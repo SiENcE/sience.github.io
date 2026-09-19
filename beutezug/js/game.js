@@ -353,6 +353,9 @@
     if (S.leicht) {
       el.titel.appendChild(PF.render('KINDERMODUS', { scale: 2, color: CYAN }));
     }
+    /* Gemessen wird an der Tafel: #titel selbst ist so breit wie sein
+     * Inhalt und wuesste nie, dass der zu breit ist. */
+    passeAn(el.titel.parentNode);
     zeichneAuszahlung();
     zeichnePlan();
     zeichneFuss();
@@ -413,6 +416,11 @@
       faktor ? 'SPICKEN ' + KOSTEN.spicken * faktor : 'SPICKEN GRATIS',
       { scale: 2, color: GOLD });
     schreib(el.menuText, 'MENÜ', { scale: 3, color: CREME });
+
+    /* Auf einem schmalen Telefon ist "TIPP GRATIS" in scale 3 breiter
+     * als der Knopf, und der schiebt MENÜ aus dem Bild. */
+    passeAn(el.btnTipp);
+    passeAn(el.btnMenu);
   }
 
   /* ---------------------------------------------------------------- */
@@ -1161,7 +1169,9 @@
       tafel.className = 'rangliste';
       liste.forEach(function (eintrag, i) {
         var zeile = document.createElement('div');
-        zeile.className = 'rang' + (i === opts.neu ? ' neu' : '');
+        /* pfreihe: die vier Spalten suchen sich eine gemeinsame
+         * Schriftgroesse, statt jede fuer sich zu schrumpfen. */
+        zeile.className = 'rang pfreihe' + (i === opts.neu ? ' neu' : '');
         var farbe = i === opts.neu ? GOLD : CREME;
         [
           String(i + 1) + '.',
@@ -1244,6 +1254,190 @@
     return reihe;
   }
 
+  /* ----------------------------------------------------------------
+   * Enge Bildschirme
+   *
+   * Die Pixelschrift wird in festen Bildschirmpixeln gezeichnet: eine
+   * Zeile mit 42 Zeichen in scale 2 ist 502px breit und haengt auf
+   * einem 320px-Telefon links und rechts heraus. Beim Bauen weiss ein
+   * Dialog seine Breite noch nicht -- also wird erst gemessen, wenn er
+   * haengt, und dann nachgesetzt.
+   *
+   * Nachgesetzt wird in dieser Reihenfolge: erst umbrechen, und nur
+   * wenn nicht einmal eine einzelne Glyphe in die Breite passt,
+   * verkleinern. Umgekehrt herum waere die Anleitung auf dem Telefon
+   * zwar vollstaendig da, aber zu klein zum Lesen -- und gelesen wird
+   * sie von jemandem, der das Spiel noch nicht kennt.
+   */
+
+  function px(wert) {
+    var n = parseFloat(wert);
+    return isNaN(n) ? 0 : n;
+  }
+
+  /* Wieviel Platz hat eine Zeile an dieser Stelle? Gemessen wird nicht
+   * am Elternteil: ein Flexkind richtet sich nach seinem Inhalt und
+   * meldet die bereits zu grosse Breite brav zurueck. Also zaehlt der
+   * Dialog, abzueglich aller Polster und Raender auf dem Weg dorthin. */
+  function platzFuer(cv, wurzel) {
+    var s = getComputedStyle(wurzel);
+    var w = wurzel.clientWidth - px(s.paddingLeft) - px(s.paddingRight);
+    for (var n = cv.parentNode; n && n !== wurzel; n = n.parentNode) {
+      var p = getComputedStyle(n);
+      w -= px(p.paddingLeft) + px(p.paddingRight) +
+           px(p.borderLeftWidth) + px(p.borderRightWidth);
+    }
+    return Math.max(PF.CELL_W, Math.floor(w));
+  }
+
+  /* Breite einer Vorlage in Fontpixeln. Schatten und Polster zaehlen
+   * mit: sie kosten Breite, ohne Text zu sein. */
+  function fontBreite(roh) {
+    var o = roh.opts || {};
+    var tracking = (o.tracking === undefined) ? 1 : o.tracking;
+    return PF.measure(roh.text, tracking) +
+      (o.shadow ? 1 : 0) + (o.pad || 0) * 2;
+  }
+
+  /* Wie breit waere diese Zeile, wenn sie ungebremst gesetzt wuerde?
+   * Nicht offsetWidth fragen: ein `max-width: 100%` im Stylesheet
+   * staucht das Canvas vorher und meldet brav "passt" zurueck -- das
+   * Ergebnis waere eine gequetschte, unscharfe Zeile statt einer
+   * umgebrochenen. */
+  function sollBreite(roh) {
+    return fontBreite(roh) * ((roh.opts || {}).scale || 3);
+  }
+
+  /* Die Vorlage einer Stelle: das, woraus sie urspruenglich entstand. */
+  function rohVon(stelle) {
+    return stelle.pfRoh ||
+      (stelle.pfText ? { text: stelle.pfText, opts: stelle.pfOpts } : null);
+  }
+
+  /* Eine Reihe setzt mehrere Stuecke nebeneinander -- die Bestenliste
+   * etwa Platz, Kuerzel, Summe und Auftraege. Vier Spalten in vier
+   * verschiedenen Groessen saehen aus wie ein Fehler, also sucht die
+   * Reihe eine Groesse fuer alle: die groesste, in der ihre Stuecke
+   * zusammen noch nebeneinander passen. */
+  function passeReiheAn(reihe) {
+    var stuecke = Array.prototype.slice
+      .call(reihe.querySelectorAll('canvas.pf'));
+    if (!stuecke.length) return;
+
+    var rohs = [];
+    for (var i = 0; i < stuecke.length; i++) {
+      var roh = rohVon(stuecke[i]);
+      if (!roh) return;
+      rohs.push(roh);
+    }
+
+    var s = getComputedStyle(reihe);
+    var platz = reihe.clientWidth - px(s.paddingLeft) - px(s.paddingRight) -
+      px(s.columnGap) * (stuecke.length - 1);
+
+    var skala = 1;
+    var gesamt = 0;
+    rohs.forEach(function (r) {
+      skala = Math.max(skala, (r.opts || {}).scale || 3);
+      gesamt += fontBreite(r);
+    });
+    while (skala > 1 && gesamt * skala > platz) skala--;
+
+    stuecke.forEach(function (cv, k) {
+      var o = {};
+      Object.keys(rohs[k].opts || {}).forEach(function (n) {
+        o[n] = rohs[k].opts[n];
+      });
+      o.scale = skala;
+      var neu = PF.render(rohs[k].text, o);
+      neu.pfRoh = rohs[k];
+      cv.parentNode.replaceChild(neu, cv);
+    });
+  }
+
+  /* Setzt eine Zeile neu -- immer aus der Vorlage, nie aus dem, was
+   * gerade dasteht. Wer das Telefon zurueckdreht, bekommt so seine
+   * lange Zeile wieder, statt auf dem engen Umbruch sitzenzubleiben.
+   *
+   * Aus einer Zeile koennen mehrere werden, und die stecken in einem
+   * eigenen Kaestchen: sonst zerfiele der Satz im Flexkasten der
+   * Hinweise in lauter gleichberechtigte Zeilen, und die Abstaende
+   * zwischen den Saetzen stimmten nicht mehr. */
+  function setzeNeu(alt, roh, platz) {
+    var o = {};
+    Object.keys(roh.opts || {}).forEach(function (k) { o[k] = roh.opts[k]; });
+
+    var text = roh.text;
+    var tracking = (o.tracking === undefined) ? 1 : o.tracking;
+    /* Schatten und Polster kosten Breite, ohne Text zu sein. */
+    var zuschlag = (o.shadow ? 1 : 0) + (o.pad || 0) * 2;
+    /* Verkleinert wird nach dem laengsten Wort, nicht nach dem
+     * laengsten Satz: ein Satz darf umbrechen, ein Wort nicht. Sonst
+     * steht ueber dem Hauptmenue "BEUTEZU" und darunter "G". */
+    var breitestes = 0;
+    text.split(/\s+/).forEach(function (wort) {
+      breitestes = Math.max(breitestes, PF.measure(wort, tracking));
+    });
+    var skala = o.scale || 3;
+    while (skala > 1 && (breitestes + zuschlag) * skala > platz) skala--;
+    o.scale = skala;
+
+    var zeilen = PF.wrap(text, platz / skala - zuschlag, tracking);
+    var ersatz;
+
+    if (zeilen.length < 2) {
+      ersatz = PF.render(zeilen[0], o);
+    } else {
+      ersatz = document.createElement('div');
+      ersatz.className = 'pfblock';
+      /* Vorgelesen wird der Satz am Stueck, nicht Zeile fuer Zeile. */
+      ersatz.setAttribute('role', 'img');
+      ersatz.setAttribute('aria-label',
+        o.label !== undefined ? o.label : text);
+      zeilen.forEach(function (zeile) {
+        var teil = PF.render(zeile, o);
+        teil.removeAttribute('role');
+        teil.removeAttribute('aria-label');
+        teil.setAttribute('aria-hidden', 'true');
+        ersatz.appendChild(teil);
+      });
+    }
+
+    ersatz.pfRoh = roh;
+    alt.parentNode.replaceChild(ersatz, alt);
+  }
+
+  /* Einmal ueber alles, was unter `wurzel` gesetzt ist. Die Liste wird
+   * vorab eingefroren, weil sie sich unter der Hand aendert.
+   *
+   * `wurzel` muss der naechste Kasten mit einer festen Breite sein --
+   * fuer einen Dialog der Dialog selbst, fuer einen Knopf der Knopf. */
+  function passeAn(wurzel) {
+    if (!wurzel || !wurzel.querySelectorAll) return;
+
+    /* Zuerst die Reihen: sie setzen mehrere Stuecke auf einmal neu. */
+    Array.prototype.slice
+      .call(wurzel.querySelectorAll('.pfreihe')).forEach(passeReiheAn);
+
+    Array.prototype.slice
+      .call(wurzel.querySelectorAll('canvas.pf, .pfblock'))
+      .forEach(function (stelle) {
+        if (!stelle.parentNode) return;
+        /* Die Zeilen in einem Kaestchen gehoeren dem Kaestchen. */
+        if (stelle.parentNode.classList.contains('pfblock')) return;
+        /* Und die Stuecke einer Reihe gehoeren der Reihe. */
+        if (stelle.parentNode.closest('.pfreihe')) return;
+
+        var roh = rohVon(stelle);
+        if (!roh) return;
+
+        var platz = platzFuer(stelle, wurzel);
+        /* Was noch nie angefasst wurde und passt, bleibt, wie es ist. */
+        if (!stelle.pfRoh && sollBreite(roh) <= platz) return;
+        setzeNeu(stelle, roh, platz);
+      });
+  }
+
   function oeffneOverlay(inhalt) {
     /* Jeder Dialogwechsel raeumt einen etwaigen Tastaturhaken der
      * Nameneingabe weg, sonst tippt man spaeter ins Leere. */
@@ -1252,6 +1446,10 @@
     el.overlayInhalt.textContent = '';
     el.overlayInhalt.appendChild(inhalt);
     el.overlay.classList.add('offen');
+
+    /* Erst sichtbar, dann messbar: jetzt steht fest, wie breit der
+     * Dialog wirklich ist. */
+    passeAn(inhalt);
 
     /* Erst jetzt darf sich ein Dialog verdrahten. Wuerde er das schon
      * beim Bauen tun, raeumte das loeseEingabeHaken() oben ihn gleich
@@ -1309,16 +1507,19 @@
     }
 
     box.appendChild(knopfReihe([
-      ['BEUTEZUG', function () { schliesseOverlay(); neuerBeutezug(false); }],
+      ['ERWACHSENE', function () { schliesseOverlay(); neuerBeutezug(false); }],
       ['FÜR KINDER', function () { schliesseOverlay(); neuerBeutezug(true); }]
     ]));
 
     /* Was die beiden Knoepfe unterscheidet, und zwar in dem, was man
-     * beim Spielen merkt: wo die Woerter liegen und was es kostet. */
+     * beim Spielen merkt: wo die Woerter liegen und was es kostet.
+     * Der Knopf heisst nach der Zielgruppe, nicht nach dem Spiel --
+     * "BEUTEZUG" stand vorher neben "FÜR KINDER" und las sich wie
+     * zwei verschiedene Spiele statt wie zwei Schwierigkeiten. */
     [
-      [['BEUTEZUG: WÖRTER LIEGEN IN JEDER RICHTUNG,',
+      [['ERWACHSENE: WÖRTER IN JEDER RICHTUNG,',
         'AUCH RÜCKWÄRTS. HILFEN KOSTEN EINSATZ.'], CREME],
-      [['FÜR KINDER: EIN WORT WAAGERECHT VON LINKS,',
+      [['FÜR KINDER: EIN WORT VON LINKS,',
         'VIELE KACHELN ZEIGEN IHREN BUCHSTABEN.'], CYAN]
     ].forEach(function (block) {
       var was = document.createElement('div');
@@ -1487,7 +1688,7 @@
     [
       ['ZIEH MIT DEM FINGER ÜBER MEHRERE BILDER.', CYAN],
       ['GEDRÜCKT HALTEN – NICHT EINZELN TIPPEN.', CYAN],
-      ['IMMER GERADEAUS: QUER, RUNTER ODER SCHRÄG.', CREME],
+      ['IMMER GERADEAUS: QUER, RUNTER, SCHRÄG.', CREME],
       ['STIMMT DAS WORT, KLINGELT DIE KASSE.', CREME],
       ['RECHTS STEHT, WELCHE WÖRTER GESUCHT SIND.', CREME],
       ['STECKST DU FEST, HILFT TIPP ODER SPICKEN.', GOLD],
@@ -1599,6 +1800,9 @@
 
     global.addEventListener('resize', function () {
       if (S && S.auswahl.length) zeichneSpur();
+      /* Gedreht wird das Telefon mitten im Dialog. Der Neuaufbau
+       * kaeme dafuer zu spaet -- also nachmessen, solange er steht. */
+      if (overlayOffen()) passeAn(el.overlayInhalt.firstElementChild);
     });
   }
 

@@ -72,6 +72,16 @@ canvas.pf {
   image-rendering: crisp-edges;
 }
 
+/* Ein Satz, der auf einem engen Bildschirm umgebrochen werden musste.
+ * Er haelt seine Zeilen zusammen, damit er im Flexkasten der Hinweise
+ * ein Eintrag bleibt und nicht als drei einzelne Zeilen mitzaehlt. */
+.pfblock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
 /* ---------------------------------------------------------------- */
 /* Gehaeuse                                                          */
 
@@ -480,7 +490,10 @@ canvas.pf {
 
 .knopfreihe {
   display: grid;
-  grid-template-columns: 1fr auto;
+  /* minmax(0, ...): ohne die Null waechst die Spalte auf die Breite
+   * ihrer Beschriftung und schiebt MENÜ aus dem Bild. Der Knopf darf
+   * schmaler werden als sein Text -- der bricht dann um. */
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: clamp(8px, 1.1vw, 16px);
 }
 
@@ -488,7 +501,10 @@ canvas.pf {
   position: relative;
   display: grid;
   place-items: center;
-  padding: clamp(12px, 1.5vw, 20px) clamp(14px, 2vw, 26px);
+  /* Seitliches Polster nur 10px im Kleinsten: bei 320px Bildschirm
+   * entscheiden vier Pixel darueber, ob "BESTENLISTE" noch in seiner
+   * Groesse auf den Knopf passt oder eine Stufe kleiner gesetzt wird. */
+  padding: clamp(12px, 1.5vw, 20px) clamp(10px, 2vw, 26px);
   border: 0;
   border-radius: 8px;
   cursor: pointer;
@@ -606,6 +622,24 @@ canvas.pf {
 }
 
 .abrechnung > span:nth-child(even) { justify-self: end; }
+
+/* Auf einem schmalen Telefon passen Bezeichnung und Zahl nicht mehr
+ * nebeneinander. Dann steht die Zahl unter ihrem Namen, und die Luft
+ * wandert zwischen die Paare, damit erkennbar bleibt, was zu wem
+ * gehoert. */
+@media (max-width: 420px) {
+  .abrechnung {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .abrechnung > span:nth-child(even) {
+    justify-self: start;
+    margin-bottom: 10px;
+  }
+
+  .abrechnung > span:last-child { margin-bottom: 0; }
+}
 
 .extraliste {
   display: flex;
@@ -783,15 +817,19 @@ canvas.pf {
 
 .rang {
   display: grid;
-  /* Platz, Kuerzel, Summe, Auftraege -- die Summe bekommt den Rest. */
-  grid-template-columns: 2.6em 3.4em 1fr 2.6em;
-  gap: 10px;
+  /* Platz, Kuerzel, Summe, Auftraege -- die Summe bekommt den Rest.
+   * Wie gross die Schrift darin ausfaellt, entscheidet die Reihe
+   * selbst; siehe passeReiheAn() und .pfreihe in game.js. */
+  grid-template-columns: auto auto 1fr auto;
+  gap: clamp(6px, 1.5vw, 12px);
   align-items: center;
   padding: 3px 6px;
   border-radius: 4px;
 }
 
-.rang > span:last-child { justify-self: end; }
+.rang > span { display: flex; min-width: 0; }
+
+.rang > span:last-child { justify-content: flex-end; }
 
 .rang.neu {
   background: rgba(255, 210, 63, 0.14);
