@@ -318,6 +318,12 @@ canvas.pf {
   overflow: visible;
   opacity: 0;
   transition: opacity 0.12s;
+  /* Ueber die Kacheln, auch ueber die angehobenen (z-index 4). Die
+   * Kapsel gehoert um den Zug herum, nicht darunter: eine Kachel mit
+   * deckendem Ruecken -- umgedreht oder im Kindermodus gleich als
+   * Buchstabe -- wuerde sie sonst verschlucken. Lesbar bleibt das,
+   * weil nur die Fuellung durchscheinend ist. */
+  z-index: 5;
 }
 
 #spur.aktiv { opacity: 1; }

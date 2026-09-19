@@ -50,7 +50,24 @@
       vorbei: false,
       leicht: !!leicht
     };
+    merkeModus(L.leicht);
     starteLevel(0);
+  }
+
+  /* Der zuletzt gespielte Modus. Er entscheidet, welches Brett beim
+   * naechsten Start hinter dem Hauptmenue liegt -- und er ist die
+   * Vorgabe, wenn ein Beutezug ohne ausdrueckliche Wahl beginnt. */
+  function merkeModus(leicht) {
+    var stand = ladeStand();
+    if (!!stand.kinderModus === !!leicht) return;
+    stand.kinderModus = !!leicht;
+    speichereStand(stand);
+  }
+
+  /* Der Modus des laufenden Beutezugs -- gebraucht ueberall dort, wo
+   * "noch einer" gemeint ist und nicht "einer wie beim ersten Start". */
+  function leichterModus() {
+    return !!(L && L.leicht);
   }
 
   /* Was gerade auf dem Spiel steht: gesicherte Beute plus das, was im
@@ -59,16 +76,16 @@
     return L.topf + (S ? S.punkte : 0);
   }
 
-  /* Die Gebühren wachsen mit jedem Auftrag. Genau daraus entsteht die
+  /* Der Einsatz waechst mit jedem Auftrag. Genau daraus entsteht die
    * Entscheidung am Ende eines Auftrags: noch einer, oder abhauen? */
-  function gebuehrenFaktor() {
-    return S.gebuehrenfrei ? 0 : Math.max(1, S.levelNr);
+  function einsatzFaktor() {
+    return S.einsatzfrei ? 0 : Math.max(1, S.levelNr);
   }
 
   /* Kinder und Erwachsene teilen sich die Bestenliste nicht -- die
    * Zahlen entstehen unter zu verschiedenen Bedingungen. */
-  function listenSchluessel() {
-    return (L && L.leicht) ? 'bestenlisteKinder' : 'bestenliste';
+  function listenSchluessel(leicht) {
+    return leicht ? 'bestenlisteKinder' : 'bestenliste';
   }
 
   /* ---------------------------------------------------------------- */
@@ -138,13 +155,13 @@
       gefundenZiele: new Set(),
       gefundenExtra: new Set(),
       punkte: 0,
-      abzug: 0,
+      einsatz: 0,
       angezeigt: L ? L.topf : 0,
       leicht: leicht,
       /* Der erste Auftrag ist zum Ueben: Tipp, Spicken und Fehlgriffe
        * kosten nichts. Ab dem zweiten wird abgerechnet -- im
        * Kindermodus nie. */
-      gebuehrenfrei: nummer === 0 || leicht,
+      einsatzfrei: nummer === 0 || leicht,
       felder: brett.buchstaben.map(function () {
         return { gedreht: false, farbe: null, tipp: false, kurz: 0, nurBuchstabe: false };
       }),
@@ -346,11 +363,11 @@
     schreib(el.auszahlung, zahl(S.angezeigt, 6), {
       scale: 6, color: GOLD, shadow: '#3a2a00'
     });
-    if (S.abzug > 0) {
-      el.abzug.hidden = false;
-      schreib(el.abzug, 'ABZUG -' + S.abzug, { scale: 2, color: ROT });
+    if (S.einsatz > 0) {
+      el.einsatz.hidden = false;
+      schreib(el.einsatz, 'EINSATZ -' + S.einsatz, { scale: 2, color: ROT });
     } else {
-      el.abzug.hidden = true;
+      el.einsatz.hidden = true;
     }
   }
 
@@ -388,7 +405,7 @@
   function zeichneFuss() {
     var rest = S.ziele.length - S.gefundenZiele.size;
     schreib(el.rest, 'NOCH ' + rest, { scale: 2, color: rest ? CREME : GOLD });
-    var faktor = gebuehrenFaktor();
+    var faktor = einsatzFaktor();
     schreib(el.tippText,
       faktor ? 'TIPP ' + KOSTEN.tipp * faktor : 'TIPP GRATIS',
       { scale: 3, color: GOLD });
@@ -405,15 +422,15 @@
     return wort.length >= 3 && Woerter.DICT.has(wort);
   }
 
-  /* Eine Gebuehr mindert die Auszahlung und wird zugleich als Abzug
-   * ausgewiesen, damit am Ende nachvollziehbar bleibt, wo der Gewinn
-   * geblieben ist. Auf dem Uebungsauftrag kostet nichts etwas. */
-  function gebuehr(betrag) {
-    var faktor = gebuehrenFaktor();
+  /* Ein Einsatz mindert die Auszahlung und wird zugleich ausgewiesen,
+   * damit am Ende nachvollziehbar bleibt, wo der Gewinn geblieben ist.
+   * Auf dem Uebungsauftrag setzt man nichts. */
+  function zahleEinsatz(betrag) {
+    var faktor = einsatzFaktor();
     if (!faktor) return 0;
 
     betrag *= faktor;
-    S.abzug += betrag;
+    S.einsatz += betrag;
     /* Darf den Auftrag ins Minus ziehen -- bezahlt wird aus dem Topf,
      * also auch aus der Beute frueherer Auftraege. */
     S.punkte -= betrag;
@@ -443,7 +460,7 @@
     var wort = Brett.wortAusPfad(S.brett, pfad);
 
     if (!istWort(wort)) {
-      gebuehr(KOSTEN.fehler);
+      zahleEinsatz(KOSTEN.fehler);
       Klang.sfx.fehler();
       zittern();
       leereAuswahl();
@@ -627,7 +644,7 @@
         zeichneAuszahlung();
         return;
       }
-      /* Laeuft in beide Richtungen -- Gebuehren zaehlen den Topf
+      /* Laeuft in beide Richtungen -- ein Einsatz zaehlt den Topf
        * genauso hoerbar herunter, wie Funde ihn hochzaehlen. */
       var schrittweite = Math.max(1, Math.ceil(Math.abs(rest) / 12));
       S.angezeigt += rest > 0 ? schrittweite : -schrittweite;
@@ -753,7 +770,7 @@
     }).slice(0, 2);
     if (!verraten.length) return;
 
-    gebuehr(KOSTEN.tipp);
+    zahleEinsatz(KOSTEN.tipp);
 
     verraten.forEach(function (index, i) {
       S.felder[index].tipp = true;
@@ -769,7 +786,7 @@
   function spicken() {
     if (S.spicktGerade || S.fertig) return;
     S.spicktGerade = true;
-    gebuehr(KOSTEN.spicken);
+    zahleEinsatz(KOSTEN.spicken);
 
     Klang.sfx.spicken();
     el.brett.classList.add('spickt');
@@ -787,7 +804,7 @@
   function levelGeschafft() {
     Klang.sfx.fanfare();
 
-    var bonus = Math.max(0, 200 - S.abzug);
+    var bonus = Math.max(0, 200 - S.einsatz);
     S.punkte += bonus;
 
     /* Die Beute des Auftrags wandert in den Topf. S.punkte wieder auf
@@ -819,7 +836,7 @@
     if (schafftEsRein(summe)) {
       oeffneOverlay(baueNamensEingabe(summe));
     } else {
-      oeffneOverlay(baueBestenliste(null, summe));
+      oeffneOverlay(baueBestenliste());
     }
   }
 
@@ -836,7 +853,7 @@
     var zeilen = [
       ['GEFUNDEN', S.gefundenZiele.size + ' VON ' + S.ziele.length],
       ['EXTRAWORTE', String(S.gefundenExtra.size)],
-      ['ABZUG', '-' + S.abzug],
+      ['EINSATZ', '-' + S.einsatz],
       ['SAUBER-BONUS', '+' + bonus],
       ['AUFTRÄGE', String(L.auftraege)],
       ['IM TOPF', zahl(L.topf, 6)]
@@ -872,7 +889,7 @@
     var warnung = document.createElement('div');
     warnung.className = 'hinweise';
     [
-      ['NÄCHSTER AUFTRAG: GEBÜHREN MAL ' + naechsterFaktor, ROT],
+      ['NÄCHSTER AUFTRAG: EINSATZ MAL ' + naechsterFaktor, ROT],
       ['DER TOPF BLEIBT DABEI IM RISIKO.', CREME]
     ].forEach(function (zeile) {
       warnung.appendChild(PF.render(zeile[0], { scale: 2, color: zeile[1] }));
@@ -916,8 +933,16 @@
     box.appendChild(text);
 
     box.appendChild(knopfReihe([
-      ['NEUER BEUTEZUG', function () { schliesseOverlay(); neuerBeutezug(); }],
+      ['NEUER BEUTEZUG', function () {
+        var wieder = leichterModus();
+        schliesseOverlay();
+        neuerBeutezug(wieder);
+      }],
       ['BESTENLISTE', function () { oeffneOverlay(baueBestenliste()); }]
+    ]));
+
+    box.appendChild(knopfReihe([
+      ['HAUPTMENÜ', function () { oeffneOverlay(baueStartschirm()); }]
     ]));
 
     return box;
@@ -930,8 +955,9 @@
   var TASTEN = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   var eingabeHaken = null;
 
-  function ladeListe() {
-    var liste = ladeStand()[listenSchluessel()];
+  function ladeListe(leicht) {
+    var liste = ladeStand()[listenSchluessel(
+      arguments.length ? leicht : leichterModus())];
     return Array.isArray(liste) ? liste : [];
   }
 
@@ -957,7 +983,7 @@
     liste = liste.slice(0, PLAETZE);
 
     var stand = ladeStand();
-    stand[listenSchluessel()] = liste;
+    stand[listenSchluessel(leichterModus())] = liste;
     speichereStand(stand);
     return liste.indexOf(eintrag);
   }
@@ -1104,20 +1130,24 @@
   }
 
   /*
-   * opts.neu       Platz des gerade eingetragenen Ergebnisses
-   * opts.ausMenue  aus dem Menue geoeffnet, also nur zurueck
+   * opts.neu      Platz des gerade eingetragenen Ergebnisses
+   * opts.zurueck  Bauer des Dialogs, aus dem heraus geblaettert wurde;
+   *               fehlt er, ist das der Schluss eines Beutezugs
+   * opts.leicht   welche der beiden Listen -- sonst die des Laufs
    */
   function baueBestenliste(opts) {
     opts = opts || {};
-    var liste = ladeListe();
+    var leicht = opts.leicht === undefined ? leichterModus() : !!opts.leicht;
+    var liste = ladeListe(leicht);
 
     var box = document.createElement('div');
     box.className = 'dialog';
+    box.fest = dialogFest;
 
     var h = document.createElement('div');
     h.className = 'dialogtitel';
     h.appendChild(PF.render(
-      (L && L.leicht) ? 'BESTE KINDER' : 'BESTENLISTE',
+      leicht ? 'BESTE KINDER' : 'BESTENLISTE',
       { scale: 5, color: GOLD, shadow: '#3a2a00' }));
     box.appendChild(h);
 
@@ -1150,7 +1180,7 @@
 
     /* Wer es nicht in die Liste geschafft hat, soll sein Ergebnis
      * trotzdem sehen. */
-    if (opts.neu === undefined && !opts.ausMenue && L && L.vorbei) {
+    if (opts.neu === undefined && !opts.zurueck && L && L.vorbei) {
       var eigen = document.createElement('div');
       eigen.className = 'hinweise';
       eigen.appendChild(PF.render('DIESER BEUTEZUG: ' + zahl(L.topf, 6),
@@ -1159,17 +1189,44 @@
       box.appendChild(eigen);
     }
 
-    box.appendChild(knopfReihe(
-      opts.ausMenue
-        ? [['ZURÜCK', function () { oeffneOverlay(baueMenue()); }]]
-        : [['NEUER BEUTEZUG', function () { schliesseOverlay(); neuerBeutezug(); }]]
-    ));
+    /* Zwei Listen, ein Dialog -- sonst muesste man raten, wo die Zahl
+     * gelandet ist, die man gerade eingetragen hat. */
+    if (opts.zurueck) {
+      box.appendChild(knopfReihe([
+        [leicht ? 'BESTENLISTE' : 'BESTE KINDER', function () {
+          oeffneOverlay(baueBestenliste({ zurueck: opts.zurueck, leicht: !leicht }));
+        }],
+        ['ZURÜCK', function () { oeffneOverlay(opts.zurueck()); }]
+      ]));
+    } else {
+      /* "NEUER BEUTEZUG" heisst: noch einer wie der gerade beendete.
+       * Wer aus dem Kindermodus kommt, will nicht ungefragt bei den
+       * Erwachsenen landen. */
+      box.appendChild(knopfReihe([
+        ['NEUER BEUTEZUG', function () {
+          var wieder = leichterModus();
+          schliesseOverlay();
+          neuerBeutezug(wieder);
+        }],
+        ['HAUPTMENÜ', function () { oeffneOverlay(baueStartschirm()); }]
+      ]));
+    }
 
     return box;
   }
 
   /* ---------------------------------------------------------------- */
   /* Overlay: Menue, Anleitung, Spickzettel                            */
+
+  /* Manche Dialoge sind kein Zwischenstopp, sondern der Ort, an dem das
+   * Spiel gerade steht: das Hauptmenue vor dem ersten Zug, die
+   * Abrechnung nach dem letzten. Sie gehen nur ueber einen ihrer
+   * Knoepfe weg -- ein Klick daneben oder Esc laesst sie stehen. */
+  var dialogFest = false;
+
+  function darfWeg() {
+    return !dialogFest && !(S && S.fertig);
+  }
 
   function knopfReihe(eintraege) {
     var reihe = document.createElement('div');
@@ -1191,6 +1248,7 @@
     /* Jeder Dialogwechsel raeumt einen etwaigen Tastaturhaken der
      * Nameneingabe weg, sonst tippt man spaeter ins Leere. */
     loeseEingabeHaken();
+    dialogFest = !!inhalt.fest;
     el.overlayInhalt.textContent = '';
     el.overlayInhalt.appendChild(inhalt);
     el.overlay.classList.add('offen');
@@ -1207,13 +1265,91 @@
 
   function schliesseOverlay() {
     loeseEingabeHaken();
+    dialogFest = false;
     el.overlay.classList.remove('offen');
     el.overlayInhalt.textContent = '';
+  }
+
+  /* Laeuft gerade ein Beutezug, in den sich zurueckkehren lohnt? Das
+   * frisch gebaute Brett hinter dem Hauptmenue zaehlt nicht -- erst
+   * wer etwas gefunden oder verloren hat, hat etwas zu verlieren. */
+  function spielLaeuft() {
+    return !!(S && !S.fertig && L &&
+      (L.auftraege > 0 || S.gefundenZiele.size > 0 || S.einsatz > 0));
+  }
+
+  /*
+   * Das Hauptmenue: beim Start und nach jedem beendeten Beutezug.
+   * Es traegt die einzige Entscheidung, die vor dem Spiel steht --
+   * fuer wen ist die Runde. Bisher fiel die nebenbei im Menue, und
+   * jeder Weg zurueck ins Spiel landete stillschweigend wieder bei
+   * den Erwachsenen.
+   */
+  function baueStartschirm() {
+    var box = document.createElement('div');
+    box.className = 'dialog anleitung';
+    /* Kein Klick daneben, kein Esc: hinter diesem Schirm liegt ein
+     * Brett, das noch niemand gewaehlt hat. */
+    box.fest = true;
+
+    var marke = document.createElement('div');
+    marke.className = 'mittig';
+    marke.appendChild(PF.render(NAME, { scale: 6, color: GOLD, shadow: '#3a2a00' }));
+    box.appendChild(marke);
+
+    var unter = document.createElement('div');
+    unter.className = 'mittig marke';
+    unter.appendChild(PF.render('DIE EMOJI-WORTJAGD', {
+      scale: 2, color: GOLD_MATT, tracking: 2
+    }));
+    box.appendChild(unter);
+
+    if (spielLaeuft()) {
+      box.appendChild(knopfReihe([['WEITER SPIELEN', schliesseOverlay]]));
+    }
+
+    box.appendChild(knopfReihe([
+      ['BEUTEZUG', function () { schliesseOverlay(); neuerBeutezug(false); }],
+      ['FÜR KINDER', function () { schliesseOverlay(); neuerBeutezug(true); }]
+    ]));
+
+    /* Was die beiden Knoepfe unterscheidet, und zwar in dem, was man
+     * beim Spielen merkt: wo die Woerter liegen und was es kostet. */
+    [
+      [['BEUTEZUG: WÖRTER LIEGEN IN JEDER RICHTUNG,',
+        'AUCH RÜCKWÄRTS. HILFEN KOSTEN EINSATZ.'], CREME],
+      [['FÜR KINDER: EIN WORT WAAGERECHT VON LINKS,',
+        'VIELE KACHELN ZEIGEN IHREN BUCHSTABEN.'], CYAN]
+    ].forEach(function (block) {
+      var was = document.createElement('div');
+      was.className = 'hinweise';
+      block[0].forEach(function (zeile) {
+        was.appendChild(PF.render(zeile, { scale: 2, color: block[1] }));
+      });
+      box.appendChild(was);
+    });
+
+    box.appendChild(knopfReihe([
+      ['ANLEITUNG', function () { oeffneOverlay(baueAnleitung(baueStartschirm)); }],
+      ['BESTENLISTE', function () {
+        oeffneOverlay(baueBestenliste({ zurueck: baueStartschirm }));
+      }]
+    ]));
+
+    box.appendChild(knopfReihe([
+      [Klang.an ? 'TON: AN' : 'TON: AUS', function () {
+        Klang.an = !Klang.an;
+        oeffneOverlay(baueStartschirm());
+      }]
+    ]));
+
+    return box;
   }
 
   function baueMenue() {
     var box = document.createElement('div');
     box.className = 'dialog';
+    box.fest = dialogFest;
 
     var h = document.createElement('div');
     h.className = 'dialogtitel';
@@ -1239,7 +1375,7 @@
 
     box.appendChild(knopfReihe([
       ['WEITER', schliesseOverlay],
-      ['ANLEITUNG', function () { oeffneOverlay(baueAnleitung(true)); }],
+      ['ANLEITUNG', function () { oeffneOverlay(baueAnleitung(baueMenue)); }],
       ['SPICKZETTEL', function () { oeffneOverlay(baueSpickzettel()); }]
     ]));
 
@@ -1247,7 +1383,9 @@
      * Brett neu wuerfeln darf, hat kein Risiko mehr zu tragen. Wer
      * aussteigen will, haut ab und sichert den Topf. */
     box.appendChild(knopfReihe([
-      ['BESTENLISTE', function () { oeffneOverlay(baueBestenliste({ ausMenue: true })); }],
+      ['BESTENLISTE', function () {
+        oeffneOverlay(baueBestenliste({ zurueck: baueMenue }));
+      }],
       [Klang.an ? 'TON: AN' : 'TON: AUS', function () {
         Klang.an = !Klang.an;
         oeffneOverlay(baueMenue());
@@ -1255,16 +1393,16 @@
     ]));
 
     /* Der Modus wird nicht umgeschaltet, sondern neu begonnen -- ein
-     * halb gespielter Beutezug liesse sich sonst nicht vergleichen. */
+     * halb gespielter Beutezug liesse sich sonst nicht vergleichen.
+     * "NEUER BEUTEZUG" heisst dabei: noch einer wie dieser. Wer den
+     * Modus wechseln will, geht ueber das Hauptmenue. */
     box.appendChild(knopfReihe([
       ['NEUER BEUTEZUG', function () {
+        var leicht = leichterModus();
         schliesseOverlay();
-        neuerBeutezug(false);
+        neuerBeutezug(leicht);
       }],
-      ['FÜR KINDER', function () {
-        schliesseOverlay();
-        neuerBeutezug(true);
-      }]
+      ['HAUPTMENÜ', function () { oeffneOverlay(baueStartschirm()); }]
     ]));
 
     return box;
@@ -1272,10 +1410,20 @@
 
   /* Die wichtigste Huerde ist nicht die Wortsuche, sondern der Gedanke
    * dahinter: das Bild ist nicht die Antwort, das Bild ist ein
-   * Buchstabe. Also steht genau das gross und zuerst da. */
+   * Buchstabe. Also steht genau das gross und zuerst da -- und zwar
+   * ausgeschrieben, denn "Emojis sind Buchstaben, keine Antwort" war
+   * ein Merksatz fuer jemanden, der die Regel schon kennt. Ein Kind
+   * braucht sie ausbuchstabiert: das Bild heisst PIZZA, PIZZA faengt
+   * mit P an, also ist die Kachel ein P.
+   *
+   * zurueck: der Dialog, aus dem heraus geoeffnet wurde -- als Bauer,
+   * nicht als fertiger Knoten, damit er beim Zurueckgehen frische
+   * Zahlen zeigt. Ohne ihn ist das der allererste Besuch, und dann
+   * steht unten nicht "ZURÜCK", sondern die Wahl. */
   function baueAnleitung(zurueck) {
     var box = document.createElement('div');
     box.className = 'dialog anleitung';
+    box.fest = dialogFest;
 
     /* Der Spielname steht klein obendrueber wie der Schriftzug auf dem
      * Automatengehaeuse -- die Schlagzeile darunter hat den Auftritt. */
@@ -1286,17 +1434,22 @@
 
     var kopf = document.createElement('div');
     kopf.className = 'schlagzeile';
-    [['EMOJIS SIND', GOLD], ['BUCHSTABEN', CYAN], ['KEINE ANTWORT', GOLD]]
+    [['JEDES BILD IST', GOLD], ['EIN BUCHSTABE', CYAN]]
       .forEach(function (zeile) {
         kopf.appendChild(PF.render(zeile[0], {
           scale: 5, color: zeile[1], shadow: '#08220f'
         }));
       });
+    kopf.appendChild(PF.render('UND ZWAR DER, MIT DEM SEIN NAME ANFÄNGT.',
+      { scale: 2, color: CREME }));
     box.appendChild(kopf);
 
+    /* Der Name steht mit unter dem Bild. Ohne ihn muss man die Regel
+     * schon kennen, um das Beispiel zu verstehen -- und genau die soll
+     * es ja erst zeigen. */
     var beispiele = document.createElement('div');
     beispiele.className = 'beispiele';
-    [['🍕', 'P'], ['🦁', 'L'], ['🚀', 'R']]
+    [['🍕', 'PIZZA', 'P'], ['🦁', 'LÖWE', 'L'], ['🚀', 'RAKETE', 'R']]
       .forEach(function (paar) {
         var spalte = document.createElement('div');
         spalte.className = 'beispiel';
@@ -1306,15 +1459,17 @@
         bild.textContent = paar[0];
 
         spalte.appendChild(bild);
+        spalte.appendChild(PF.render(paar[1], { scale: 2, color: CREME }));
         spalte.appendChild(PF.render('↓', { scale: 3, color: '#6fbf8a' }));
-        spalte.appendChild(PF.render(paar[1], { scale: 5, color: CREME, box: 'base' }));
+        spalte.appendChild(PF.render(paar[2], { scale: 5, color: GOLD, box: 'base' }));
         beispiele.appendChild(spalte);
       });
     box.appendChild(beispiele);
 
     var satz = document.createElement('div');
     satz.className = 'mittig';
-    satz.appendChild(PF.render('EIN EMOJI ALLEIN GEWINNT NICHTS.', { scale: 2, color: GOLD }));
+    satz.appendChild(PF.render('ERST MEHRERE BILDER ERGEBEN EIN WORT.',
+      { scale: 2, color: GOLD }));
     box.appendChild(satz);
 
     /* Kleine Nachstellung der Zugkapsel -- zeigt in einem Bild, was ein
@@ -1330,24 +1485,25 @@
     var hinweise = document.createElement('div');
     hinweise.className = 'hinweise';
     [
-      ['HALTEN UND IN EINEM ZUG DARÜBERZIEHEN –', CYAN],
-      ['NICHT EINZELN ANTIPPEN.', CYAN],
-      ['GERADE LINIEN: WAAGERECHT, SENKRECHT,', CREME],
-      ['DIAGONAL. GELESEN WIRD IN ZUGRICHTUNG.', CREME],
-      ['DER ERSTE AUFTRAG IST GRATIS – TIPP UND', CREME],
-      ['SPICKEN KOSTEN AB AUFTRAG 2.', CREME],
-      ['FÜR KINDER: EIN WORT, WAAGERECHT,', GOLD],
-      ['VIELE KACHELN SCHON ALS BUCHSTABE.', GOLD]
+      ['ZIEH MIT DEM FINGER ÜBER MEHRERE BILDER.', CYAN],
+      ['GEDRÜCKT HALTEN – NICHT EINZELN TIPPEN.', CYAN],
+      ['IMMER GERADEAUS: QUER, RUNTER ODER SCHRÄG.', CREME],
+      ['STIMMT DAS WORT, KLINGELT DIE KASSE.', CREME],
+      ['RECHTS STEHT, WELCHE WÖRTER GESUCHT SIND.', CREME],
+      ['STECKST DU FEST, HILFT TIPP ODER SPICKEN.', GOLD],
+      ['AB AUFTRAG 2 KOSTEN SIE EINSATZ.', GOLD],
+      ['FÜR KINDER: EIN WORT VON LINKS NACH', CYAN],
+      ['RECHTS, UND NICHTS KOSTET ETWAS.', CYAN]
     ].forEach(function (zeile) {
       hinweise.appendChild(PF.render(zeile[0], { scale: 2, color: zeile[1] }));
     });
     box.appendChild(hinweise);
 
-    /* Beim ersten Besuch steht hier "LOS GEHT'S" und der Knopf schliesst;
-     * aus dem Menue heraus fuehrt er zurueck ins Menue. */
+    /* Beim ersten Besuch steht hier "LOS GEHT'S" und der Knopf
+     * schliesst; sonst fuehrt er dahin zurueck, wo man herkam. */
     box.appendChild(knopfReihe(
       zurueck
-        ? [['ZURÜCK', function () { oeffneOverlay(baueMenue()); }]]
+        ? [['ZURÜCK', function () { oeffneOverlay(zurueck()); }]]
         : [
             ['LOS GEHT\'S', schliesseOverlay],
             ['FÜR KINDER', function () {
@@ -1364,6 +1520,7 @@
   function baueSpickzettel() {
     var box = document.createElement('div');
     box.className = 'dialog breit';
+    box.fest = dialogFest;
 
     var h = document.createElement('div');
     h.className = 'dialogtitel';
@@ -1421,13 +1578,13 @@
     });
 
     el.overlay.addEventListener('click', function (ev) {
-      if (ev.target === el.overlay && !S.fertig) schliesseOverlay();
+      if (ev.target === el.overlay && darfWeg()) schliesseOverlay();
     });
 
     document.addEventListener('keydown', function (ev) {
       if (ev.key === 'Escape') {
         if (overlayOffen()) {
-          if (!S.fertig) schliesseOverlay();
+          if (darfWeg()) schliesseOverlay();
         } else {
           oeffneOverlay(baueMenue());
         }
@@ -1447,7 +1604,7 @@
 
   function los() {
     ['brett', 'brettRahmen', 'spur', 'spurKapsel', 'titel',
-     'auszahlung', 'abzug', 'plan', 'extra', 'rest',
+     'auszahlung', 'einsatz', 'plan', 'extra', 'rest',
      'btnTipp', 'tippText', 'btnSpicken', 'spickenText', 'btnMenu', 'menuText',
      'lblAuszahlung', 'lblPlan', 'overlay', 'overlayInhalt'].forEach(function (id) {
       el[id] = $(id);
@@ -1460,14 +1617,22 @@
     verdrahte();
 
     var stand = ladeStand();
-    neuerBeutezug();
-
-    /* Beim allerersten Besuch gleich erklaeren, worum es geht. */
-    if (!stand.schonGespielt) {
+    var erstesMal = !stand.schonGespielt;
+    if (erstesMal) {
       stand.schonGespielt = true;
       speichereStand(stand);
-      oeffneOverlay(baueAnleitung());
     }
+
+    /* Hinter dem Startdialog liegt schon ein Brett -- ein Automat, der
+     * dunkel dasteht, sieht kaputt aus. Gespielt wird es erst, wenn im
+     * Hauptmenue jemand einen Modus waehlt; bis dahin ist es Kulisse
+     * im zuletzt gespielten Modus. */
+    neuerBeutezug(!!stand.kinderModus);
+
+    /* Beim allerersten Besuch gleich erklaeren, worum es geht -- die
+     * Anleitung nennt die beiden Modi selbst, ein Hauptmenue davor
+     * waere eine Frage ohne Grundlage. */
+    oeffneOverlay(erstesMal ? baueAnleitung() : baueStartschirm());
   }
 
   /* Kleiner Griff von aussen: praktisch zum Nachstellen einer Runde in

@@ -189,7 +189,7 @@
    *   - `aufgedeckt` zeigt einen Teil der Kacheln gleich als Buchstabe.
    *     Aus K_TZE laesst sich die Katze erschliessen -- das lehrt die
    *     Zuordnung, statt sie abzufragen.
-   *   - Kleines Brett, kurze Woerter, keine Gebuehren.
+   *   - Kleines Brett, kurze Woerter, kein Einsatz.
    */
   /*
    * Die Steigerung ist der eigentliche Entwurf: der erste Auftrag hat
