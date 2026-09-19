@@ -1,0 +1,806 @@
+/* ------------------------------------------------------------------
+ * style.css -- ein Automat aus den Achtzigern.
+ *
+ * Alles Schrift-artige ist ein <canvas> aus pixelfont.js; CSS kuemmert
+ * sich hier nur um Gehaeuse, Kacheln und Bewegung.
+ * ------------------------------------------------------------------ */
+
+:root {
+  --gold: #ffd23f;
+  --gold-matt: #9a7a26;
+  --gruen: #1d7a43;
+  --gruen-dunkel: #0e4526;
+  --creme: #eaf7d8;
+  --cyan: #5ce1ff;
+  --rot: #ff4d6d;
+  --violett: #3a2160;
+  --bg: #140a1c;
+  --rahmen: #4a0d1c;
+  --lueckenmass: clamp(2px, 0.45vw, 6px);
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background-color: var(--bg);
+  background-image:
+    radial-gradient(circle at 50% 40%, rgba(120, 40, 160, 0.18), transparent 60%),
+    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: auto, 14px 14px;
+  color: var(--creme);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  overflow-x: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Gehaeuserand und Roehrenschleier liegen ueber allem, fangen aber
+ * keine Klicks ab. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  border: clamp(6px, 1.4vw, 20px) solid var(--rahmen);
+  border-radius: 12px;
+  box-shadow:
+    inset 0 0 140px rgba(0, 0, 0, 0.85),
+    inset 0 0 0 2px rgba(255, 210, 63, 0.12);
+  pointer-events: none;
+  z-index: 40;
+}
+
+.scanlines {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  opacity: 0.45;
+  background: repeating-linear-gradient(
+    to bottom,
+    rgba(0, 0, 0, 0.22) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+canvas.pf {
+  display: block;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+/* ---------------------------------------------------------------- */
+/* Gehaeuse                                                          */
+
+#automat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 27rem);
+  gap: clamp(10px, 1.8vw, 26px);
+  align-items: start;
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: clamp(14px, 2.2vw, 34px);
+  min-height: 100%;
+}
+
+@media (max-width: 900px) {
+  #automat {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Goldene Laufschrift-Umrandung, wie die Lampen an einem Spielautomaten. */
+.marquee { position: relative; }
+
+.marquee::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  pointer-events: none;
+  border-radius: 3px;
+  background:
+    repeating-linear-gradient(90deg, var(--gold) 0 6px, transparent 6px 13px) left top / 100% 3px repeat-x,
+    repeating-linear-gradient(90deg, var(--gold) 0 6px, transparent 6px 13px) left bottom / 100% 3px repeat-y,
+    repeating-linear-gradient(180deg, var(--gold) 0 6px, transparent 6px 13px) left top / 3px 100% repeat-y,
+    repeating-linear-gradient(180deg, var(--gold) 0 6px, transparent 6px 13px) right top / 3px 100% repeat-y;
+  background-repeat: no-repeat;
+  opacity: 0.85;
+}
+
+/* ---------------------------------------------------------------- */
+/* Brett                                                             */
+
+#brettRahmen {
+  --spalten: 8;
+  --zeilen: 11;
+  --polster: clamp(10px, 1.4vw, 20px);
+  --hoehe: calc(100dvh - 9rem);
+  position: relative;
+  /* Der Rahmen legt sich um das Brett, statt die ganze Spalte zu fuellen --
+   * sonst schwimmt ein schmales Brett in einer gruenen Flaeche. Gerechnet
+   * wird ueber die Hoehe, damit auch ein 8x11-Brett ohne Scrollen passt.
+   * Wichtig: eine feste Breite, keine max-width. Ein Rasterkind mit
+   * `margin: auto` schrumpft sonst auf seinen Inhalt zusammen -- und der
+   * Inhalt ist ein Gitter, das sich seinerseits nach dem Elter richtet. */
+  width: min(
+    100%,
+    calc(var(--hoehe) * var(--spalten) / var(--zeilen) + var(--polster) * 2)
+  );
+  margin-inline: auto;
+  padding: var(--polster);
+  border-radius: 10px;
+  background-color: var(--gruen);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.13) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.13) 1px, transparent 1px);
+  background-size: 13px 13px;
+  box-shadow:
+    0 0 0 4px #0b2f19,
+    0 0 0 7px #061a0e,
+    0 18px 40px rgba(0, 0, 0, 0.6),
+    inset 0 0 70px rgba(0, 0, 0, 0.35);
+}
+
+#brettRahmen.zittert { animation: zittern 0.3s steps(3); }
+
+@keyframes zittern {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-5px, 2px); }
+  50% { transform: translate(4px, -3px); }
+  75% { transform: translate(-3px, -1px); }
+}
+
+#brett {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--spalten), 1fr);
+  grid-template-rows: repeat(var(--zeilen), 1fr);
+  gap: var(--lueckenmass);
+  width: 100%;
+  aspect-ratio: var(--spalten) / var(--zeilen);
+  touch-action: none;
+}
+
+/* Schmaler Bildschirm: das Brett darf die volle Breite nehmen und die
+ * Seite darf scrollen -- besser als briefmarkengrosse Kacheln. Der
+ * Gewinnplan braucht dann auch keine Mindesthoehe mehr, sonst steht
+ * unter dem Brett erst einmal ein leeres gruenes Feld. */
+@media (max-width: 900px) {
+  #brettRahmen { width: 100%; }
+  .tafel.wachsend { min-height: 0; }
+}
+
+.kachel {
+  position: relative;
+  container-type: size;
+  cursor: pointer;
+  perspective: 500px;
+  /* Die Kachel selbst bewegt sich, das Drehen macht .dreh darunter.
+   * Zwei getrennte Ebenen, damit sich Heben und Umdrehen nicht in die
+   * Quere kommen. */
+  transition: transform 0.13s cubic-bezier(0.3, 1.5, 0.5, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .kachel:hover {
+    transform: translateY(-5px) scale(1.06);
+    z-index: 3;
+  }
+
+  .kachel:hover .vorne,
+  .kachel:hover .hinten {
+    box-shadow:
+      inset 0 0 0 2px var(--wortfarbe, rgba(255, 255, 255, 0.35)),
+      0 9px 18px rgba(0, 0, 0, 0.55);
+  }
+}
+
+/* Kacheln im Zug stehen noch etwas hoeher als die unter dem Zeiger. */
+.kachel.gewaehlt {
+  transform: translateY(-4px) scale(1.08);
+  z-index: 4;
+}
+
+/* Beim Auftragsbeginn fallen die Kacheln nacheinander ein. */
+@keyframes kachelRein {
+  from { opacity: 0; transform: translateY(-14px) scale(0.75); }
+  to { opacity: 1; transform: none; }
+}
+
+.kachel.rein { animation: kachelRein 0.3s ease-out backwards; }
+
+.dreh {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.45s cubic-bezier(0.4, 1.6, 0.5, 1);
+}
+
+.kachel.gedreht .dreh,
+#brett.spickt .kachel .dreh { transform: rotateY(180deg); }
+
+#brett.spickt .kachel .dreh { transition-delay: 0ms !important; }
+
+.seite {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.vorne {
+  font-size: 66cqh;
+  line-height: 1;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.12));
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  user-select: none;
+}
+
+.hinten {
+  transform: rotateY(180deg);
+  background: linear-gradient(180deg, #125e33, #0a3a1e);
+  box-shadow: inset 0 0 0 2px var(--wortfarbe, var(--gold));
+}
+
+.hinten canvas {
+  height: 58cqh;
+  width: auto;
+}
+
+.kachel.gefunden .hinten {
+  background: linear-gradient(180deg, #0f5c30, #063d1d);
+  box-shadow:
+    inset 0 0 0 2px var(--wortfarbe, var(--gold)),
+    0 0 12px color-mix(in srgb, var(--wortfarbe, var(--gold)) 60%, transparent);
+}
+
+/* Kacheln ohne Bild (Kindermodus): sie zeigen gleich ihren Buchstaben
+ * und sind ausdruecklich kein Fund. Deshalb matt und ohne Leuchten --
+ * sonst sieht das Brett aus, als waere die Haelfte schon geloest. */
+.buchstabenkachel .vorne {
+  background: linear-gradient(180deg, #0c4526, #062c16);
+  box-shadow: inset 0 0 0 2px #2a6b45;
+}
+
+.buchstabenkachel .vorne canvas {
+  height: 58cqh;
+  width: auto;
+}
+
+/* Wird so eine Kachel Teil eines Fundes, bekommt sie die Wortfarbe wie
+ * jede andere auch. */
+.buchstabenkachel.gefunden .vorne {
+  background: linear-gradient(180deg, #0f5c30, #063d1d);
+  box-shadow:
+    inset 0 0 0 2px var(--wortfarbe, var(--gold)),
+    0 0 12px color-mix(in srgb, var(--wortfarbe, var(--gold)) 60%, transparent);
+}
+
+/* Umdrehen waere sinnlos: vorne steht schon derselbe Buchstabe. */
+.buchstabenkachel .dreh { transform: none !important; }
+
+.kachel.tipp .hinten {
+  animation: tippblinken 1.1s ease-in-out 4;
+}
+
+@keyframes tippblinken {
+  0%, 100% { box-shadow: inset 0 0 0 2px var(--gold); }
+  50% { box-shadow: inset 0 0 0 3px #fff, 0 0 18px var(--gold); }
+}
+
+/* Die ausgewaehlten Kacheln bekommen keinen eigenen Rahmen -- das
+ * uebernimmt die Kapsel, die sich um den ganzen Zug legt. Hier reicht
+ * ein bisschen mehr Licht. */
+.kachel.gewaehlt .vorne {
+  filter: brightness(1.22);
+}
+
+.kachel.blinkt .vorne {
+  box-shadow: inset 0 0 0 3px var(--blinkfarbe, #fff);
+}
+
+/* Ein Zug ist immer eine Gerade, also wird er auch als eine Form
+ * gezeichnet: eine Kapsel vom ersten bis zum letzten Feld, halb
+ * durchsichtig, damit die Emojis darunter lesbar bleiben. */
+#spur {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+#spur.aktiv { opacity: 1; }
+
+#spurKapsel {
+  fill: rgba(92, 225, 255, 0.16);
+  stroke: #eafcff;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 7px rgba(92, 225, 255, 0.85));
+}
+
+
+
+
+
+/* Muenzenregen bei einem Treffer aus dem Gewinnplan. */
+.muenze {
+  position: absolute;
+  z-index: 6;
+  width: 9px;
+  height: 9px;
+  margin: -4px 0 0 -4px;
+  border-radius: 2px;
+  background: var(--gold);
+  box-shadow: 0 0 7px rgba(255, 210, 63, 0.9);
+  pointer-events: none;
+  animation: muenzeFlug var(--dauer, 0.8s) cubic-bezier(0.2, 0.7, 0.4, 1) forwards;
+}
+
+@keyframes muenzeFlug {
+  0% { opacity: 1; transform: translate(0, 0) scale(1) rotate(0deg); }
+  70% { opacity: 1; }
+  100% {
+    opacity: 0;
+    transform: translate(var(--dx), var(--dy)) scale(0.35) rotate(var(--dreh));
+  }
+}
+
+/* Kurzes Aufleuchten des Gehaeuses, wenn ein Auftragswort faellt. */
+#brettRahmen.blitzt { animation: rahmenblitz 0.45s ease-out; }
+
+@keyframes rahmenblitz {
+  0% { box-shadow: 0 0 0 4px var(--gold), 0 0 60px rgba(255, 210, 63, 0.7); }
+  100% {
+    box-shadow:
+      0 0 0 4px #0b2f19,
+      0 0 0 7px #061a0e,
+      0 18px 40px rgba(0, 0, 0, 0.6),
+      inset 0 0 70px rgba(0, 0, 0, 0.35);
+  }
+}
+
+/* Das gerade gestrichene Wort im Gewinnplan blinkt einmal auf. */
+.planwort.frisch { animation: planblitz 0.4s steps(2) 3; }
+
+@keyframes planblitz {
+  50% { filter: brightness(2.4); }
+}
+
+.gewinnblase {
+  position: absolute;
+  z-index: 5;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: aufsteigen 1.2s ease-out forwards;
+}
+
+.gewinnblase.ziel { animation-duration: 1.4s; }
+
+@keyframes aufsteigen {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
+  18% { opacity: 1; transform: translate(-50%, -70%) scale(1.15); }
+  100% { opacity: 0; transform: translate(-50%, -190%) scale(1); }
+}
+
+/* ---------------------------------------------------------------- */
+/* Seitenpult                                                        */
+
+#panel {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(8px, 1.1vw, 16px);
+  min-width: 0;
+}
+
+.tafel {
+  padding: clamp(12px, 1.4vw, 20px);
+  border-radius: 8px;
+  background-color: var(--gruen-dunkel);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.14) 1px, transparent 1px);
+  background-size: 13px 13px;
+  box-shadow:
+    0 0 0 3px #04200f,
+    inset 0 0 40px rgba(0, 0, 0, 0.4);
+}
+
+.tafel.wachsend { min-height: clamp(180px, 34vh, 420px); }
+
+#titelTafel { display: grid; place-items: center; }
+
+#titel canvas { max-width: 100%; height: auto; }
+
+.block { display: flex; flex-direction: column; gap: 6px; }
+
+.etikett { padding-left: 4px; opacity: 0.75; }
+
+.zaehlerreihe {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.zaehler {
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: #06170c;
+  box-shadow: inset 0 0 0 2px #0d3a1e, 0 0 18px rgba(0, 0, 0, 0.5);
+}
+
+.chip {
+  padding: 6px 10px;
+  border-radius: 5px;
+  box-shadow: inset 0 0 0 2px var(--rot);
+  background: rgba(255, 77, 109, 0.08);
+}
+
+#plan {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 12px 16px;
+  margin-top: 14px;
+  align-content: flex-start;
+}
+
+/* Rasterkinder wehren sich per Vorgabe gegen das Schrumpfen. Ohne
+ * `min-width: 0` schiebt ein langes Wort wie SCHLOSS seine Nachbarspalte
+ * einfach beiseite. */
+.planwort {
+  display: block;
+  min-width: 0;
+}
+
+.planwort canvas {
+  max-width: 100%;
+  height: auto;
+}
+
+.planwort.erledigt { opacity: 0.75; }
+
+.extrazeile { margin-top: 16px; }
+
+.knopfreihe {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: clamp(8px, 1.1vw, 16px);
+}
+
+.knopf {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: clamp(12px, 1.5vw, 20px) clamp(14px, 2vw, 26px);
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  transition: transform 0.08s, filter 0.12s;
+}
+
+.knopf.gold {
+  background: linear-gradient(180deg, #33206b, #1b1038);
+  box-shadow: 0 0 0 3px var(--gold-matt), 0 6px 0 #0d0820;
+}
+
+.knopf.violett {
+  background: linear-gradient(180deg, #4a2d7d, #261548);
+  box-shadow: 0 0 0 3px var(--creme), 0 6px 0 #0d0820;
+}
+
+.knopf:hover { filter: brightness(1.18); }
+
+.knopf:active { transform: translateY(3px); }
+
+.knopf:focus-visible,
+.nurtext:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+.fussreihe {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 4px;
+}
+
+.nurtext {
+  border: 0;
+  background: none;
+  padding: 4px;
+  cursor: pointer;
+  color: inherit;
+  transition: filter 0.12s;
+}
+
+.nurtext:hover { filter: brightness(1.3); }
+
+/* ---------------------------------------------------------------- */
+/* Overlay                                                           */
+
+#overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: none;
+  place-items: center;
+  padding: clamp(16px, 4vw, 48px);
+  background: rgba(8, 4, 14, 0.86);
+  backdrop-filter: blur(3px);
+  overflow: auto;
+}
+
+/* Die Spalte muss ausdruecklich gesetzt sein. Eine automatische Spur
+ * richtet sich nach dem Inhalt, dann haengt die Breite des Dialogs an
+ * seinem eigenen Text -- und `width: min(860px, 100%)` liefert Unfug. */
+#overlay.offen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* Der Behaelter verschwindet aus dem Layout, damit der Dialog selbst
+ * das Rasterkind ist. Sonst richtet sich seine Breite nach diesem
+ * ungestylten Zwischen-div und `width: min(560px, 100%)` greift ins
+ * Leere -- der Dialog wird dann so breit wie sein laengster Satz. */
+#overlayInhalt { display: contents; }
+
+.dialog {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: clamp(18px, 3vw, 32px);
+  border-radius: 10px;
+  background-color: var(--gruen-dunkel);
+  background-image:
+    linear-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.14) 1px, transparent 1px);
+  background-size: 13px 13px;
+  box-shadow:
+    0 0 0 3px var(--gold-matt),
+    0 0 0 8px #04200f,
+    0 24px 60px rgba(0, 0, 0, 0.7);
+  animation: reinfahren 0.22s ease-out;
+}
+
+.dialog.breit { width: min(860px, 100%); }
+
+@keyframes reinfahren {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+
+.dialogtitel { display: grid; place-items: center; }
+
+.dialogtitel canvas { max-width: 100%; height: auto; }
+
+.abrechnung {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px 20px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.abrechnung > span:nth-child(even) { justify-self: end; }
+
+.extraliste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  max-height: 24vh;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.dialogknoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.dialogknoepfe .knopf {
+  flex: 1 1 auto;
+  background: linear-gradient(180deg, #33206b, #1b1038);
+  box-shadow: 0 0 0 3px var(--gold-matt), 0 5px 0 #0d0820;
+}
+
+/* Der Einstiegsbildschirm: alles mittig, alles in Pixelschrift. */
+.dialog.anleitung { gap: 14px; }
+
+/* Schriftzug ueber der Schlagzeile, mit etwas Luft nach unten. */
+.marke { margin-bottom: -4px; }
+
+.schlagzeile,
+.beispiele,
+.hinweise,
+.mittig {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.schlagzeile,
+.hinweise {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.schlagzeile canvas { max-width: 100%; height: auto; }
+
+.hinweise { gap: 4px; }
+
+.beispiele { gap: clamp(20px, 6vw, 56px); }
+
+.beispiel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.beispielemoji {
+  font-size: clamp(34px, 6vw, 48px);
+  line-height: 1;
+}
+
+/* Die drei Kaestchen in der Kapsel, wie sie beim Ziehen aussehen. */
+.zugdemo {
+  display: flex;
+  gap: 5px;
+  padding: 6px;
+  border: 3px solid #eafcff;
+  border-radius: 999px;
+  background: rgba(92, 225, 255, 0.16);
+  box-shadow: 0 0 10px rgba(92, 225, 255, 0.7);
+}
+
+.zugdemo span {
+  width: 26px;
+  height: 26px;
+  border-radius: 5px;
+  background: #0b3d21;
+  box-shadow: inset 0 0 0 2px #1c6b39;
+}
+
+.spickgitter {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  max-height: 54vh;
+  overflow: auto;
+  padding: 12px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.spickzelle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.spickemoji { font-size: 26px; line-height: 1; }
+
+/* ---------------------------------------------------------------- */
+/* Bestenliste und Nameneingabe                                      */
+
+.dialog.eingabe { gap: 12px; }
+
+/* Die drei Stellen des Kuerzels. */
+.schlitze {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+}
+
+.schlitz {
+  display: grid;
+  place-items: center;
+  width: clamp(48px, 12vw, 64px);
+  aspect-ratio: 3 / 4;
+  border-radius: 6px;
+  background: #06170c;
+  box-shadow: inset 0 0 0 2px #1c6b39;
+}
+
+/* Die Stelle, die als naechstes dran ist, blinkt wie ein Cursor. */
+.schlitz.dran {
+  box-shadow: inset 0 0 0 3px var(--gold), 0 0 14px rgba(255, 210, 63, 0.5);
+  animation: cursorblinken 1s steps(2, end) infinite;
+}
+
+@keyframes cursorblinken {
+  50% { box-shadow: inset 0 0 0 3px var(--gold-matt); }
+}
+
+.tastatur {
+  display: grid;
+  grid-template-columns: repeat(9, 1fr);
+  gap: clamp(3px, 0.7vw, 6px);
+}
+
+.taste {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  background: linear-gradient(180deg, #33206b, #1b1038);
+  box-shadow: inset 0 0 0 2px var(--gold-matt);
+  transition: filter 0.08s, transform 0.06s;
+}
+
+.taste:hover { filter: brightness(1.35); }
+
+.taste:active { transform: translateY(2px); }
+
+.taste:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.knopf.aus { cursor: not-allowed; filter: grayscale(0.6) brightness(0.7); }
+
+.rangliste {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+.rang {
+  display: grid;
+  /* Platz, Kuerzel, Summe, Auftraege -- die Summe bekommt den Rest. */
+  grid-template-columns: 2.6em 3.4em 1fr 2.6em;
+  gap: 10px;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 4px;
+}
+
+.rang > span:last-child { justify-self: end; }
+
+.rang.neu {
+  background: rgba(255, 210, 63, 0.14);
+  box-shadow: inset 0 0 0 2px var(--gold);
+  animation: frischblinken 0.5s steps(2) 4;
+}
+
+@keyframes frischblinken {
+  50% { background: rgba(255, 210, 63, 0.34); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
