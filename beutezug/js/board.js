@@ -3,9 +3,15 @@
  *
  * Das Brett entsteht rueckwaerts: zuerst werden die gesuchten Woerter
  * als gerade Strecken hineingelegt (acht Richtungen, keine Knicke,
- * Kreuzungen auf gleichen Buchstaben erwuenscht), danach wird der Rest
- * mit gewichteten Zufallsbuchstaben aufgefuellt. So ist garantiert,
- * dass jeder Auftrag ueberhaupt loesbar ist.
+ * Kreuzungen auf gleichen Buchstaben je nach Auftrag verboten, erlaubt
+ * oder gesucht), danach wird der Rest mit gewichteten Zufallsbuchstaben
+ * aufgefuellt. So ist garantiert, dass jeder Auftrag ueberhaupt loesbar
+ * ist.
+ *
+ * Was ein Auftrag ausser Brettgroesse und Worten noch mitbringen darf,
+ * ist die Schwierigkeit: `richtungen`, `neueRichtung`, `kreuzen`,
+ * `koeder` und `dichte`. Welcher Auftrag was bekommt, entscheidet die
+ * Stufenleiter in words.js -- hier wird es nur gebaut.
  *
  * Gerade Strecken heisst auch: ein Wort kann rueckwaerts im Brett
  * liegen. Dann wird es eben von hinten nach vorne gezogen -- gelesen
@@ -100,12 +106,19 @@
     return felder;
   }
 
-  /* Sucht eine Strecke fuer ein Wort. Felder duerfen belegt sein, wenn
-   * dort bereits der passende Buchstabe liegt -- das erzeugt die
-   * Kreuzungen, die ein Brett erst dicht machen. Alle Kombinationen aus
-   * Start und Richtung werden gemischt durchprobiert: wenn ueberhaupt
-   * ein Platz frei ist, wird er auch gefunden. */
-  function findePfad(wort, buchstaben, spalten, zeilen, rng, richtungen) {
+  /* Sucht eine Strecke fuer ein Wort. Alle Kombinationen aus Start und
+   * Richtung werden gemischt durchprobiert: wenn ueberhaupt ein Platz
+   * frei ist, wird er auch gefunden.
+   *
+   * `kreuzen` sagt, ob das Wort belegte Felder mitbenutzen darf, wenn
+   * dort schon der passende Buchstabe liegt:
+   *   false   nie -- jedes Wort hat seine eigenen Kacheln,
+   *   true    wo es sich zufaellig ergibt,
+   *   'mehr'  wo immer es geht: von allen Plaetzen gewinnt der mit den
+   *           meisten geteilten Kacheln. Das macht das Brett zum Knoten.
+   * Ganz auf einem anderen Wort darf ein Wort nie liegen -- ARM mitten
+   * in ALARM waere kein zweiter Fund, sondern derselbe. */
+  function findePfad(wort, buchstaben, spalten, zeilen, rng, richtungen, kreuzen) {
     richtungen = richtungen || RICHTUNGEN;
     var kandidaten = [];
     for (var feld = 0; feld < buchstaben.length; feld++) {
@@ -113,19 +126,47 @@
     }
     mische(kandidaten, rng);
 
+    var bester = null;
+    var besteTeile = -1;
+
     for (var k = 0; k < kandidaten.length; k++) {
       var felder = strecke(kandidaten[k][0], richtungen[kandidaten[k][1]],
                            wort.length, spalten, zeilen);
       if (!felder) continue;
 
       var passt = true;
+      var geteilt = 0;
       for (var i = 0; i < felder.length; i++) {
         var da = buchstaben[felder[i]];
-        if (da !== null && da !== wort[i]) { passt = false; break; }
+        if (da === null) continue;
+        if (da !== wort[i] || kreuzen === false) { passt = false; break; }
+        geteilt++;
       }
-      if (passt) return felder;
+      if (!passt || geteilt === felder.length) continue;
+      if (kreuzen !== 'mehr') return felder;
+      if (geteilt > besteTeile) {
+        bester = felder;
+        besteTeile = geteilt;
+      }
     }
-    return null;
+    return bester;
+  }
+
+  /*
+   * Koeder: der Anfang eines gesuchten Wortes, ohne seinen letzten
+   * Buchstaben, auf freie Felder gelegt. Wer KASS liest, zieht los --
+   * und muss erst merken, dass dort kein E folgt. Koeder teilen sich
+   * keine Kachel mit einem Wort; sie sollen falsche Faehrten sein, keine
+   * Abkuerzungen.
+   */
+  function legeKoeder(anzahl, worte, buchstaben, spalten, zeilen, rng, richtungen) {
+    for (var i = 0; i < anzahl; i++) {
+      var wort = worte[Math.floor(rng() * worte.length)];
+      var stueck = wort.slice(0, Math.max(2, wort.length - 1));
+      var pfad = findePfad(stueck, buchstaben, spalten, zeilen, rng, richtungen, false);
+      if (!pfad) continue;
+      for (var j = 0; j < pfad.length; j++) buchstaben[pfad[j]] = stueck[j];
+    }
   }
 
   /*
@@ -138,12 +179,24 @@
     var felder = spalten * zeilen;
     var nachbarn = nachbarnTabelle(spalten, zeilen);
     var richtungen = erlaubteRichtungen(auftrag);
+    /* Fuehrt ein Auftrag eine Richtung neu ein, muss sie auch vorkommen:
+     * eine angekuendigte Neuerung, die der Zufall weglaesst, waere keine.
+     * Das laengste Wort bekommt sie, solange das Brett noch leer ist. */
+    var neueRichtung = auftrag.neueRichtung
+      ? erlaubteRichtungen({ richtungen: [auftrag.neueRichtung] })
+      : null;
 
     /* Lange Woerter zuerst: die haben die wenigsten Moeglichkeiten und
      * sollen sich das Brett aussuchen duerfen, solange es leer ist. */
     var reihenfolge = auftrag.worte.slice().sort(function (a, b) {
       return b.length - a.length;
     });
+
+    /* Die Fuellkacheln eines dichten Bretts kommen zum Teil aus den
+     * gesuchten Woertern selbst. Dann liegen ueberall dieselben Bilder
+     * wie im Gewinnplan, und das Auge findet keinen Anker mehr. */
+    var dichte = auftrag.dichte || 0;
+    var zielBuchstaben = auftrag.worte.join('');
 
     var buchstaben = null;
     var pfade = null;
@@ -156,7 +209,8 @@
 
       for (var w = 0; w < reihenfolge.length; w++) {
         var wort = reihenfolge[w];
-        var pfad = findePfad(wort, buchstaben, spalten, zeilen, rng, richtungen);
+        var pfad = findePfad(wort, buchstaben, spalten, zeilen, rng,
+          w === 0 && neueRichtung ? neueRichtung : richtungen, auftrag.kreuzen);
         if (!pfad) { geschafft = false; break; }
         for (var i = 0; i < pfad.length; i++) buchstaben[pfad[i]] = wort[i];
         pfade[wort] = pfad;
@@ -164,10 +218,13 @@
 
       if (geschafft) {
         var fuellRng = zufall((saat || 1) * 31 + versuch);
+        legeKoeder(auftrag.koeder || 0, reihenfolge, buchstaben,
+          spalten, zeilen, fuellRng, richtungen);
         for (var f = 0; f < felder; f++) {
-          if (buchstaben[f] === null) {
-            buchstaben[f] = global.EmojiAlphabet.randomLetter(fuellRng);
-          }
+          if (buchstaben[f] !== null) continue;
+          buchstaben[f] = fuellRng() < dichte
+            ? zielBuchstaben[Math.floor(fuellRng() * zielBuchstaben.length)]
+            : global.EmojiAlphabet.randomLetter(fuellRng);
         }
         break;
       }
@@ -205,6 +262,7 @@
   /* ---------------------------------------------------------------- */
 
   var trie = null;
+  var trieQuelle = null;
 
   function baueTrie(woerter) {
     var wurzel = {};
@@ -227,7 +285,14 @@
    * Vorwaerts und rueckwaerts sind hier zwei verschiedene Strahlen, also
    * findet ein Durchlauf beide Leserichtungen von selbst. */
   function alleLoesungen(brett, woerterbuch) {
-    if (!trie) trie = baueTrie(Array.from(woerterbuch));
+    /* Der Trie wird an seinem Woerterbuch festgehalten, nicht bloss
+     * einmal gebaut: ein Sprachwechsel schiebt ein anderes hier herein,
+     * und mit dem alten Trie faende der Loeser dann deutsche Woerter in
+     * einem englischen Brett. */
+    if (!trie || trieQuelle !== woerterbuch) {
+      trie = baueTrie(Array.from(woerterbuch));
+      trieQuelle = woerterbuch;
+    }
 
     var gefunden = new Set();
     var spalten = brett.spalten;

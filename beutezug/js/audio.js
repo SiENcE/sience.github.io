@@ -134,6 +134,19 @@
         ton({ hz: note(12 + h), dauer: 0.18, laut: 0.42, nach: i * 0.1, typ: 'square' });
       });
     },
+    /* Die letzten Sekunden eines Alarms ticken hoerbar -- wer aufs
+     * Brett starrt, schaut nicht auf die Uhr. */
+    tick: function () {
+      ton({ hz: 1200, dauer: 0.03, laut: 0.18, typ: 'square' });
+    },
+
+    /* Die Sirene, wenn der Alarm einen erwischt. */
+    sirene: function () {
+      [0, 1, 2].forEach(function (i) {
+        ton({ hz: 620, bisHz: 980, dauer: 0.22, laut: 0.3, nach: i * 0.26, typ: 'sawtooth' });
+      });
+    },
+
     spicken: function () {
       ton({ hz: note(19), bisHz: note(31), dauer: 0.25, laut: 0.25, typ: 'triangle' });
     }

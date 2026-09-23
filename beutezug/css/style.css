@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
- * style.css -- ein Automat aus den Achtzigern.
+ * style.css -- Spielkarten, Filz und kantige rote Plakate.
  *
  * Alles Schrift-artige ist ein <canvas> aus pixelfont.js; CSS kuemmert
  * sich hier nur um Gehaeuse, Kacheln und Bewegung.
@@ -8,14 +8,14 @@
 :root {
   --gold: #ffd23f;
   --gold-matt: #9a7a26;
-  --gruen: #1d7a43;
-  --gruen-dunkel: #0e4526;
-  --creme: #eaf7d8;
-  --cyan: #5ce1ff;
-  --rot: #ff4d6d;
-  --violett: #3a2160;
-  --bg: #140a1c;
-  --rahmen: #4a0d1c;
+  --gruen: #17675f;
+  --gruen-dunkel: #103d39;
+  --creme: #fff1d5;
+  --cyan: #79e6d2;
+  --rot: #e62e40;
+  --violett: #29272d;
+  --bg: #151519;
+  --rahmen: #a51e2e;
   --lueckenmass: clamp(2px, 0.45vw, 6px);
 }
 
@@ -29,11 +29,12 @@ html, body {
 body {
   background-color: var(--bg);
   background-image:
-    radial-gradient(circle at 50% 40%, rgba(120, 40, 160, 0.18), transparent 60%),
-    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
-  background-size: auto, 14px 14px;
+    linear-gradient(124deg, transparent 58%, #c51d32 58% 72%, transparent 72%),
+    radial-gradient(ellipse at 35% 20%, #303038, #101014 75%);
+  background-attachment: fixed;
+  background-size: auto;
   color: var(--creme);
-  font-family: ui-monospace, "Cascadia Mono", Consolas, "DejaVu Sans Mono", monospace;
+  font-family: Arial, Helvetica, sans-serif;
   overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
 }
@@ -44,11 +45,9 @@ body::before {
   content: "";
   position: fixed;
   inset: 0;
-  border: clamp(6px, 1.4vw, 20px) solid var(--rahmen);
-  border-radius: 12px;
-  box-shadow:
-    inset 0 0 140px rgba(0, 0, 0, 0.85),
-    inset 0 0 0 2px rgba(255, 210, 63, 0.12);
+  border: 0;
+  border-top: 4px solid var(--rot);
+  box-shadow: inset 0 0 50px rgba(0, 0, 0, 0.18);
   pointer-events: none;
   z-index: 40;
 }
@@ -56,20 +55,17 @@ body::before {
 .scanlines {
   position: fixed;
   inset: 0;
-  z-index: 45;
+  z-index: 0;
   pointer-events: none;
-  opacity: 0.45;
-  background: repeating-linear-gradient(
-    to bottom,
-    rgba(0, 0, 0, 0.22) 0 1px,
-    transparent 1px 3px
-  );
+  opacity: 0.16;
+  background: radial-gradient(#fff 0.6px, transparent 0.8px) 0 0 / 5px 5px;
 }
 
 canvas.pf {
   display: block;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
+  width: var(--schrift-breite);
+  height: auto;
+  image-rendering: auto;
 }
 
 /* Ein Satz, der auf einem engen Bildschirm umgebrochen werden musste.
@@ -86,20 +82,43 @@ canvas.pf {
 /* Gehaeuse                                                          */
 
 #automat {
+  position: relative;
+  z-index: 1;
+  min-height: 100svh;
+  grid-template-rows: auto 1fr auto auto;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(270px, 27rem);
-  gap: clamp(10px, 1.8vw, 26px);
-  align-items: start;
-  max-width: 1500px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  align-content: start;
+  max-width: 760px;
   margin: 0 auto;
-  padding: clamp(14px, 2.2vw, 34px);
-  min-height: 100%;
+  padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
 }
 
-@media (max-width: 900px) {
+#kopf {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 10px;
+  min-width: 0;
+}
+
+#aktionen {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+#aktionen .knopf { padding: 10px 4px; min-height: 52px; }
+#aktionen .knopf:last-child { background: #eee5d4; border-color: #eee5d4; box-shadow: 3px 4px 0 #08090c; }
+#aktionen { padding-top: 2px; }
+
+@media (max-width: 480px) {
   #automat {
-    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
   }
+  #kopf { gap: 6px; }
 }
 
 /* Goldene Laufschrift-Umrandung, wie die Lampen an einem Spielautomaten. */
@@ -126,8 +145,9 @@ canvas.pf {
 #brettRahmen {
   --spalten: 8;
   --zeilen: 11;
-  --polster: clamp(10px, 1.4vw, 20px);
-  --hoehe: calc(100dvh - 9rem);
+  --polster: 8px;
+  --hoehe: max(240px, calc(100vh - 280px));
+  --hoehe: max(240px, calc(100svh - 280px));
   position: relative;
   /* Der Rahmen legt sich um das Brett, statt die ganze Spalte zu fuellen --
    * sonst schwimmt ein schmales Brett in einer gruenen Flaeche. Gerechnet
@@ -140,18 +160,19 @@ canvas.pf {
     calc(var(--hoehe) * var(--spalten) / var(--zeilen) + var(--polster) * 2)
   );
   margin-inline: auto;
+  align-self: center;
   padding: var(--polster);
-  border-radius: 10px;
+  border-radius: 2px;
   background-color: var(--gruen);
   background-image:
     linear-gradient(rgba(0, 0, 0, 0.13) 1px, transparent 1px),
     linear-gradient(90deg, rgba(0, 0, 0, 0.13) 1px, transparent 1px);
   background-size: 13px 13px;
   box-shadow:
-    0 0 0 4px #0b2f19,
-    0 0 0 7px #061a0e,
-    0 18px 40px rgba(0, 0, 0, 0.6),
-    inset 0 0 70px rgba(0, 0, 0, 0.35);
+    0 0 0 2px #082b29,
+    0 3px 0 3px #080a0c,
+    0 12px 28px rgba(0, 0, 0, 0.4),
+    inset 0 0 45px rgba(0, 0, 0, 0.25);
 }
 
 #brettRahmen.zittert { animation: zittern 0.3s steps(3); }
@@ -174,13 +195,14 @@ canvas.pf {
   touch-action: none;
 }
 
-/* Schmaler Bildschirm: das Brett darf die volle Breite nehmen und die
- * Seite darf scrollen -- besser als briefmarkengrosse Kacheln. Der
- * Gewinnplan braucht dann auch keine Mindesthoehe mehr, sonst steht
- * unter dem Brett erst einmal ein leeres gruenes Feld. */
-@media (max-width: 900px) {
-  #brettRahmen { width: 100%; }
-  .tafel.wachsend { min-height: 0; }
+/* Auch hochkant bleibt Platz fuer Plan und Knopfzeile. Im sehr flachen
+ * Querformat hat die Lesbarkeit Vorrang; dann darf die Seite scrollen. */
+@media (max-width: 480px) {
+  #brettRahmen {
+    --polster: 6px;
+    --hoehe: max(240px, calc(100vh - 260px));
+    --hoehe: max(240px, calc(100svh - 260px));
+  }
 }
 
 .kachel {
@@ -240,7 +262,7 @@ canvas.pf {
   inset: 0;
   display: grid;
   place-items: center;
-  border-radius: 5px;
+  border-radius: 3px;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
@@ -248,14 +270,14 @@ canvas.pf {
 .vorne {
   font-size: 66cqh;
   line-height: 1;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0.12));
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.25);
+  background: linear-gradient(155deg, #fff8e8, #e8d9b9);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 2px 0 #082b29;
   user-select: none;
 }
 
 .hinten {
   transform: rotateY(180deg);
-  background: linear-gradient(180deg, #125e33, #0a3a1e);
+  background: linear-gradient(155deg, #164d48, #102d2c);
   box-shadow: inset 0 0 0 2px var(--wortfarbe, var(--gold));
 }
 
@@ -275,8 +297,8 @@ canvas.pf {
  * und sind ausdruecklich kein Fund. Deshalb matt und ohne Leuchten --
  * sonst sieht das Brett aus, als waere die Haelfte schon geloest. */
 .buchstabenkachel .vorne {
-  background: linear-gradient(180deg, #0c4526, #062c16);
-  box-shadow: inset 0 0 0 2px #2a6b45;
+  background: linear-gradient(155deg, #253b39, #142624);
+  box-shadow: inset 0 0 0 1px #49716a, 0 2px 0 #082b29;
 }
 
 .buchstabenkachel .vorne canvas {
@@ -349,6 +371,63 @@ canvas.pf {
 
 
 
+/* Die Ansage einer neuen Stufe: ein Plakat quer ueber dem Brett. Es
+ * faengt keinen Zeiger ab -- wer schon ziehen will, zieht hindurch. */
+#neuigkeit {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 7;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(92%, 420px);
+  padding: 14px 16px;
+  border-left: 5px solid var(--rot);
+  background: rgba(16, 16, 19, 0.94);
+  box-shadow: 5px 5px 0 #08090c, 0 18px 40px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.92);
+  transition: opacity 0.25s ease-out, transform 0.25s ease-out;
+}
+
+#neuigkeit.zeigt {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+#neuigkeit canvas { max-width: 100%; height: auto; }
+
+/* Der Alarm: die Uhr im Titelschild und ein roter Balken ueber dem
+ * Brett, der mit der Zeit schrumpft. Der Balken liegt in der Luecke
+ * zwischen Kopf und Brett und verschiebt nichts. */
+#alarm { align-self: flex-start; }
+
+#alarm.knapp { animation: alarmBlinkt 0.6s steps(2) infinite; }
+
+@keyframes alarmBlinkt {
+  50% { opacity: 0.35; }
+}
+
+#brettRahmen.alarm::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: -8px;
+  z-index: 2;
+  width: var(--alarmrest, 100%);
+  height: 4px;
+  background: var(--rot);
+  box-shadow: 0 0 8px rgba(230, 46, 64, 0.8);
+  transition: width 0.25s linear;
+}
+
+/* Verdeckte Worte im Gewinnplan: gestrichelt, weil sie erst noch
+ * gefunden werden muessen, bevor man sie lesen kann. */
+.planwort.verdeckt { border-style: dashed; }
+
 /* Muenzenregen bei einem Treffer aus dem Gewinnplan. */
 .muenze {
   position: absolute;
@@ -410,33 +489,72 @@ canvas.pf {
 }
 
 /* ---------------------------------------------------------------- */
-/* Seitenpult                                                        */
-
-#panel {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(8px, 1.1vw, 16px);
-  min-width: 0;
-}
+/* Kopf und Gewinnplan                                               */
 
 .tafel {
-  padding: clamp(12px, 1.4vw, 20px);
-  border-radius: 8px;
-  background-color: var(--gruen-dunkel);
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.14) 1px, transparent 1px);
-  background-size: 13px 13px;
-  box-shadow:
-    0 0 0 3px #04200f,
-    inset 0 0 40px rgba(0, 0, 0, 0.4);
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid #454149;
+  border-left: 4px solid var(--rot);
+  border-radius: 0;
+  background: linear-gradient(120deg, #2b292f, #1c1c21);
+  box-shadow: 3px 3px 0 #09090c;
 }
 
-.tafel.wachsend { min-height: clamp(180px, 34vh, 420px); }
+#titelTafel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 0;
+  border-left: 5px solid var(--creme);
+  background: #dc2339;
+  box-shadow: 4px 4px 0 #08090c;
+  clip-path: polygon(0 0, 100% 0, 96% 100%, 0 100%);
+  padding-right: 16px;
+}
 
-#titelTafel { display: grid; place-items: center; }
+#marke, #titel, #beuteAnzeige { min-width: 0; }
+#marke { transform: skew(-8deg); transform-origin: left center; }
+#titel { opacity: 0.9; }
+#titel .pfblock { align-items: flex-start; }
+#marke canvas, #titel canvas, .zaehler canvas { max-width: 100%; height: auto; }
 
-#titel canvas { max-width: 100%; height: auto; }
+#beuteAnzeige {
+  position: relative;
+  justify-content: center;
+  padding: 6px 8px;
+  border-bottom: 3px solid var(--gold);
+  background: #101013;
+  max-width: 200px;
+}
+
+#lblAuszahlung { opacity: 0.85; }
+
+#gewinnplan { position: relative; padding: 10px 12px 13px; border: 0; border-top: 2px solid #eee5d4; background: #17171c; }
+#gewinnplan::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 3px;
+  width: var(--fortschritt, 0%);
+  background: var(--gold);
+  transition: width 0.4s ease-out;
+}
+
+.planKopf {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px 10px;
+}
+
+.planKopf > * { min-width: 0; }
+.planKopf canvas, #extra canvas { max-width: 100%; height: auto; }
 
 .block { display: flex; flex-direction: column; gap: 6px; }
 
@@ -450,33 +568,47 @@ canvas.pf {
 }
 
 .zaehler {
-  padding: 10px 14px;
-  border-radius: 6px;
-  background: #06170c;
-  box-shadow: inset 0 0 0 2px #0d3a1e, 0 0 18px rgba(0, 0, 0, 0.5);
+  min-width: 0;
+  padding: 2px 0;
+  color: var(--gold);
 }
 
+/* Der Einsatz haengt als Etikett auf der Goldkante, statt eine eigene
+ * Zeile zu belegen. Wuerde er den Kopf erst beim ersten Tipp hoeher
+ * machen, schrumpfte das Brett mitten im Auftrag und die Kacheln
+ * rutschten unter dem Finger weg. */
 .chip {
-  padding: 6px 10px;
-  border-radius: 5px;
+  position: absolute;
+  top: 100%;
+  right: 6px;
+  z-index: 2;
+  padding: 2px 6px;
+  border-radius: 3px;
   box-shadow: inset 0 0 0 2px var(--rot);
-  background: rgba(255, 77, 109, 0.08);
+  background: #101013;
+  transform: translateY(-50%);
+  pointer-events: none;
 }
 
 #plan {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
-  gap: 12px 16px;
-  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
   align-content: flex-start;
 }
 
-/* Rasterkinder wehren sich per Vorgabe gegen das Schrumpfen. Ohne
- * `min-width: 0` schiebt ein langes Wort wie SCHLOSS seine Nachbarspalte
- * einfach beiseite. */
+/* Ganze Wortkarten umbrechen, statt den Plan seitlich abzuschneiden. */
 .planwort {
-  display: block;
+  display: flex;
+  align-items: center;
   min-width: 0;
+  max-width: 100%;
+  padding: 5px 7px;
+  border: 1px solid #514b4c;
+  border-radius: 0;
+  background: #28272e;
+  box-shadow: 1px 2px 0 #080a0c;
 }
 
 .planwort canvas {
@@ -484,9 +616,10 @@ canvas.pf {
   height: auto;
 }
 
-.planwort.erledigt { opacity: 0.75; }
+.planwort.erledigt { opacity: 0.75; border-color: #477970; background: #163631; }
 
-.extrazeile { margin-top: 16px; }
+.extrazeile { margin-top: 6px; }
+#extra:empty { display: none; }
 
 .knopfreihe {
   display: grid;
@@ -501,12 +634,11 @@ canvas.pf {
   position: relative;
   display: grid;
   place-items: center;
-  /* Seitliches Polster nur 10px im Kleinsten: bei 320px Bildschirm
-   * entscheiden vier Pixel darueber, ob "BESTENLISTE" noch in seiner
-   * Groesse auf den Knopf passt oder eine Stufe kleiner gesetzt wird. */
-  padding: clamp(12px, 1.5vw, 20px) clamp(10px, 2vw, 26px);
-  border: 0;
-  border-radius: 8px;
+  min-width: 0;
+  min-height: 44px;
+  padding: 12px 10px;
+  border: 1px solid #736b69;
+  border-radius: 0;
   cursor: pointer;
   font: inherit;
   color: inherit;
@@ -514,13 +646,15 @@ canvas.pf {
 }
 
 .knopf.gold {
-  background: linear-gradient(180deg, #33206b, #1b1038);
-  box-shadow: 0 0 0 3px var(--gold-matt), 0 6px 0 #0d0820;
+  background: #27201b;
+  border-color: var(--gold);
+  box-shadow: 3px 3px 0 #09090c, inset 4px 0 0 var(--gold);
 }
 
 .knopf.violett {
-  background: linear-gradient(180deg, #4a2d7d, #261548);
-  box-shadow: 0 0 0 3px var(--creme), 0 6px 0 #0d0820;
+  background: #c62035;
+  border-color: var(--rot);
+  box-shadow: 3px 3px 0 #09090c, inset 4px 0 0 var(--rot);
 }
 
 .knopf:hover { filter: brightness(1.18); }
@@ -533,13 +667,7 @@ canvas.pf {
   outline-offset: 3px;
 }
 
-.fussreihe {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 0 4px;
-}
+.knopf canvas { max-width: 100%; height: auto; }
 
 .nurtext {
   border: 0;
@@ -562,7 +690,7 @@ canvas.pf {
   display: none;
   place-items: center;
   padding: clamp(16px, 4vw, 48px);
-  background: rgba(8, 4, 14, 0.86);
+  background: rgba(10, 10, 14, 0.9);
   backdrop-filter: blur(3px);
   overflow: auto;
 }
@@ -587,16 +715,13 @@ canvas.pf {
   flex-direction: column;
   gap: 18px;
   padding: clamp(18px, 3vw, 32px);
-  border-radius: 10px;
-  background-color: var(--gruen-dunkel);
-  background-image:
-    linear-gradient(rgba(0, 0, 0, 0.14) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.14) 1px, transparent 1px);
-  background-size: 13px 13px;
-  box-shadow:
-    0 0 0 3px var(--gold-matt),
-    0 0 0 8px #04200f,
-    0 24px 60px rgba(0, 0, 0, 0.7);
+  min-width: 0;
+  justify-self: center;
+  border: 2px solid var(--rot);
+  border-top: 8px solid var(--rot);
+  border-radius: 0;
+  background: linear-gradient(135deg, #302b30, #19191e);
+  box-shadow: 7px 7px 0 #08080b, 0 24px 60px rgba(0, 0, 0, 0.7);
   animation: reinfahren 0.22s ease-out;
 }
 
@@ -660,8 +785,9 @@ canvas.pf {
 
 .dialogknoepfe .knopf {
   flex: 1 1 auto;
-  background: linear-gradient(180deg, #33206b, #1b1038);
-  box-shadow: 0 0 0 3px var(--gold-matt), 0 5px 0 #0d0820;
+  background: linear-gradient(120deg, #87202e, #421d26);
+  border-color: var(--rot);
+  box-shadow: 3px 3px 0 #09090c;
 }
 
 /* Der Einstiegsbildschirm: alles mittig, alles in Pixelschrift. */
@@ -671,7 +797,6 @@ canvas.pf {
 .marke { margin-bottom: -4px; }
 
 .schlagzeile,
-.beispiele,
 .hinweise,
 .mittig {
   display: flex;
@@ -689,38 +814,127 @@ canvas.pf {
 
 .hinweise { gap: 4px; }
 
-.beispiele { gap: clamp(20px, 6vw, 56px); }
+/* Die beiden Reiter der Anleitung. Der offene ist hell wie der
+ * MENÜ-Knopf im Pult, der andere bleibt ein gewoehnlicher Knopf. */
+.reiter {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
 
-.beispiel {
+.reiterknopf {
+  padding: 10px 6px;
+  min-height: 44px;
+  background: linear-gradient(120deg, #87202e, #421d26);
+  border-color: var(--rot);
+  box-shadow: 3px 3px 0 #09090c;
+}
+
+.reiterknopf.aktiv {
+  background: #eee5d4;
+  border-color: #eee5d4;
+  cursor: default;
+  filter: none;
+}
+
+/* Das Beispielwort: Bilder, Namen und Buchstaben in Spalten, und die
+ * Zugkapsel liegt hinter der Bilderzeile, wie auf dem Brett. */
+.wortbeispiel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.beispielreihe {
+  --emoji: clamp(32px, 7vw, 44px);
+  position: relative;
+  display: flex;
+  justify-content: center;
+  gap: clamp(10px, 4vw, 30px);
+  padding: 0 14px;
+}
+
+.beispielspalte {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 6px;
 }
 
-.beispielemoji {
-  font-size: clamp(34px, 6vw, 48px);
-  line-height: 1;
-}
-
-/* Die drei Kaestchen in der Kapsel, wie sie beim Ziehen aussehen. */
-.zugdemo {
-  display: flex;
-  gap: 5px;
-  padding: 6px;
+.beispielkapsel {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -6px;
+  height: calc(var(--emoji) * 1.2 + 12px);
   border: 3px solid #eafcff;
   border-radius: 999px;
   background: rgba(92, 225, 255, 0.16);
   box-shadow: 0 0 10px rgba(92, 225, 255, 0.7);
+  transform-origin: left center;
+  animation: kapselZieht 2.6s ease-in-out infinite;
 }
 
-.zugdemo span {
+/* Die Kapsel waechst vom ersten Bild bis zum letzten, bleibt kurz
+ * stehen und faengt wieder an -- wie ein Finger, der das Wort zieht.
+ * Ohne Bewegung steht sie einfach ganz da. */
+@keyframes kapselZieht {
+  0% { transform: scaleX(0.2); opacity: 0; }
+  12% { opacity: 1; }
+  55%, 85% { transform: scaleX(1); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+.beispielemoji {
+  font-size: var(--emoji);
+  line-height: 1.2;
+}
+
+/* Die Schritte: nummeriert und linksbuendig, damit man sie der Reihe
+ * nach liest. Der Absatz rueckt ueber sein Polster ein -- passeAn()
+ * rechnet Polster mit, eine Nachbarspalte nicht. */
+.schritte {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schritt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  border-left: 4px solid var(--gold);
+  background: rgba(0, 0, 0, 0.22);
+}
+
+.schritte.fuer-kinder .schritt { border-left-color: var(--cyan); }
+
+.schritt .pfblock { align-items: flex-start; }
+
+.schrittkopf {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.schrittnummer {
+  display: grid;
+  place-items: center;
+  flex: none;
   width: 26px;
   height: 26px;
-  border-radius: 5px;
-  background: #0b3d21;
-  box-shadow: inset 0 0 0 2px #1c6b39;
+  border-radius: 50%;
+  background: var(--gold);
 }
+
+.schritte.fuer-kinder .schrittnummer { background: var(--cyan); }
 
 .spickgitter {
   display: grid;
@@ -790,8 +1004,8 @@ canvas.pf {
   border: 0;
   border-radius: 4px;
   cursor: pointer;
-  background: linear-gradient(180deg, #33206b, #1b1038);
-  box-shadow: inset 0 0 0 2px var(--gold-matt);
+  background: linear-gradient(135deg, #413039, #251d25);
+  box-shadow: inset 0 0 0 1px var(--gold-matt);
   transition: filter 0.08s, transform 0.06s;
 }
 
@@ -839,6 +1053,27 @@ canvas.pf {
 
 @keyframes frischblinken {
   50% { background: rgba(255, 210, 63, 0.34); }
+}
+
+/* Auf kurzen Telefonen spart das Pult Polster, nicht Lesegroesse. */
+@media (max-width: 480px) and (max-height: 700px) {
+  #automat { gap: 8px; }
+  #titelTafel { padding-top: 6px; padding-bottom: 6px; }
+  #beuteAnzeige { gap: 3px; padding-top: 4px; padding-bottom: 4px; }
+  .zaehler { padding: 0; }
+  #gewinnplan { padding: 6px 8px 9px; }
+  .planwort { padding: 3px 5px; }
+  #aktionen .knopf { min-height: 44px; padding-top: 6px; padding-bottom: 6px; }
+}
+
+/* Treffer werden erst nach dem Loslassen gefeiert, nie als Loesungshilfe. */
+#beuteAnzeige.kassiert { animation: kassenSprung 0.45s ease-out; }
+.kachel.jubel { animation: kartenJubel 0.48s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
+@keyframes kassenSprung {
+  35% { transform: translateY(-4px) rotate(-2deg) scale(1.04); box-shadow: 0 5px 0 var(--gold); }
+}
+@keyframes kartenJubel {
+  40% { transform: translateY(-5px) scale(1.09); }
 }
 
 @media (prefers-reduced-motion: reduce) {

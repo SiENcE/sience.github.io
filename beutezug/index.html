@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="description" content="Wortsuchspiel: Jedes Emoji steht fuer den ersten Buchstaben seines Namens.">
 <meta name="color-scheme" content="dark">
+<!-- Titel und lang sind die deutsche Vorgabe; game.js setzt beide auf
+     die erkannte oder gewaehlte Sprache, sobald es laeuft. -->
 <title>BEUTEZUG &ndash; die Emoji-Wortjagd</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>&#127829;</text></svg>">
 <link rel="stylesheet" href="css/style.css">
@@ -15,7 +17,22 @@
 
 <main id="automat">
 
-  <section id="brettRahmen" class="marquee">
+  <header id="kopf">
+    <div class="tafel" id="titelTafel">
+      <div id="marke"></div>
+      <div id="titel"></div>
+      <div id="alarm" role="timer" hidden></div>
+    </div>
+    <div class="block" id="beuteAnzeige">
+      <div class="etikett" id="lblAuszahlung"></div>
+      <div class="zaehlerreihe">
+        <div class="zaehler" id="auszahlung"></div>
+        <div class="chip" id="einsatz" hidden></div>
+      </div>
+    </div>
+  </header>
+
+  <section id="brettRahmen">
     <!-- Die Zugspur gehoert in das Gitter, nicht daneben: sie wird aus
          den Kachelkoordinaten gezeichnet, und die zaehlen ab #brett. -->
     <div id="brett" role="grid" aria-label="Spielbrett">
@@ -23,45 +40,31 @@
         <rect id="spurKapsel" />
       </svg>
     </div>
+    <!-- Die Ansage einer neuen Stufe liegt ueber dem Brett, nicht im
+         Gitter: sie ist keine Kachel und soll keinen Zug abfangen. -->
+    <div id="neuigkeit" role="status" aria-live="polite" hidden></div>
   </section>
 
-  <aside id="panel">
-
-    <div class="tafel marquee" id="titelTafel">
-      <div id="titel"></div>
-    </div>
-
-    <div class="block">
-      <div class="etikett" id="lblAuszahlung"></div>
-      <div class="zaehlerreihe">
-        <div class="zaehler marquee" id="auszahlung"></div>
-        <div class="chip" id="einsatz" hidden></div>
-      </div>
-    </div>
-
-    <div class="tafel marquee wachsend">
+  <section id="gewinnplan" class="tafel" aria-label="Gewinnplan">
+    <div class="planKopf">
       <div class="etikett" id="lblPlan"></div>
-      <div id="plan"></div>
-      <div id="extra" class="extrazeile"></div>
-    </div>
-
-    <div class="knopfreihe">
-      <button type="button" id="btnTipp" class="knopf gold marquee">
-        <span id="tippText"></span>
-      </button>
-      <button type="button" id="btnMenu" class="knopf violett">
-        <span id="menuText"></span>
-      </button>
-    </div>
-
-    <div class="fussreihe">
       <span id="rest"></span>
-      <button type="button" id="btnSpicken" class="nurtext">
-        <span id="spickenText"></span>
-      </button>
     </div>
+    <div id="plan"></div>
+    <div id="extra" class="extrazeile"></div>
+  </section>
 
-  </aside>
+  <nav id="aktionen" aria-label="Spielaktionen">
+    <button type="button" id="btnTipp" class="knopf gold">
+      <span id="tippText"></span>
+    </button>
+    <button type="button" id="btnSpicken" class="knopf violett">
+      <span id="spickenText"></span>
+    </button>
+    <button type="button" id="btnMenu" class="knopf violett">
+      <span id="menuText"></span>
+    </button>
+  </nav>
 
 </main>
 
@@ -69,6 +72,7 @@
   <div id="overlayInhalt"></div>
 </div>
 
+<script src="js/i18n.js"></script>
 <script src="js/pixelfont.js"></script>
 <script src="js/emoji.js"></script>
 <script src="js/words.js"></script>

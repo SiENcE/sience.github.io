@@ -1,5 +1,5 @@
 /* ------------------------------------------------------------------
- * emoji.js -- das Alphabet.
+ * emoji.js -- die Alphabete.
  *
  * Jede Kachel auf dem Brett ist ein Emoji, das fuer den ersten
  * Buchstaben seines eigenen Namens steht: die Pizza ist ein P, der
@@ -11,11 +11,21 @@
  * der gelaeufigere; wo der naheliegende Name mit einem anderen
  * Buchstaben beginnt (die Eule gehoert zum E, nicht zum U), taucht das
  * Emoji nur dort auf, damit dasselbe Bild nie zwei Buchstaben bedeutet.
+ *
+ * Das Alphabet ist der Teil des Spiels, der am wenigsten uebersetzbar
+ * ist: dieselbe Katze ist im Deutschen ein K und im Englischen ein C.
+ * Jede Sprache bekommt darum ihre eigene Zuordnung -- dieselben Bilder,
+ * neu sortiert -- und ihre eigene Buchstabenhaeufigkeit fuer die
+ * Fuellkacheln. Innerhalb einer Sprache gilt weiter: ein Emoji, ein
+ * Buchstabe.
  * ------------------------------------------------------------------ */
 (function (global) {
   'use strict';
 
-  var ALPHABET = {
+  var ALPHABETE = {};
+  var GEWICHTE = {};
+
+  ALPHABETE.de = {
     A: [['🍎', 'APFEL'], ['🐒', 'AFFE'], ['⚓', 'ANKER'], ['🐜', 'AMEISE'],
         ['🦅', 'ADLER'], ['🥑', 'AVOCADO'], ['👽', 'ALIEN'], ['🍍', 'ANANAS'],
         ['🚗', 'AUTO'], ['👁️', 'AUGE']],
@@ -94,30 +104,141 @@
         ['🧙', 'ZAUBERER'], ['🎯', 'ZIELSCHEIBE']]
   };
 
-  /* Ungefaehre Buchstabenhaeufigkeit im Deutschen, fuer die Fuellkacheln.
+  /*
+   * Englisch: dieselben Bilder, neu einsortiert. Die Umsortierung ist
+   * der eigentliche Inhalt dieser Tabelle -- aus der KATZE wird CAT,
+   * aus dem LÖWEN LION (der bleibt beim L), aus der KRONE wird QUEEN,
+   * weil es fuer das Q sonst kein Bild gibt. Q, X, Y und Z sind hier
+   * so knapp wie im Deutschen; darum bleiben sie in der Haeufigkeit
+   * unten selten.
+   *
+   * Fuenf Bilder kommen neu dazu, weil sie erst im Englischen einen
+   * Buchstaben tragen, der sonst leer bliebe: UMBRELLA, UNICORN, YARN,
+   * ZERO und QUESTION.
+   */
+  ALPHABETE.en = {
+    A: [['🍎', 'APPLE'], ['⚓', 'ANCHOR'], ['🐜', 'ANT'], ['🥑', 'AVOCADO'],
+        ['👽', 'ALIEN'], ['⏰', 'ALARM']],
+    B: [['🍌', 'BANANA'], ['🐻', 'BEAR'], ['📖', 'BOOK'], ['🚌', 'BUS'],
+        ['🐝', 'BEE'], ['🍞', 'BREAD'], ['🦫', 'BEAVER'], ['🦡', 'BADGER'],
+        ['🪣', 'BUCKET'], ['🚲', 'BICYCLE'], ['🦇', 'BAT'], ['🧠', 'BRAIN'],
+        ['🐦', 'BIRD'], ['🧺', 'BASKET'], ['🧱', 'BRICKS'], ['🦋', 'BUTTERFLY']],
+    C: [['💻', 'COMPUTER'], ['🤡', 'CLOWN'], ['🥐', 'CROISSANT'], ['🍹', 'COCKTAIL'],
+        ['🧁', 'CUPCAKE'], ['🚗', 'CAR'], ['🥫', 'CAN'], ['🐱', 'CAT'],
+        ['🎂', 'CAKE'], ['🧀', 'CHEESE'], ['🍒', 'CHERRY'], ['🕯️', 'CANDLE'],
+        ['🐄', 'COW'], ['🦀', 'CRAB'], ['📷', 'CAMERA'], ['🐪', 'CAMEL'],
+        ['🥕', 'CARROT'], ['☕', 'COFFEE'], ['🧭', 'COMPASS'], ['🍪', 'COOKIE'],
+        ['🥒', 'CUCUMBER'], ['🌽', 'CORN'], ['☁️', 'CLOUD'], ['🐛', 'CATERPILLAR'],
+        ['🎪', 'CIRCUS']],
+    D: [['🐬', 'DOLPHIN'], ['🦕', 'DINOSAUR'], ['🐉', 'DRAGON'], ['🍩', 'DONUT'],
+        ['💎', 'DIAMOND'], ['🦆', 'DUCK'], ['🦌', 'DEER'], ['🐕', 'DOG'],
+        ['🚪', 'DOOR'], ['🪘', 'DRUM'], ['🎲', 'DICE']],
+    E: [['🥚', 'EGG'], ['🐘', 'ELEPHANT'], ['🌍', 'EARTH'], ['🦅', 'EAGLE'],
+        ['👁️', 'EYE'], ['👂', 'EAR'], ['🧯', 'EXTINGUISHER']],
+    F: [['🐟', 'FISH'], ['🔥', 'FIRE'], ['🦊', 'FOX'], ['🪶', 'FEATHER'],
+        ['🦶', 'FOOT'], ['🚩', 'FLAG'], ['🦩', 'FLAMINGO'], ['🎬', 'FILM'],
+        ['🌼', 'FLOWER'], ['🍴', 'FORK'], ['🍟', 'FRIES'], ['🎡', 'FERRIS WHEEL']],
+    G: [['🎸', 'GUITAR'], ['🦒', 'GIRAFFE'], ['👻', 'GHOST'], ['🎁', 'GIFT'],
+        ['🪿', 'GOOSE'], ['👓', 'GLASSES'], ['🧤', 'GLOVE'], ['🐐', 'GOAT']],
+    H: [['🏠', 'HOUSE'], ['🖐️', 'HAND'], ['❤️', 'HEART'], ['🔨', 'HAMMER'],
+        ['🐔', 'HEN'], ['🎩', 'HAT'], ['🍯', 'HONEY'], ['🚁', 'HELICOPTER'],
+        ['🐹', 'HAMSTER'], ['👜', 'HANDBAG'], ['🦔', 'HEDGEHOG'], ['🐴', 'HORSE'],
+        ['🌭', 'HOT DOG']],
+    I: [['🏝️', 'ISLAND'], ['🪲', 'INSECT'], ['🧊', 'ICE'], ['🍦', 'ICE CREAM']],
+    J: [['🃏', 'JOKER'], ['🕹️', 'JOYSTICK'], ['👖', 'JEANS'], ['🧥', 'JACKET'],
+        ['🤹', 'JUGGLER'], ['🪼', 'JELLYFISH']],
+    K: [['🥝', 'KIWI'], ['🦘', 'KANGAROO'], ['🐨', 'KOALA'], ['🪁', 'KITE'],
+        ['🔑', 'KEY'], ['🔪', 'KNIFE']],
+    L: [['🦁', 'LION'], ['💡', 'LAMP'], ['🪜', 'LADDER'], ['🚂', 'LOCOMOTIVE'],
+        ['🔊', 'LOUDSPEAKER'], ['🏮', 'LANTERN'], ['🍭', 'LOLLIPOP'],
+        ['⚡', 'LIGHTNING'], ['🦞', 'LOBSTER'], ['🍋', 'LEMON']],
+    M: [['🌙', 'MOON'], ['🐭', 'MOUSE'], ['🥛', 'MILK'], ['🧲', 'MAGNET'],
+        ['🎤', 'MICROPHONE'], ['🥭', 'MANGO'], ['🧜', 'MERMAID'], ['🏍️', 'MOTORBIKE'],
+        ['🦟', 'MOSQUITO'], ['🎭', 'MASKS'], ['🐒', 'MONKEY'], ['💰', 'MONEY'],
+        ['🏔️', 'MOUNTAIN'], ['🍄', 'MUSHROOM']],
+    N: [['👃', 'NOSE'], ['🪺', 'NEST'], ['🥜', 'NUT'], ['🍜', 'NOODLES'],
+        ['🪡', 'NEEDLE'], ['🌃', 'NIGHT'], ['🔢', 'NUMBERS'], ['🎶', 'NOTES']],
+    O: [['🐙', 'OCTOPUS'], ['🍊', 'ORANGE'], ['🫒', 'OLIVE'], ['🦦', 'OTTER'],
+        ['🦉', 'OWL'], ['🧅', 'ONION']],
+    P: [['🍕', 'PIZZA'], ['🐧', 'PENGUIN'], ['🐼', 'PANDA'], ['🍑', 'PEACH'],
+        ['🌴', 'PALM'], ['🧩', 'PUZZLE'], ['🦚', 'PEACOCK'], ['🥞', 'PANCAKE'],
+        ['🍿', 'POPCORN'], ['🐩', 'POODLE'], ['🫑', 'PEPPER'], ['🎹', 'PIANO'],
+        ['📯', 'POSTHORN'], ['✏️', 'PENCIL'], ['🍐', 'PEAR'], ['🍍', 'PINEAPPLE'],
+        ['🥨', 'PRETZEL'], ['🥔', 'POTATO'], ['🐷', 'PIG']],
+    Q: [['❓', 'QUESTION'], ['👑', 'QUEEN']],
+    R: [['🚀', 'ROCKET'], ['🌈', 'RAINBOW'], ['🤖', 'ROBOT'], ['💍', 'RING'],
+        ['🌹', 'ROSE'], ['🍚', 'RICE'], ['📻', 'RADIO'], ['🐀', 'RAT'],
+        ['🌧️', 'RAIN'], ['🎒', 'RUCKSACK'], ['📏', 'RULER'], ['🦏', 'RHINO'],
+        ['🦝', 'RACCOON']],
+    S: [['☀️', 'SUN'], ['⭐', 'STAR'], ['🐍', 'SNAKE'], ['🧦', 'SOCK'],
+        ['🚢', 'SHIP'], ['🐌', 'SNAIL'], ['⛄', 'SNOWMAN'], ['🕷️', 'SPIDER'],
+        ['🧽', 'SPONGE'], ['🌻', 'SUNFLOWER'], ['🐑', 'SHEEP'], ['❄️', 'SNOWFLAKE'],
+        ['🧂', 'SALT'], ['✂️', 'SCISSORS'], ['👟', 'SHOE'], ['🥪', 'SANDWICH'],
+        ['🎷', 'SAXOPHONE'], ['🕸️', 'SPIDERWEB'], ['🚿', 'SHOWER'], ['🦈', 'SHARK'],
+        ['🐿️', 'SQUIRREL'], ['🍓', 'STRAWBERRY'], ['⬜', 'SQUARE']],
+    T: [['🐯', 'TIGER'], ['🍅', 'TOMATO'], ['🎺', 'TRUMPET'], ['🎫', 'TICKET'],
+        ['🔭', 'TELESCOPE'], ['📞', 'TELEPHONE'], ['🚕', 'TAXI'], ['🧸', 'TEDDY'],
+        ['🌮', 'TACO'], ['🍵', 'TEA'], ['🦃', 'TURKEY'], ['🌳', 'TREE'],
+        ['🚚', 'TRUCK'], ['🚆', 'TRAIN'], ['🦷', 'TOOTH'], ['🎯', 'TARGET']],
+    U: [['🛸', 'UFO'], ['🚇', 'UNDERGROUND'], ['🩲', 'UNDERPANTS'],
+        ['☂️', 'UMBRELLA'], ['🦄', 'UNICORN']],
+    V: [['🌋', 'VOLCANO'], ['🏐', 'VOLLEYBALL'], ['🚐', 'VAN'], ['🪻', 'VIOLET'],
+        ['🧛', 'VAMPIRE'], ['🎻', 'VIOLIN']],
+    W: [['🍉', 'WATERMELON'], ['🐋', 'WHALE'], ['🌊', 'WAVE'], ['🐺', 'WOLF'],
+        ['💧', 'WATER'], ['🌾', 'WHEAT'], ['🍷', 'WINE'], ['🪱', 'WORM'],
+        ['🪟', 'WINDOW'], ['🛞', 'WHEEL'], ['⌚', 'WATCH'], ['🧙', 'WIZARD']],
+    X: [['❌', 'X'], ['✖️', 'X-MARK']],
+    Y: [['🧘', 'YOGA'], ['🛥️', 'YACHT'], ['🪀', 'YOYO'], ['🧶', 'YARN']],
+    Z: [['🦓', 'ZEBRA'], ['🧟', 'ZOMBIE'], ['0️⃣', 'ZERO']]
+  };
+
+  /* Ungefaehre Buchstabenhaeufigkeit der Sprache, fuer die Fuellkacheln.
    * Q, X und Y bleiben absichtlich selten -- ein Brett voller Exoten ist
    * ein Brett, auf dem nichts zu finden ist. */
-  var WEIGHT = {
+  GEWICHTE.de = {
     A: 65, B: 19, C: 27, D: 51, E: 174, F: 17, G: 30, H: 48, I: 76, J: 3,
     K: 15, L: 35, M: 25, N: 98, O: 25, P: 7, Q: 1, R: 70, S: 73, T: 62,
     U: 44, V: 7, W: 19, X: 1, Y: 1, Z: 11
   };
 
-  var LETTERS = Object.keys(ALPHABET);
+  GEWICHTE.en = {
+    A: 82, B: 15, C: 28, D: 43, E: 127, F: 22, G: 20, H: 61, I: 70, J: 2,
+    K: 8, L: 40, M: 24, N: 67, O: 75, P: 19, Q: 1, R: 60, S: 63, T: 91,
+    U: 28, V: 10, W: 24, X: 1, Y: 20, Z: 1
+  };
+
+  var LETTERS = Object.keys(ALPHABETE.de);
 
   /* Ein Eimer voller Buchstaben, in dem haeufige oefter vorkommen.
-   * Ziehen heisst dann einfach: einen Zettel herausgreifen. */
-  var WEIGHTED_POOL = (function () {
-    var pool = [];
+   * Ziehen heisst dann einfach: einen Zettel herausgreifen. Pro Sprache
+   * einmal gefuellt, beim ersten Zug in dieser Sprache. */
+  var eimer = {};
+
+  function pool(code) {
+    if (eimer[code]) return eimer[code];
+    var gewicht = GEWICHTE[code];
+    var liste = [];
     LETTERS.forEach(function (letter) {
-      var n = Math.max(1, Math.round(WEIGHT[letter] / 3));
-      for (var i = 0; i < n; i++) pool.push(letter);
+      var n = Math.max(1, Math.round(gewicht[letter] / 3));
+      for (var i = 0; i < n; i++) liste.push(letter);
     });
-    return pool;
-  })();
+    eimer[code] = liste;
+    return liste;
+  }
+
+  var aktiv = 'de';
+
+  function setzeSprache(code) {
+    if (ALPHABETE[code]) aktiv = code;
+    return aktiv;
+  }
+
+  function alphabet() {
+    return ALPHABETE[aktiv];
+  }
 
   function tileFor(letter, rng) {
-    var bucket = ALPHABET[letter];
+    var bucket = alphabet()[letter];
     if (!bucket || !bucket.length) {
       return { emoji: '❔', name: 'UNBEKANNT', letter: letter };
     }
@@ -127,15 +248,22 @@
   }
 
   function randomLetter(rng) {
+    var liste = pool(aktiv);
     var r = rng ? rng() : Math.random();
-    return WEIGHTED_POOL[Math.floor(r * WEIGHTED_POOL.length) % WEIGHTED_POOL.length];
+    return liste[Math.floor(r * liste.length) % liste.length];
   }
 
   global.EmojiAlphabet = {
-    ALPHABET: ALPHABET,
+    ALPHABETE: ALPHABETE,
+    GEWICHTE: GEWICHTE,
     LETTERS: LETTERS,
-    WEIGHT: WEIGHT,
+    alphabet: alphabet,
+    gewichte: function () { return GEWICHTE[aktiv]; },
+    setzeSprache: setzeSprache,
+    sprache: function () { return aktiv; },
     tileFor: tileFor,
     randomLetter: randomLetter
   };
+
+  if (global.Sprache) global.Sprache.folgt(setzeSprache);
 })(window);
