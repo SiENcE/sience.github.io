@@ -11,6 +11,7 @@
 --bg: #151519;
 --rahmen: #a51e2e;
 --lueckenmass: clamp(2px, 0.45vw, 6px);
+--zoom: 1;
 }
 * { box-sizing: border-box; }
 html, body {
@@ -63,28 +64,28 @@ gap: 3px;
 position: relative;
 z-index: 1;
 min-height: 100svh;
-grid-template-rows: auto 1fr auto auto;
+grid-template-rows: auto auto 1fr auto;
 display: grid;
 grid-template-columns: minmax(0, 1fr);
-gap: 10px;
+gap: calc(10px * var(--zoom));
 align-content: start;
-max-width: 760px;
+max-width: calc(760px * var(--zoom));
 margin: 0 auto;
-padding: max(16px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(18px, env(safe-area-inset-left));
+padding: max(calc(16px * var(--zoom)), env(safe-area-inset-top)) max(calc(18px * var(--zoom)), env(safe-area-inset-right)) max(calc(20px * var(--zoom)), env(safe-area-inset-bottom)) max(calc(18px * var(--zoom)), env(safe-area-inset-left));
 }
 #kopf {
 display: grid;
 grid-template-columns: minmax(0, 1fr) auto;
 align-items: stretch;
-gap: 10px;
+gap: calc(10px * var(--zoom));
 min-width: 0;
 }
 #aktionen {
 display: grid;
 grid-template-columns: repeat(3, minmax(0, 1fr));
-gap: 8px;
+gap: calc(8px * var(--zoom));
 }
-#aktionen .knopf { padding: 10px 4px; min-height: 52px; }
+#aktionen .knopf { padding: calc(10px * var(--zoom)) 4px; min-height: calc(52px * var(--zoom)); }
 #aktionen .knopf:last-child { background: #eee5d4; border-color: #eee5d4; box-shadow: 3px 4px 0 #08090c; }
 #aktionen { padding-top: 2px; }
 @media (max-width: 480px) {
@@ -413,7 +414,7 @@ animation: aufsteigen 1.2s ease-out forwards;
 }
 .tafel {
 min-width: 0;
-padding: 10px 12px;
+padding: calc(10px * var(--zoom)) calc(12px * var(--zoom));
 border: 1px solid #454149;
 border-left: 4px solid var(--rot);
 border-radius: 0;
@@ -425,8 +426,8 @@ position: relative;
 display: flex;
 flex-direction: column;
 justify-content: center;
-gap: 5px;
-padding: 8px 10px;
+gap: calc(5px * var(--zoom));
+padding: calc(8px * var(--zoom)) calc(10px * var(--zoom));
 border: 0;
 border-left: 5px solid var(--creme);
 background: #dc2339;
@@ -442,13 +443,19 @@ padding-right: 16px;
 #beuteAnzeige {
 position: relative;
 justify-content: center;
-padding: 6px 8px;
+padding: calc(6px * var(--zoom)) calc(8px * var(--zoom));
 border-bottom: 3px solid var(--gold);
 background: #101013;
-max-width: 200px;
+max-width: calc(200px * var(--zoom));
 }
 #lblAuszahlung { opacity: 0.85; }
-#gewinnplan { position: relative; padding: 10px 12px 13px; border: 0; border-top: 2px solid #eee5d4; background: #17171c; }
+#gewinnplan {
+position: relative;
+padding: calc(10px * var(--zoom)) calc(12px * var(--zoom)) calc(13px * var(--zoom));
+border: 0;
+border-top: 2px solid #eee5d4;
+background: #17171c;
+}
 #gewinnplan::after {
 content: '';
 position: absolute;
@@ -464,7 +471,7 @@ display: flex;
 flex-wrap: wrap;
 justify-content: space-between;
 align-items: center;
-gap: 4px 10px;
+gap: calc(4px * var(--zoom)) calc(10px * var(--zoom));
 }
 .planKopf > * { min-width: 0; }
 .planRechts {
@@ -474,11 +481,11 @@ gap: 10px;
 }
 #versuche {
 display: flex;
-gap: 4px;
+gap: calc(4px * var(--zoom));
 }
 .lampe {
-width: 12px;
-height: 12px;
+width: calc(12px * var(--zoom));
+height: calc(12px * var(--zoom));
 border-radius: 50%;
 background: radial-gradient(circle at 35% 30%, #4a4650, #1c1b20 70%);
 box-shadow: inset 0 0 0 1.5px #6d6670;
@@ -535,8 +542,8 @@ pointer-events: none;
 #plan {
 display: flex;
 flex-wrap: wrap;
-gap: 5px;
-margin-top: 6px;
+gap: calc(5px * var(--zoom));
+margin-top: calc(6px * var(--zoom));
 align-content: flex-start;
 }
 .planwort {
@@ -544,7 +551,7 @@ display: flex;
 align-items: center;
 min-width: 0;
 max-width: 100%;
-padding: 5px 7px;
+padding: calc(5px * var(--zoom)) calc(7px * var(--zoom));
 border: 1px solid #514b4c;
 border-radius: 0;
 background: #28272e;
@@ -559,8 +566,8 @@ height: auto;
 display: flex;
 justify-content: space-between;
 align-items: center;
-gap: 8px;
-margin-top: 6px;
+gap: calc(8px * var(--zoom));
+margin-top: calc(6px * var(--zoom));
 }
 #extra:empty, #serie:empty { display: none; }
 .knopfreihe {
@@ -573,8 +580,8 @@ position: relative;
 display: grid;
 place-items: center;
 min-width: 0;
-min-height: 44px;
-padding: 12px 10px;
+min-height: calc(44px * var(--zoom));
+padding: calc(12px * var(--zoom)) calc(10px * var(--zoom));
 border: 1px solid #736b69;
 border-radius: 0;
 cursor: pointer;
@@ -648,11 +655,11 @@ grid-template-columns: minmax(0, 1fr);
 }
 #overlayInhalt { display: contents; }
 .dialog {
-width: min(560px, 100%);
+width: min(calc(560px * var(--zoom)), 100%);
 display: flex;
 flex-direction: column;
-gap: 18px;
-padding: clamp(18px, 3vw, 32px);
+gap: calc(18px * var(--zoom));
+padding: calc(clamp(18px, 3vw, 32px) * var(--zoom));
 min-width: 0;
 justify-self: center;
 border: 2px solid var(--rot);
@@ -662,7 +669,7 @@ background: linear-gradient(135deg, #302b30, #19191e);
 box-shadow: 7px 7px 0 #08080b, 0 24px 60px rgba(0, 0, 0, 0.7);
 animation: reinfahren 0.22s ease-out;
 }
-.dialog.breit { width: min(860px, 100%); }
+.dialog.breit { width: min(calc(860px * var(--zoom)), 100%); }
 .dialog.ruhig { animation: none; }
 @keyframes reinfahren {
 from { opacity: 0; transform: translateY(14px) scale(0.98); }
@@ -673,9 +680,9 @@ to { opacity: 1; transform: none; }
 .abrechnung {
 display: grid;
 grid-template-columns: 1fr auto;
-gap: 8px 16px;
+gap: calc(8px * var(--zoom)) calc(16px * var(--zoom));
 align-items: center;
-padding: 14px;
+padding: calc(14px * var(--zoom));
 border-radius: 6px;
 background: rgba(0, 0, 0, 0.28);
 }
@@ -687,31 +694,31 @@ gap: 2px;
 }
 .abrechnung > span:nth-child(even) {
 justify-self: start;
-margin-bottom: 10px;
+margin-bottom: calc(10px * var(--zoom));
 }
 .abrechnung > span:last-child { margin-bottom: 0; }
 }
 .extraliste {
 display: flex;
 flex-wrap: wrap;
-gap: 8px 16px;
+gap: calc(8px * var(--zoom)) calc(16px * var(--zoom));
 max-height: 24vh;
 overflow: auto;
-padding: 12px;
+padding: calc(12px * var(--zoom));
 border-radius: 6px;
 background: rgba(0, 0, 0, 0.28);
 }
 .dialogknoepfe {
 display: flex;
 flex-wrap: wrap;
-gap: 10px;
+gap: calc(10px * var(--zoom));
 }
 .knopf.karte {
 display: flex;
 align-items: center;
 justify-content: flex-start;
-gap: 10px;
-padding: 8px 12px;
+gap: calc(10px * var(--zoom));
+padding: calc(8px * var(--zoom)) calc(12px * var(--zoom));
 text-align: left;
 background: linear-gradient(120deg, #87202e, #421d26);
 border-color: var(--rot);
@@ -722,27 +729,27 @@ display: flex;
 flex: 1 1 0;
 flex-direction: column;
 align-items: flex-start;
-gap: 4px;
+gap: calc(4px * var(--zoom));
 min-width: 0;
 }
 .kartentext .pfblock { align-items: flex-start; }
 .kartenbild {
 flex: none;
-font-size: 30px;
+font-size: calc(30px * var(--zoom));
 line-height: 1;
 }
-.dialog.eng { gap: 10px; }
-.dialog.eng .knopf.karte { padding: 5px 10px; }
-.dialog.eng .kartenbild { font-size: 24px; }
-.dialog.eng .knopfstapel { gap: 7px; }
+.dialog.eng { gap: calc(10px * var(--zoom)); }
+.dialog.eng .knopf.karte { padding: calc(5px * var(--zoom)) calc(10px * var(--zoom)); }
+.dialog.eng .kartenbild { font-size: calc(24px * var(--zoom)); }
+.dialog.eng .knopfstapel { gap: calc(7px * var(--zoom)); }
 .kartenpreis {
 flex: none;
 margin-left: auto;
-padding-left: 6px;
+padding-left: calc(6px * var(--zoom));
 }
 .kartenreihe {
 display: flex;
-gap: 10px;
+gap: calc(10px * var(--zoom));
 }
 .kartenreihe > .karte {
 flex: 1 1 0;
@@ -751,7 +758,7 @@ min-width: 0;
 .knopfstapel {
 display: flex;
 flex-direction: column;
-gap: 10px;
+gap: calc(10px * var(--zoom));
 }
 .dialogknoepfe .knopf {
 flex: 1 1 auto;
@@ -760,21 +767,21 @@ border-color: var(--rot);
 box-shadow: 3px 3px 0 #09090c;
 }
 .dialogknoepfe .knopf.haupt {
-min-height: 56px;
+min-height: calc(56px * var(--zoom));
 background: #eee5d4;
 border-color: #eee5d4;
 box-shadow: 3px 4px 0 #08090c;
 }
 .knopf.startknopf {
-row-gap: 3px;
-padding-top: 10px;
-padding-bottom: 10px;
+row-gap: calc(3px * var(--zoom));
+padding-top: calc(10px * var(--zoom));
+padding-bottom: calc(10px * var(--zoom));
 }
-.dialogknoepfe .knopf.startknopf.haupt { min-height: 72px; }
+.dialogknoepfe .knopf.startknopf.haupt { min-height: calc(72px * var(--zoom)); }
 .dialogknoepfe .knopf.leise {
-min-height: 40px;
-padding-top: 8px;
-padding-bottom: 8px;
+min-height: calc(40px * var(--zoom));
+padding-top: calc(8px * var(--zoom));
+padding-bottom: calc(8px * var(--zoom));
 background: rgba(0, 0, 0, 0.22);
 border-color: #4d4648;
 box-shadow: none;
@@ -783,18 +790,18 @@ box-shadow: none;
 display: flex;
 align-items: center;
 justify-content: center;
-gap: 8px;
+gap: calc(8px * var(--zoom));
 }
 .knopfbild {
 flex: none;
-font-size: 20px;
+font-size: calc(20px * var(--zoom));
 line-height: 1;
 }
-.knopf.leise .knopfbild { font-size: 16px; }
+.knopf.leise .knopfbild { font-size: calc(16px * var(--zoom)); }
 .abschnitt {
 display: flex;
 align-items: center;
-gap: 10px;
+gap: calc(10px * var(--zoom));
 margin-bottom: -6px;
 }
 .abschnitt::after {
@@ -806,10 +813,10 @@ background: #4d4648;
 .knopf.karte.erwachsene { box-shadow: 3px 3px 0 #09090c, inset 4px 0 0 var(--gold); }
 .knopf.karte.kinder { box-shadow: 3px 3px 0 #09090c, inset 4px 0 0 var(--cyan); }
 .knopf.karte.tag { box-shadow: 3px 3px 0 #09090c, inset 4px 0 0 var(--rot); }
-.hauptmenue .knopf.karte { min-height: 64px; padding: 10px 14px 10px 16px; gap: 14px; }
-.hauptmenue.eng .knopf.karte { min-height: 0; padding: 6px 12px 6px 14px; gap: 12px; }
+.hauptmenue .knopf.karte { min-height: calc(64px * var(--zoom)); padding: calc(10px * var(--zoom)) calc(14px * var(--zoom)) calc(10px * var(--zoom)) calc(16px * var(--zoom)); gap: calc(14px * var(--zoom)); }
+.hauptmenue.eng .knopf.karte { min-height: 0; padding: calc(6px * var(--zoom)) calc(12px * var(--zoom)) calc(6px * var(--zoom)) calc(14px * var(--zoom)); gap: calc(12px * var(--zoom)); }
 .hauptmenue.eng .abschnitt { margin-bottom: -2px; }
-.dialog.anleitung { gap: 14px; }
+.dialog.anleitung { gap: calc(14px * var(--zoom)); }
 .marke { margin-bottom: -4px; }
 .schlagzeile,
 .hinweise,
@@ -821,18 +828,18 @@ justify-content: center;
 .schlagzeile,
 .hinweise {
 flex-direction: column;
-gap: 6px;
+gap: calc(6px * var(--zoom));
 }
 .schlagzeile canvas { max-width: 100%; height: auto; }
-.hinweise { gap: 4px; }
+.hinweise { gap: calc(4px * var(--zoom)); }
 .reiter {
 display: grid;
 grid-template-columns: 1fr 1fr;
-gap: 8px;
+gap: calc(8px * var(--zoom));
 }
 .reiterknopf {
-padding: 10px 6px;
-min-height: 44px;
+padding: calc(10px * var(--zoom)) calc(6px * var(--zoom));
+min-height: calc(44px * var(--zoom));
 background: linear-gradient(120deg, #87202e, #421d26);
 border-color: var(--rot);
 box-shadow: 3px 3px 0 #09090c;
@@ -847,22 +854,22 @@ filter: none;
 display: flex;
 flex-direction: column;
 align-items: center;
-gap: 10px;
+gap: calc(10px * var(--zoom));
 }
 .beispielreihe {
---emoji: clamp(32px, 7vw, 44px);
+--emoji: calc(clamp(32px, 7vw, 44px) * var(--zoom));
 position: relative;
 display: flex;
 justify-content: center;
-gap: clamp(10px, 4vw, 30px);
-padding: 0 14px;
+gap: calc(clamp(10px, 4vw, 30px) * var(--zoom));
+padding: 0 calc(14px * var(--zoom));
 }
 .beispielspalte {
 position: relative;
 display: flex;
 flex-direction: column;
 align-items: center;
-gap: 6px;
+gap: calc(6px * var(--zoom));
 }
 .beispielkapsel {
 position: absolute;
@@ -890,7 +897,7 @@ line-height: 1.2;
 .schritte {
 display: flex;
 flex-direction: column;
-gap: 12px;
+gap: calc(12px * var(--zoom));
 margin: 0;
 padding: 0;
 list-style: none;
@@ -899,8 +906,8 @@ list-style: none;
 display: flex;
 flex-direction: column;
 align-items: flex-start;
-gap: 6px;
-padding: 10px 12px 12px;
+gap: calc(6px * var(--zoom));
+padding: calc(10px * var(--zoom)) calc(12px * var(--zoom)) calc(12px * var(--zoom));
 border-left: 4px solid var(--gold);
 background: rgba(0, 0, 0, 0.22);
 }
@@ -909,42 +916,42 @@ background: rgba(0, 0, 0, 0.22);
 .schrittkopf {
 display: flex;
 align-items: center;
-gap: 10px;
+gap: calc(10px * var(--zoom));
 }
 .schrittnummer {
 display: grid;
 place-items: center;
 flex: none;
-width: 26px;
-height: 26px;
+width: calc(26px * var(--zoom));
+height: calc(26px * var(--zoom));
 border-radius: 50%;
 background: var(--gold);
 }
 .schritte.fuer-kinder .schrittnummer { background: var(--cyan); }
 .dialog.anleitung.eng {
-gap: 10px;
-padding: clamp(12px, 3vw, 24px);
+gap: calc(10px * var(--zoom));
+padding: calc(clamp(12px, 3vw, 24px) * var(--zoom));
 }
 .anleitung.eng .marke { display: none; }
-.anleitung.eng .schlagzeile { gap: 3px; }
-.anleitung.eng .wortbeispiel { gap: 6px; }
-.anleitung.eng .beispielreihe { --emoji: clamp(28px, 6vw, 36px); }
-.anleitung.eng .beispielspalte { gap: 3px; }
-.anleitung.eng .schritte { gap: 6px; }
-.anleitung.eng .schritt { gap: 3px; padding: 6px 10px 7px; }
-.anleitung.eng .schrittnummer { width: 22px; height: 22px; }
-.anleitung.eng .reiterknopf { min-height: 40px; padding: 6px; }
-.anleitung.eng .dialogknoepfe .knopf { padding-top: 8px; padding-bottom: 8px; }
+.anleitung.eng .schlagzeile { gap: calc(3px * var(--zoom)); }
+.anleitung.eng .wortbeispiel { gap: calc(6px * var(--zoom)); }
+.anleitung.eng .beispielreihe { --emoji: calc(clamp(28px, 6vw, 36px) * var(--zoom)); }
+.anleitung.eng .beispielspalte { gap: calc(3px * var(--zoom)); }
+.anleitung.eng .schritte { gap: calc(6px * var(--zoom)); }
+.anleitung.eng .schritt { gap: calc(3px * var(--zoom)); padding: calc(6px * var(--zoom)) calc(10px * var(--zoom)) calc(7px * var(--zoom)); }
+.anleitung.eng .schrittnummer { width: calc(22px * var(--zoom)); height: calc(22px * var(--zoom)); }
+.anleitung.eng .reiterknopf { min-height: calc(40px * var(--zoom)); padding: calc(6px * var(--zoom)); }
+.anleitung.eng .dialogknoepfe .knopf { padding-top: calc(8px * var(--zoom)); padding-bottom: calc(8px * var(--zoom)); }
 .anleitung.knapp .beispielergebnis { display: none; }
-.anleitung.knapp .beispielreihe { --emoji: 28px; }
-.dialog.anleitung.knapp { gap: 7px; }
-.anleitung.knapp .schritte { gap: 5px; }
-.anleitung.knapp .schritt { gap: 2px; padding: 4px 8px 5px; }
-.anleitung.knapp .schrittnummer { width: 18px; height: 18px; }
+.anleitung.knapp .beispielreihe { --emoji: calc(28px * var(--zoom)); }
+.dialog.anleitung.knapp { gap: calc(7px * var(--zoom)); }
+.anleitung.knapp .schritte { gap: calc(5px * var(--zoom)); }
+.anleitung.knapp .schritt { gap: 2px; padding: calc(4px * var(--zoom)) calc(8px * var(--zoom)) calc(5px * var(--zoom)); }
+.anleitung.knapp .schrittnummer { width: calc(18px * var(--zoom)); height: calc(18px * var(--zoom)); }
 .anleitung.knapp .pfblock { gap: 1px; }
-.anleitung.winzig .reiterknopf { min-height: 34px; padding: 4px; }
-.anleitung.winzig .beispielreihe { --emoji: 24px; }
-.anleitung.winzig .dialogknoepfe .knopf { min-height: 38px; padding-top: 5px; padding-bottom: 5px; }
+.anleitung.winzig .reiterknopf { min-height: calc(34px * var(--zoom)); padding: calc(4px * var(--zoom)); }
+.anleitung.winzig .beispielreihe { --emoji: calc(24px * var(--zoom)); }
+.anleitung.winzig .dialogknoepfe .knopf { min-height: calc(38px * var(--zoom)); padding-top: calc(5px * var(--zoom)); padding-bottom: calc(5px * var(--zoom)); }
 #overlay:has(.anleitung.knapp) {
 padding-top: max(6px, env(safe-area-inset-top));
 padding-bottom: max(6px, env(safe-area-inset-bottom));
@@ -952,39 +959,39 @@ padding-bottom: max(6px, env(safe-area-inset-bottom));
 .spickgitter {
 display: grid;
 grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-gap: 10px;
+gap: calc(10px * var(--zoom));
 max-height: 54vh;
 overflow: auto;
-padding: 12px;
+padding: calc(12px * var(--zoom));
 border-radius: 6px;
 background: rgba(0, 0, 0, 0.28);
 }
 .spickzelle {
 display: flex;
 align-items: center;
-gap: 10px;
-padding: 6px 8px;
+gap: calc(10px * var(--zoom));
+padding: calc(6px * var(--zoom)) calc(8px * var(--zoom));
 border-radius: 4px;
 background: rgba(255, 255, 255, 0.04);
 }
-.spickemoji { font-size: 26px; line-height: 1; }
-.dialog.eingabe { gap: 12px; }
+.spickemoji { font-size: calc(26px * var(--zoom)); line-height: 1; }
+.dialog.eingabe { gap: calc(12px * var(--zoom)); }
 .schlitze {
 display: flex;
 justify-content: center;
-gap: 12px;
+gap: calc(12px * var(--zoom));
 }
 .schlitz {
 display: grid;
 place-items: center;
-width: clamp(48px, 12vw, 64px);
+width: calc(clamp(48px, 12vw, 64px) * var(--zoom));
 aspect-ratio: 3 / 4;
 border-radius: 6px;
 background: #06170c;
 box-shadow: inset 0 0 0 2px #1c6b39;
 }
-.schlitze.lang { gap: 6px; }
-.schlitze.lang .schlitz { width: clamp(34px, 10vw, 52px); }
+.schlitze.lang { gap: calc(6px * var(--zoom)); }
+.schlitze.lang .schlitz { width: calc(clamp(34px, 10vw, 52px) * var(--zoom)); }
 .schlitz.dran {
 box-shadow: inset 0 0 0 3px var(--gold), 0 0 14px rgba(255, 210, 63, 0.5);
 animation: cursorblinken 1s steps(2, end) infinite;
@@ -995,7 +1002,7 @@ animation: cursorblinken 1s steps(2, end) infinite;
 .tastatur {
 display: grid;
 grid-template-columns: repeat(9, 1fr);
-gap: clamp(3px, 0.7vw, 6px);
+gap: calc(clamp(3px, 0.7vw, 6px) * var(--zoom));
 }
 .taste {
 display: grid;
@@ -1018,17 +1025,17 @@ outline-offset: 2px;
 .rangliste {
 display: flex;
 flex-direction: column;
-gap: 6px;
-padding: 14px;
+gap: calc(6px * var(--zoom));
+padding: calc(14px * var(--zoom));
 border-radius: 6px;
 background: rgba(0, 0, 0, 0.28);
 }
 .rang {
 display: grid;
 grid-template-columns: auto auto 1fr auto;
-gap: clamp(6px, 1.5vw, 12px);
+gap: calc(clamp(6px, 1.5vw, 12px) * var(--zoom));
 align-items: center;
-padding: 3px 6px;
+padding: calc(3px * var(--zoom)) calc(6px * var(--zoom));
 border-radius: 4px;
 }
 .rang > span { display: flex; min-width: 0; }
@@ -1042,13 +1049,13 @@ animation: frischblinken 0.5s steps(2) 4;
 50% { background: rgba(255, 210, 63, 0.34); }
 }
 @media (max-width: 480px) and (max-height: 700px) {
-#automat { gap: 8px; }
-#titelTafel { padding-top: 6px; padding-bottom: 6px; }
-#beuteAnzeige { gap: 3px; padding-top: 4px; padding-bottom: 4px; }
+#automat { gap: calc(8px * var(--zoom)); }
+#titelTafel { padding-top: calc(6px * var(--zoom)); padding-bottom: calc(6px * var(--zoom)); }
+#beuteAnzeige { gap: calc(3px * var(--zoom)); padding-top: calc(4px * var(--zoom)); padding-bottom: calc(4px * var(--zoom)); }
 .zaehler { padding: 0; }
-#gewinnplan { padding: 6px 8px 9px; }
-.planwort { padding: 3px 5px; }
-#aktionen .knopf { min-height: 44px; padding-top: 6px; padding-bottom: 6px; }
+#gewinnplan { padding: calc(6px * var(--zoom)) calc(8px * var(--zoom)) calc(9px * var(--zoom)); }
+.planwort { padding: calc(3px * var(--zoom)) calc(5px * var(--zoom)); }
+#aktionen .knopf { min-height: calc(44px * var(--zoom)); padding-top: calc(6px * var(--zoom)); padding-bottom: calc(6px * var(--zoom)); }
 }
 #beuteAnzeige.kassiert { animation: kassenSprung 0.45s ease-out; }
 .kachel.jubel { animation: kartenJubel 0.48s cubic-bezier(0.2, 0.8, 0.3, 1) both; }
