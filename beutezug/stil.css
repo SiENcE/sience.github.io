@@ -1,0 +1,503 @@
+/* ------------------------------------------------------------------
+ * stil.css -- die Webseite zum Spiel.
+ *
+ * Dieselbe Sprache wie der Automat: dunkler Filz, das rote Band,
+ * goldene Plakatschrift, cremefarbene Kacheln mit Bild und gruene mit
+ * Buchstaben. Die Leseschrift ist Lexend aus dem Spiel selbst
+ * (spielen/css/lexend.css, eingebettet) -- geladen wird nichts von
+ * fremden Servern.
+ * ------------------------------------------------------------------ */
+
+:root {
+  --gold: #ffd23f;
+  --gold-matt: #9a7a26;
+  --creme: #fff1d5;
+  --cyan: #79e6d2;
+  --rot: #c51d32;
+  --rot-hell: #e62e40;
+  --filz: #151519;
+  --flaeche: #232228;
+  --plakat: 800 1em Arial, Helvetica, sans-serif;
+  --text: 'BZ Lexend', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+/* Zweisprachig: jeder Satz steht zweimal, die Seite zeigt einen. Ohne
+ * Skript bleibt es Deutsch. */
+html[data-sprache="de"] [lang="en"],
+html[data-sprache="en"] [lang="de"] { display: none !important; }
+
+html { scroll-behavior: smooth; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+body {
+  margin: 0;
+  color: var(--creme);
+  font-family: var(--text);
+  font-weight: 500;
+  line-height: 1.6;
+  background-color: var(--filz);
+  background-image:
+    linear-gradient(124deg, transparent 58%, var(--rot) 58% 66%, transparent 66%),
+    radial-gradient(ellipse at 35% 12%, #303038, #101014 70%);
+  background-attachment: fixed;
+}
+
+a { color: var(--gold); }
+a:hover { color: #fff; }
+
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid var(--cyan);
+  outline-offset: 3px;
+}
+
+img { max-width: 100%; }
+
+.plakat {
+  font: var(--plakat);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.huelle {
+  width: min(1080px, 100% - 2rem);
+  margin-inline: auto;
+}
+
+/* ---------------------------------------------------------------- */
+/* Kopf                                                              */
+
+.leiste {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: rgba(16, 16, 20, 0.92);
+  border-top: 4px solid var(--rot-hell);
+  border-bottom: 1px solid #2c2a30;
+}
+
+.leiste .huelle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  min-height: 3.5rem;
+}
+
+.marke {
+  color: var(--gold);
+  font-size: 1.35rem;
+  text-decoration: none;
+}
+
+.leiste nav {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  font-size: 0.95rem;
+}
+
+.leiste nav a { color: var(--creme); text-decoration: none; }
+.leiste nav a:hover { color: var(--gold); }
+
+.sprachknopf {
+  font: var(--plakat);
+  font-size: 0.85rem;
+  padding: 0.45rem 0.7rem;
+  color: var(--creme);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid #4d4648;
+  cursor: pointer;
+}
+
+.sprachknopf:hover { border-color: var(--gold); }
+
+@media (max-width: 640px) {
+  .leiste nav .abschnitte { display: none; }
+}
+
+/* ---------------------------------------------------------------- */
+/* Kacheln                                                           */
+
+.kachel {
+  --gr: 3.5rem;
+  display: grid;
+  place-items: center;
+  width: var(--gr);
+  height: var(--gr);
+  border-radius: calc(var(--gr) * 0.07);
+  flex: none;
+}
+
+.kachel.bild {
+  background: linear-gradient(155deg, #fff8e8, #e8d9b9);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.6), 0 calc(var(--gr) * 0.06) 0 #082b29;
+}
+
+.kachel.bild img { width: 72%; height: 72%; }
+
+.kachel.buchstabe {
+  background: linear-gradient(155deg, #164d48, #102d2c);
+  box-shadow: inset 0 0 0 2px var(--gold), 0 calc(var(--gr) * 0.06) 0 #082b29,
+    0 0 calc(var(--gr) * 0.3) rgba(255, 210, 63, 0.3);
+  color: var(--gold);
+  font: var(--plakat);
+  font-size: calc(var(--gr) * 0.62);
+  line-height: 1;
+  text-shadow: 0 2px 0 #2b1d00;
+}
+
+/* Eine Kachel, die sich zwischen Bild und Buchstabe hin und her dreht
+ * -- die Regel des Spiels als Bewegung. Nur transform und opacity. */
+.wende {
+  position: relative;
+  width: var(--gr);
+  height: var(--gr);
+  --gr: clamp(2.4rem, 9vw, 5.2rem);
+  animation: schweben 3s ease-in-out calc(var(--i) * 0.18s) infinite alternate;
+}
+
+.wende .kachel {
+  --gr: inherit;
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+}
+
+.wende .buchstabe { animation: vorne 7s ease-in-out calc(var(--i) * 0.25s) infinite; }
+.wende .bild { animation: hinten 7s ease-in-out calc(var(--i) * 0.25s) infinite; }
+
+@keyframes vorne {
+  0%, 40% { transform: scaleX(1); opacity: 1; }
+  45%, 90% { transform: scaleX(0); opacity: 0; }
+  95%, 100% { transform: scaleX(1); opacity: 1; }
+}
+
+@keyframes hinten {
+  0%, 40% { transform: scaleX(0); opacity: 0; }
+  45%, 90% { transform: scaleX(1); opacity: 1; }
+  95%, 100% { transform: scaleX(0); opacity: 0; }
+}
+
+@keyframes schweben {
+  from { translate: 0 0; }
+  to { translate: 0 -6px; }
+}
+
+/* ---------------------------------------------------------------- */
+/* Buehne                                                            */
+
+.buehne {
+  padding: clamp(3rem, 9vw, 6rem) 0 clamp(3rem, 7vw, 5rem);
+  text-align: center;
+}
+
+.titelwort {
+  display: flex;
+  justify-content: center;
+  gap: clamp(0.25rem, 1vw, 0.6rem);
+  transform: rotate(-4deg);
+  margin-bottom: 2.5rem;
+}
+
+.unterzeile {
+  margin: 0 0 1.25rem;
+  color: var(--gold);
+  font-size: clamp(1.1rem, 3vw, 1.6rem);
+  letter-spacing: 0.25em;
+}
+
+.werbung {
+  max-width: 38rem;
+  margin: 0 auto 2rem;
+  font-size: clamp(1.05rem, 2.4vw, 1.25rem);
+}
+
+.knoepfe {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.9rem;
+}
+
+.knopf {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 15rem;
+  min-height: 3.6rem;
+  padding: 0.7rem 1.4rem;
+  font: var(--plakat);
+  font-size: 1.15rem;
+  text-decoration: none;
+  color: var(--gold);
+  background: linear-gradient(120deg, #87202e, #421d26);
+  border: 1px solid var(--rot-hell);
+  box-shadow: 3px 3px 0 #09090c;
+  transition: filter 0.12s, transform 0.08s;
+}
+
+.knopf small {
+  font-family: var(--text);
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--creme);
+}
+
+.knopf.haupt {
+  color: #17171c;
+  background: #eee5d4;
+  border-color: #eee5d4;
+}
+
+.knopf.haupt small { color: #5b5047; }
+.knopf:hover { filter: brightness(1.2); color: var(--gold); border-color: var(--gold); }
+.knopf.haupt:hover { filter: none; background: #fffaf0; color: #17171c; }
+.knopf:active { transform: translateY(3px); }
+
+.knopf.aus {
+  cursor: default;
+  color: var(--gold-matt);
+  filter: grayscale(0.5);
+}
+
+.knopf.aus:hover { filter: grayscale(0.5); color: var(--gold-matt); border-color: var(--rot-hell); }
+
+/* Der Aufruf zum Testen: unter den beiden Knoepfen, leiser als sie. */
+.tester {
+  max-width: 40rem;
+  margin: 3rem auto 0;
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+  border: 2px dashed var(--gold-matt);
+  /* Deckend, sonst laeuft das rote Band des Hintergrunds durch die Schrift. */
+  background: var(--filz);
+}
+
+.tester h2 { font-size: clamp(1.2rem, 3.4vw, 1.6rem); margin-bottom: 0.9rem; }
+.tester p { margin: 0 0 1.25rem; }
+.tester .knoepfe { margin-bottom: 1.25rem; }
+.tester .knopf { flex: 1 1 15rem; }
+.tester .klein { margin: 0; font-size: 0.85rem; opacity: 0.8; }
+
+/* ---------------------------------------------------------------- */
+/* Abschnitte                                                        */
+
+section { padding: clamp(2.5rem, 6vw, 4.5rem) 0; }
+
+h2 {
+  margin: 0 0 1.5rem;
+  color: var(--gold);
+  font: var(--plakat);
+  font-size: clamp(1.6rem, 4.5vw, 2.4rem);
+  text-transform: uppercase;
+  text-shadow: 0 3px 0 #3a2a00;
+}
+
+h3 {
+  margin: 0 0 0.6rem;
+  font: var(--plakat);
+  font-size: 1.25rem;
+  text-transform: uppercase;
+}
+
+.kasten {
+  padding: clamp(1.25rem, 3vw, 2rem);
+  background: linear-gradient(135deg, #302b30, #19191e);
+  border: 2px solid var(--rot-hell);
+  border-top-width: 6px;
+  box-shadow: 6px 6px 0 #08080b;
+}
+
+/* So geht's: das Beispielwort. */
+.beispiel {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(0.6rem, 2.5vw, 1.5rem);
+  margin: 1.5rem 0 2rem;
+}
+
+.beispiel figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0;
+}
+
+.beispiel .kachel { --gr: clamp(3.4rem, 12vw, 5rem); }
+
+.beispiel figcaption {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+.beispiel .pfeil {
+  align-self: center;
+  color: var(--gold);
+  font: var(--plakat);
+  font-size: 2rem;
+}
+
+.ergebnis {
+  color: var(--cyan);
+  font: var(--plakat);
+  font-size: clamp(1.8rem, 6vw, 2.8rem);
+  align-self: center;
+}
+
+.schritte {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: 1rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+  counter-reset: schritt;
+}
+
+.schritte li {
+  position: relative;
+  padding: 1rem 1rem 1rem 3.4rem;
+  background: rgba(0, 0, 0, 0.28);
+  border-left: 3px solid var(--gold);
+  counter-increment: schritt;
+}
+
+.schritte li::before {
+  content: counter(schritt);
+  position: absolute;
+  left: 0.9rem;
+  top: 1rem;
+  display: grid;
+  place-items: center;
+  width: 1.8rem;
+  height: 1.8rem;
+  border-radius: 50%;
+  background: var(--gold);
+  color: #17171c;
+  font: var(--plakat);
+}
+
+.schritte strong { color: var(--gold); }
+
+/* Zwei Modi nebeneinander. */
+.modi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+  gap: 1.5rem;
+}
+
+.modus {
+  border-left: 6px solid var(--gold);
+}
+
+.modus.kinder { border-left-color: var(--cyan); }
+.modus.kinder h3 { color: var(--cyan); }
+.modus h3 { display: flex; align-items: center; gap: 0.6rem; color: var(--gold); }
+.modus h3 img { width: 2rem; height: 2rem; }
+
+.modus ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.modus li { margin: 0.35rem 0; }
+
+/* Bilder aus dem Spiel. */
+.bilder {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+  gap: 1.25rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.bilder figure { margin: 0; }
+
+.bilder img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 9 / 16;
+  border: 2px solid #3a353c;
+  border-radius: 10px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.5);
+}
+
+.bilder figcaption {
+  margin-top: 0.6rem;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Versprechen: drei grosse Neins. */
+.versprechen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: 1rem;
+}
+
+.versprechen div {
+  padding: 1.25rem;
+  background: rgba(0, 0, 0, 0.28);
+  text-align: center;
+}
+
+.versprechen .plakat {
+  display: block;
+  margin-bottom: 0.4rem;
+  color: var(--gold);
+  font-size: 1.3rem;
+}
+
+/* ---------------------------------------------------------------- */
+/* Rechtliches und Fuss                                              */
+
+.rechtlich { padding: 3rem 0 4rem; }
+.rechtlich h1 {
+  margin: 0 0 1.5rem;
+  color: var(--gold);
+  font: var(--plakat);
+  font-size: clamp(1.8rem, 5vw, 2.6rem);
+  text-transform: uppercase;
+}
+.rechtlich h2 { font-size: 1.3rem; margin: 2rem 0 0.6rem; text-shadow: none; }
+.rechtlich .kasten { max-width: 52rem; }
+
+/* Was vor dem Veroeffentlichen noch eingetragen werden muss. */
+.fehlt {
+  padding: 0 0.3em;
+  color: #17171c;
+  background: var(--gold);
+  font-weight: 700;
+}
+
+footer {
+  padding: 2rem 0 3rem;
+  border-top: 1px solid #2c2a30;
+  font-size: 0.9rem;
+  color: #b9ae9a;
+}
+
+footer .huelle {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+footer nav { display: flex; flex-wrap: wrap; gap: 1.25rem; }
+footer a { color: var(--creme); }

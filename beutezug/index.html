@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="de" data-sprache="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BEUTEZUG – die Emoji-Wortjagd</title>
+<meta name="titel-de" content="BEUTEZUG – die Emoji-Wortjagd">
+<meta name="titel-en" content="BEUTEZUG – the Emoji Word Hunt">
+<meta name="description" content="Ein Wortsuchspiel, in dem jedes Emoji ein Buchstabe ist – der erste seines Namens. Für Erwachsene als Beutezug mit Risiko, für Kinder zum Lesenlernen. Ohne Werbung, ohne Datensammeln.">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#151519">
+<meta property="og:title" content="BEUTEZUG – die Emoji-Wortjagd">
+<meta property="og:description" content="Jedes Emoji ist ein Buchstabe. Finde die Wörter, sammle Beute – und hau rechtzeitig ab.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="bilder/titel.jpg">
+<link rel="icon" href="bilder/emoji/1f4b0.svg" type="image/svg+xml">
+<link rel="stylesheet" href="spielen/css/lexend.css">
+<link rel="stylesheet" href="stil.css">
+<script src="seite.js"></script>
+</head>
+<body>
+
+<header class="leiste">
+  <div class="huelle">
+    <a class="marke plakat" href="#">BEUTEZUG</a>
+    <nav>
+      <span class="abschnitte">
+        <a href="#regeln"><span lang="de">So geht's</span><span lang="en">How it works</span></a>
+      </span>
+      <span class="abschnitte">
+        <a href="#modi"><span lang="de">Modi</span><span lang="en">Modes</span></a>
+      </span>
+      <button type="button" class="sprachknopf">
+        <span lang="de">ENGLISH</span><span lang="en">DEUTSCH</span>
+      </button>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+  <!-- Die Buehne: BEUTEZUG aus Kacheln, die zwischen Bild und Buchstabe
+       wechseln. Die Bilder heissen auf Deutsch und Englisch mit demselben
+       Buchstaben an: BAER/BEAR, ELEFANT/ELEPHANT, UFO, TIGER, EI/EGG,
+       ZEBRA, U-BAHN/UNDERGROUND, GITARRE/GUITAR. -->
+  <section class="buehne">
+    <div class="huelle">
+      <div class="titelwort" role="img" aria-label="BEUTEZUG">
+        <div class="wende" style="--i: 0"><div class="kachel buchstabe">B</div><div class="kachel bild"><img src="bilder/emoji/1f43b.svg" alt=""></div></div>
+        <div class="wende" style="--i: 1"><div class="kachel buchstabe">E</div><div class="kachel bild"><img src="bilder/emoji/1f418.svg" alt=""></div></div>
+        <div class="wende" style="--i: 2"><div class="kachel buchstabe">U</div><div class="kachel bild"><img src="bilder/emoji/1f6f8.svg" alt=""></div></div>
+        <div class="wende" style="--i: 3"><div class="kachel buchstabe">T</div><div class="kachel bild"><img src="bilder/emoji/1f42f.svg" alt=""></div></div>
+        <div class="wende" style="--i: 4"><div class="kachel buchstabe">E</div><div class="kachel bild"><img src="bilder/emoji/1f95a.svg" alt=""></div></div>
+        <div class="wende" style="--i: 5"><div class="kachel buchstabe">Z</div><div class="kachel bild"><img src="bilder/emoji/1f993.svg" alt=""></div></div>
+        <div class="wende" style="--i: 6"><div class="kachel buchstabe">U</div><div class="kachel bild"><img src="bilder/emoji/1f687.svg" alt=""></div></div>
+        <div class="wende" style="--i: 7"><div class="kachel buchstabe">G</div><div class="kachel bild"><img src="bilder/emoji/1f3b8.svg" alt=""></div></div>
+      </div>
+
+      <h1 class="unterzeile plakat">
+        <span lang="de">Die Emoji-Wortjagd</span><span lang="en">The Emoji Word Hunt</span>
+      </h1>
+
+      <p class="werbung" lang="de">
+        Jedes Emoji ist ein Buchstabe – der erste seines Namens. Finde die
+        Wörter im Raster, sammle Beute im Topf und entscheide nach jedem
+        Auftrag: weitermachen oder abhauen?
+      </p>
+      <p class="werbung" lang="en">
+        Every emoji is a letter – the first letter of its name. Find the words
+        in the grid, stash your loot in the pot and decide after every job:
+        keep going or cash out?
+      </p>
+
+      <div class="knoepfe">
+        <a class="knopf haupt" href="spielen/index.html">
+          <span lang="de">Im Browser spielen</span><span lang="en">Play in your browser</span>
+          <small lang="de">Demo mit 20 Aufträgen, ohne Installation</small>
+          <small lang="en">demo with 20 jobs, nothing to install</small>
+        </a>
+        <a class="knopf play-store aus" aria-disabled="true">
+          <span>Google Play</span>
+          <small class="bald" lang="de">bald verfügbar</small>
+          <small class="bald" lang="en">coming soon</small>
+        </a>
+      </div>
+
+      <!-- Der geschlossene Test braucht Tester. Adressen sammelt die Seite
+           nicht: Wer mitmacht, tritt selbst der Google-Gruppe bei, und die
+           Gruppe ist die Testerliste in der Play Console. Dieselben zwei
+           Adressen stehen in tools/demo.js fuer das Ende der Demo. Ist die
+           App erschienen, blendet seite.js diesen Kasten aus. -->
+      <div class="tester" id="tester">
+        <h2><span lang="de">Android-Tester gesucht</span><span lang="en">Android testers wanted</span></h2>
+        <p lang="de">Die App ist im geschlossenen Test bei Google Play. Spiel sie vor
+          allen anderen – zwei Schritte, beide mit dem Google-Konto, mit dem dein
+          Android-Telefon angemeldet ist:</p>
+        <p lang="en">The app is in a closed test on Google Play. Play it before anyone
+          else – two steps, both with the Google account your Android phone is
+          signed in with:</p>
+        <div class="knoepfe">
+          <a class="knopf" href="https://groups.google.com/g/beutezug-tester" target="_blank" rel="noopener">
+            <span lang="de">1. Testergruppe beitreten</span><span lang="en">1. Join the tester group</span>
+            <small lang="de">bei Google Groups</small>
+            <small lang="en">on Google Groups</small>
+          </a>
+          <a class="knopf" href="https://play.google.com/apps/testing/de.twobitskid.beutezug" target="_blank" rel="noopener">
+            <span lang="de">2. App holen</span><span lang="en">2. Get the app</span>
+            <small lang="de">Test annehmen, dann installieren</small>
+            <small lang="en">accept the test, then install</small>
+          </a>
+        </div>
+        <p class="klein" lang="de">Deine Adresse sehen nur Google und wir als Verwalter
+          der Gruppe; wir nutzen sie nur für den Test. Austreten geht jederzeit.
+          Mehr dazu im <a href="datenschutz.html#tester">Datenschutz</a>.</p>
+        <p class="klein" lang="en">Only Google and we, as the group's managers, see your
+          address; we use it for the test only. You can leave at any time. More in the
+          <a href="datenschutz.html#tester-en">privacy policy</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="regeln">
+    <div class="huelle">
+      <div class="kasten">
+        <h2>
+          <span lang="de">Jedes Emoji ist ein Buchstabe</span>
+          <span lang="en">Every emoji is a letter</span>
+        </h2>
+        <p lang="de">Nimm den ersten Buchstaben seines Namens. Aus Haus, Uhr, Nase und Delfin wird:</p>
+        <p lang="en">Take the first letter of its name. Dolphin, owl and gift make:</p>
+
+        <div class="beispiel" lang="de">
+          <figure><div class="kachel bild"><img src="bilder/emoji/1f3e0.svg" alt=""></div><figcaption>HAUS</figcaption></figure>
+          <figure><div class="kachel bild"><img src="bilder/emoji/231a.svg" alt=""></div><figcaption>UHR</figcaption></figure>
+          <figure><div class="kachel bild"><img src="bilder/emoji/1f443.svg" alt=""></div><figcaption>NASE</figcaption></figure>
+          <figure><div class="kachel bild"><img src="bilder/emoji/1f42c.svg" alt=""></div><figcaption>DELFIN</figcaption></figure>
+          <span class="pfeil" aria-hidden="true">→</span>
+          <span class="ergebnis">HUND</span>
+        </div>
+        <div class="beispiel" lang="en">
+          <figure><div class="kachel bild"><img src="bilder/emoji/1f42c.svg" alt=""></div><figcaption>DOLPHIN</figcaption></figure>
+          <figure><div class="kachel bild"><img src="bilder/emoji/1f989.svg" alt=""></div><figcaption>OWL</figcaption></figure>
+          <figure><div class="kachel bild"><img src="bilder/emoji/1f381.svg" alt=""></div><figcaption>GIFT</figcaption></figure>
+          <span class="pfeil" aria-hidden="true">→</span>
+          <span class="ergebnis">DOG</span>
+        </div>
+
+        <ol class="schritte" lang="de">
+          <li><strong>Ziehen.</strong> Zieh gerade über die Emojis, vom ersten bis zum letzten Buchstaben. Suchwörter zählen doppelt, jedes andere Wort aus dem Wörterbuch einfach.</li>
+          <li><strong>Versuche.</strong> Jeder Zug ohne Wort kostet einen Versuch. Welche Buchstaben du gerade ziehst, siehst du nicht – genau das ist das Spiel.</li>
+          <li><strong>Hilfe.</strong> Tipp deckt Buchstaben auf, Spicken zeigt kurz alle. Beides zahlst du aus dem Topf.</li>
+          <li><strong>Abhauen.</strong> Nach jedem Auftrag: weiter zum nächsten, größeren – oder den Topf sichern und in die Bestenliste.</li>
+        </ol>
+        <ol class="schritte" lang="en">
+          <li><strong>Drag.</strong> Drag in a straight line across the emojis, from first letter to last. Target words score double, any other dictionary word scores single.</li>
+          <li><strong>Tries.</strong> Every drag without a word costs a try. You never see the letters you are spelling – that is the game.</li>
+          <li><strong>Help.</strong> Hint reveals letters, peek shows them all for a moment. Both are paid from the pot.</li>
+          <li><strong>Cash out.</strong> After every job: on to the next, bigger one – or secure the pot and enter the high scores.</li>
+        </ol>
+      </div>
+    </div>
+  </section>
+
+  <section id="modi">
+    <div class="huelle">
+      <h2><span lang="de">Zwei Spiele in einem</span><span lang="en">Two games in one</span></h2>
+      <div class="modi">
+        <div class="kasten modus">
+          <h3><img src="bilder/emoji/1f4b0.svg" alt=""><span lang="de">Erwachsene</span><span lang="en">Adults</span></h3>
+          <ul lang="de">
+            <li>Ein Beutezug aus immer neuen Aufträgen: größere Bretter, neue Richtungen, Köder und verdeckte Wörter.</li>
+            <li>Jeder fünfte Auftrag ist ein Tresor – mit Beute, Tücken und manchmal einem Alarm gegen die Uhr.</li>
+            <li>Beim Hehler gibt es Dietriche und Komplizen, die die Regeln zu deinen Gunsten biegen.</li>
+            <li>Tagescoup: jeden Tag dasselbe Spiel für alle, mit eigener Bestenliste.</li>
+          </ul>
+          <ul lang="en">
+            <li>A heist of ever-new jobs: bigger boards, new directions, decoys and masked words.</li>
+            <li>Every fifth job is a vault – with rewards, twists and sometimes an alarm against the clock.</li>
+            <li>The fence sells lockpicks and hires out crew who bend the rules in your favour.</li>
+            <li>Daily heist: the same game for everyone each day, with its own high scores.</li>
+          </ul>
+        </div>
+        <div class="kasten modus kinder">
+          <h3><img src="bilder/emoji/1f9f8.svg" alt=""><span lang="de">Für Kinder</span><span lang="en">For kids</span></h3>
+          <ul lang="de">
+            <li>Für Leseanfänger in der ersten und zweiten Klasse: Wörter mit höchstens sechs Buchstaben, Sätze aus Wörtern der ersten Klasse.</li>
+            <li>Viele Buchstaben stehen am Anfang schon da – aus K_TZE wird die Katze.</li>
+            <li>Tipp und Spicken kosten nichts, und es gibt fünf Versuche statt drei.</li>
+            <li>Kein Geld, kein Topf, kein Risiko – nur lesen und finden.</li>
+          </ul>
+          <ul lang="en">
+            <li>For new readers aged seven to eight: words of six letters or fewer, instructions in first-grade words.</li>
+            <li>Many letters are already shown at first – C_T becomes the cat.</li>
+            <li>Hint and peek are free, and there are five tries instead of three.</li>
+            <li>No money, no pot, no risk – just reading and finding.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="bilder">
+    <div class="huelle">
+      <h2><span lang="de">Aus dem Spiel</span><span lang="en">Screenshots</span></h2>
+      <ul class="bilder">
+        <li><figure><img src="bilder/titel.jpg" width="720" height="1280" loading="lazy" alt="Titelschirm: BEUTEZUG aus Kacheln, eine zeigt ihr Emoji"><figcaption><span lang="de">Bild ist Buchstabe</span><span lang="en">Picture is letter</span></figcaption></figure></li>
+        <li><figure><img src="bilder/brett.jpg" width="720" height="1280" loading="lazy" alt="Spielbrett mit zwei gefundenen Wörtern"><figcaption><span lang="de">Wörter finden</span><span lang="en">Find the words</span></figcaption></figure></li>
+        <li><figure><img src="bilder/abrechnung.jpg" width="720" height="1280" loading="lazy" alt="Abrechnung nach einem Auftrag: weiter oder abhauen"><figcaption><span lang="de">Weiter oder abhauen?</span><span lang="en">Continue or cash out?</span></figcaption></figure></li>
+        <li><figure><img src="bilder/kinder.jpg" width="720" height="1280" loading="lazy" alt="Kindermodus mit vielen Buchstabenkacheln"><figcaption><span lang="de">Kindermodus</span><span lang="en">Kids mode</span></figcaption></figure></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="huelle">
+      <div class="versprechen">
+        <div>
+          <span class="plakat"><span lang="de">Keine Werbung</span><span lang="en">No ads</span></span>
+          <span lang="de">Nicht im Spiel und nicht bei den Kindern.</span>
+          <span lang="en">Not in the game, and not for kids.</span>
+        </div>
+        <div>
+          <span class="plakat"><span lang="de">Keine Daten</span><span lang="en">No data</span></span>
+          <span lang="de">Kein Konto, keine Analyse. Alles bleibt auf deinem Gerät.</span>
+          <span lang="en">No account, no tracking. Everything stays on your device.</span>
+        </div>
+        <div>
+          <span class="plakat"><span lang="de">Kein Abo</span><span lang="en">No subscription</span></span>
+          <span lang="de">20 Aufträge gratis, im Browser und in der App. Danach in der App einmal bezahlen.</span>
+          <span lang="en">20 jobs free, in the browser and in the app. Then pay once in the app.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="huelle">
+    <span>© 2026 BEUTEZUG · <span lang="de">Deutsch und Englisch</span><span lang="en">German and English</span></span>
+    <nav>
+      <a href="datenschutz.html"><span lang="de">Datenschutz</span><span lang="en">Privacy</span></a>
+      <a href="impressum.html"><span lang="de">Impressum</span><span lang="en">Legal notice</span></a>
+      <span><span lang="de">Emoji:</span><span lang="en">Emoji:</span> <a href="https://github.com/googlefonts/noto-emoji">Noto Emoji</a> (Apache 2.0)</span>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

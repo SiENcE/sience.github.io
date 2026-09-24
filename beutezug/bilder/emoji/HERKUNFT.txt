@@ -1,0 +1,9 @@
+Die Emoji-Bilder in diesem Ordner stammen aus Noto Emoji von Google
+(https://github.com/googlefonts/noto-emoji), heruntergeladen von
+https://fonts.gstatic.com/s/e/notoemoji/latest/<codepoint>/emoji.svg.
+
+Die Bilder stehen unter der Apache License 2.0 (LICENSE-2.0.txt).
+Copyright 2013 Google LLC. Unveraendert uebernommen; der Dateiname ist
+der Unicode-Codepunkt.
+
+Dieselben Bilder zeigt die Android-App (Noto Color Emoji, SIL OFL 1.1).
