@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Abyssal Bloom</title>
+<link rel="icon" href="assets/favicon.png">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #02050b; }
+  /* one low-res canvas, scaled up by a whole number with no smoothing */
+  #screen {
+    position: fixed;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    touch-action: none;
+    cursor: crosshair;
+  }
+</style>
+</head>
+<body>
+<canvas id="screen" aria-label="Abyssal Bloom — an idle game about a bioluminescent reef"></canvas>
+<script src="assets/atlas.js"></script>
+<script src="src/data.js"></script>
+<script src="src/state.js"></script>
+<script src="src/gfx.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/world.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/tutorial.js"></script>
+<script src="src/help.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
