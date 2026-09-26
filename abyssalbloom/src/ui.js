@@ -41,8 +41,11 @@ const plain = s => s.replace(/\*/g, "");
 
 function drawHUD() {
   const cx = play.cx;
-  const zone = ZONES[Math.min(S.depth, ZONES.length - 1)].toUpperCase();
-  text(`${zone}   ${(200 + S.depth * 1300).toLocaleString()} M`, cx, 9, { font: "caps", colour: C.dim, align: "center" });
+  // while sinking the depth counts up with the camera
+  const sinking = descent.active && descent.from;
+  const zone = (sinking && !descent.done ? descent.from : Z).name.toUpperCase();
+  const m = sinking ? Math.round(lerp(descent.from.depthM, descent.to.depthM, descent.p) / 10) * 10 : Z.depthM;
+  text(`${zone}   ${m.toLocaleString()} M`, cx, 9, { font: "caps", colour: C.dim, align: "center" });
 
   // lumen motes fly into the counter; it hops a pixel when they land
   const n = fmt(S.lumen), w = textWidth(n, "big") + 17, hop = ui.counterBump > 0 ? 1 : 0;
@@ -117,7 +120,7 @@ function drawPanel() {
   // mutations: the cheapest ones currently unlocked
   const perRow = Math.floor((P.w - pad * 2 + 2) / 20);
   const rows = P.portrait ? 1 : 2;
-  const avail = UPGRADES.filter(u => !S.upg.includes(u.id) && u.req(S)).sort((a, b) => a.cost - b.cost)
+  const avail = UPGRADES.filter(upgradeHere).sort((a, b) => a.cost - b.cost)
     .slice(0, perRow * rows);
   if (avail.length) {
     text("MUTATIONS", P.x + pad + 1, y, { font: "caps", colour: C.dim });
@@ -169,10 +172,11 @@ function drawShopList(L) {
   ctx.beginPath(); ctx.rect(L.x, L.y, L.w, L.h); ctx.clip();
   const rowH = 25;
   let prevOwned = true, y = L.y - Math.round(ui.scroll), shown = 0;
-  for (const s of SPECIES) {
+  const list = shopSpecies();
+  for (const s of list) {
     const owned = S.owned[s.id] || 0;
     // the next species shows as a silhouette once the previous one is owned
-    const known = s.index === 0 || owned > 0 || S.total >= s.cost * 0.4;
+    const known = s === list[0] || owned > 0 || S.total >= s.cost * 0.4;
     const visible = known || prevOwned;
     prevOwned = owned > 0;
     if (!visible) continue;
@@ -218,13 +222,22 @@ function drawShopRow(s, owned, known, x, y, w, h, clip) {
 
 function drawFooter(x, y, w, showDescend) {
   if (!showDescend) return drawFooterRow(x, y + 3, w);
-  const pa = pearlsAvailable(), can = pa >= 1;
-  const hov = hotspot(x, y, w, 24, "descend", () => { if (can) askDescend(); });
+  const pa = pearlsAvailable(), gate = gateMet(), can = pa >= 1 && gate;
+  // a zone's gate comes first: until it is met, the plate shows its progress
+  const hov = gate ? hotspot(x, y, w, 24, "descend", () => { if (can) askDescend(); })
+    : hotspot(x, y, w, 24, "gate", null, { tip: ["THE WAY DOWN", Z.gate.desc] });
   if (can) buttonBox(x, y, w, 24, { hover: hov, pressed: pressed("descend", hov), accent: C.violet });
   else bevel(x, y, w, 24, C.winLo, C.win, C.winLo);
   sprite("pearl", x + 5, y + 6);
   text("DESCEND", x + 22, y + 4, { font: "caps", colour: can ? C.violet : C.faint });
-  const info = can ? `to ${ZONES[Math.min(S.depth + 1, ZONES.length - 1)]}  +${pa} pearl${pa > 1 ? "s" : ""}`
+  if (!gate) {
+    const k = Math.min(1, (S.gate || 0) / Z.gate.need);
+    text(Z.gate.text(S.gate || 0), x + 22, y + 13, { colour: C.gold });
+    rect(x + 22, y + 21, w - 26, 1, C.winHi);
+    rect(x + 22, y + 21, Math.round((w - 26) * k), 1, C.gold);
+    return drawFooterRow(x, y + 27, w);
+  }
+  const info = can ? `to ${zoneDef(S.depth + 1).name}  +${pa} pearl${pa > 1 ? "s" : ""}`
     : S.allTime < DESCEND_AT ? `at ${fmt(DESCEND_AT)} lumen  (${Math.floor((100 * S.allTime) / DESCEND_AT)}%)`
       : `next pearl at ${fmt(Math.pow(S.pearls + 1, 2) * DESCEND_AT)}`;
   text(info, x + 22, y + 13, { colour: can ? C.text : C.faint });
@@ -236,10 +249,17 @@ function drawFooter(x, y, w, showDescend) {
 function drawFooterRow(x, ry, w) {
   if (S.pearls || S.depth) {
     sprite("pearl", x, ry - 1);
-    text(`${S.pearls} pearls  +${S.pearls * 10}%`, x + 15, ry + 1, { colour: C.dim });
+    text(`${fmt(S.pearls)}  +${fmt(Math.round(S.pearls * M.pearlPct * 100))}%`, x + 15, ry + 1, { colour: C.dim });
   }
-  const b2 = x + w - 13, b1 = b2 - 15, b0 = b1 - 15;
-  let hv = hotspot(b0, ry - 1, 13, 11, "help", () => openCodex(), { tip: ["HOW TO PLAY", "Every mechanic, with a replay of its lesson. Key: H"] });
+  const b2 = x + w - 13, b1 = b2 - 15, b0 = b1 - 15, bl = b0 - 15;
+  let hv;
+  if (logShown()) {
+    hv = hotspot(bl, ry - 1, 13, 11, "log", () => openLog(), { tip: ["DEPTH LOG", `The tree, trials, secrets, relics and bestiary. *${S.black}* black pearls. Key: L`] });
+    buttonBox(bl, ry - 1, 13, 11, { hover: hv, pressed: pressed("log", hv) });
+    spriteC("bpearl", bl + 7, ry + 4);
+    if (logNews() && Math.floor(now * 2) % 2) rect(bl + 10, ry, 2, 2, C.gold);
+  }
+  hv = hotspot(b0, ry - 1, 13, 11, "help", () => openCodex(), { tip: ["HOW TO PLAY", "Every mechanic, with a replay of its lesson. Key: H"] });
   buttonBox(b0, ry - 1, 13, 11, { hover: hv, pressed: pressed("help", hv) });
   icon("help", b0 + 5, ry + 1, C.cyan);
   // a gold dot while the codex holds a page you haven't read
@@ -317,6 +337,7 @@ function drawUI(dt) {
 
 // windows that take all input: the codex, and dialogs on top of it
 function drawOverlays() {
+  if (ui.log) drawLog();
   if (ui.codex) drawCodex();
   if (ui.modal) drawModal();
 }
@@ -352,10 +373,10 @@ function toggleMute() {
 }
 
 async function askReset() {
-  if (await modal("Wipe the reef?", ["Everything - lumen, creatures, pearls and depth - is lost."], "Wipe", "Keep")) {
+  if (await modal("Wipe the reef?", ["Everything - lumen, creatures, pearls, depth and the whole Depth Log - is lost."], "Wipe", "Keep")) {
     localStorage.removeItem(SAVE_KEY);
-    S = freshState(); rebuildMods(); creatures = []; links.clear(); resonance = 1;
-    tutReset(); buildBackground();
+    S = freshState(); rebuildMods(); creatures = []; links.clear(); resonance = 1; tide.on = false;
+    setZone(); tutReset(); buildBackground(); placeProps(); rollSparks(); setDrone(Z);
   }
 }
 
@@ -364,11 +385,12 @@ async function askReset() {
 cvs.addEventListener("pointerdown", e => {
   initAudio();
   const [x, y] = toLogical(e);
+  if (descent.active && !ui.modal && !ui.codex) return skipDescent();
   ui.mouse = { x, y, in: true, touch: e.pointerType !== "mouse" };
   cvs.setPointerCapture(e.pointerId);
   const h = hitHot(x, y);
   if (!h || h.id !== ui.tapTip) ui.tapTip = null; // tapping elsewhere closes a touch tooltip
-  if (ui.modal || ui.codex) { if (h) ui.press = h.id; return; }
+  if (ui.modal || ui.codex || ui.log) { if (h) ui.press = h.id; return; }
   if (h) {
     ui.press = h.id;
     if (h.scroll) ui.drag = { y, scroll: ui.scroll, moved: false };
@@ -377,6 +399,9 @@ cvs.addEventListener("pointerdown", e => {
   if (x >= play.w || y >= play.h) return;
   if (spore && Math.hypot(x - spore.x, y - spore.y) < 12) return catchSpore();
   if (Math.hypot(x - play.cx, y - play.cy) < HEART_R) return tapHeart();
+  if (tapGulper(x, y)) return;
+  if (tapShiny(x, y)) return;
+  if (grabAnchor(x, y)) return;
   current.on = true; current.x = x; current.y = y;
 });
 
@@ -384,6 +409,7 @@ cvs.addEventListener("pointermove", e => {
   const [x, y] = toLogical(e);
   ui.mouse = { x, y, in: true, touch: e.pointerType !== "mouse" };
   if (current.on) { current.x = x; current.y = y; }
+  dragAnchor(x, y);
   if (ui.drag) {
     const dy = ui.drag.y - y;
     if (Math.abs(dy) > 3) ui.drag.moved = true;
@@ -398,6 +424,7 @@ function pointerEnd(e) {
     if (h && h.id === ui.press && h.onClick && !(ui.drag && ui.drag.moved)) h.onClick();
   }
   ui.press = null; ui.drag = null; current.on = false;
+  dropAnchor();
   if (e.pointerType !== "mouse") ui.mouse.in = false;
 }
 cvs.addEventListener("pointerup", pointerEnd);
@@ -411,5 +438,7 @@ cvs.addEventListener("wheel", e => {
 addEventListener("keydown", e => {
   if (e.key === "Escape") {
     if (ui.modal) { const m = ui.modal; ui.modal = null; m.res(false); } else if (ui.codex) closeCodex();
+    else if (ui.log) closeLog();
   } else if ((e.key === "h" || e.key === "?") && !ui.modal) ui.codex ? closeCodex() : openCodex();
+  else if (e.key === "l" && !ui.modal && !ui.codex) ui.log ? closeLog() : openLog();
 });

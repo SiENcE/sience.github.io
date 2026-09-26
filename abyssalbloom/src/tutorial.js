@@ -22,11 +22,13 @@ function learn(id) { if (!learned(id)) { S.learned.push(id); save(); } }
 const has = id => (S.owned[id] || 0) > 0;
 const speciesOwned = () => SPECIES.filter(s => has(s.id)).length;
 const affordableUpgrade = () =>
-  UPGRADES.filter(u => !S.upg.includes(u.id) && u.req(S) && S.lumen >= u.cost).sort((a, b) => a.cost - b.cost)[0];
+  UPGRADES.filter(u => upgradeHere(u) && S.lumen >= u.cost).sort((a, b) => a.cost - b.cost)[0];
 
 const LESSONS = [
   { id: "tap", when: () => true, done: () => S.clicks >= 5 || baseRate() > 0 },
   { id: "spore", when: () => !!spore, done: () => (S.spores || 0) > 0 },
+  // a gulper is eating the web right now: that comes before everything else
+  { id: "gulper", when: () => gulper.on && !gulper.flee, done: () => (S.mech.drivenOff || 0) > 0 },
   { id: "buy", when: () => S.lumen >= SP.plankton.cost, done: () => baseRate() > 0 },
   { id: "income", when: () => baseRate() > 0, done: () => tut.active === "income" && tut.t > 5 },
   { id: "mutation", when: () => !!affordableUpgrade(), done: () => S.upg.length > 0 },
@@ -34,7 +36,12 @@ const LESSONS = [
   { id: "thread", when: () => speciesOwned() >= 2, done: () => tut.threadDone },
   { id: "current", when: () => learned("thread") && tut.sinceThread > 8 && creatures.length >= 4,
     done: () => tut.heldFor > 1 && (charged > 0 || tut.heldFor > 3) },
-  { id: "descend", when: () => pearlsAvailable() >= 1, done: () => S.depth > 0 },
+  { id: "vents", when: () => ventList.length > 0 && creatures.length >= 3, done: () => tut.ventFor > 2 },
+  { id: "anchor", when: () => creatures.some(c => c.s.sessile === "floor" && c.born >= 1),
+    done: () => (S.mech.moved || 0) > 0 },
+  { id: "gate", when: () => !!Z.gate && !gateMet() && pearlsAvailable() >= 1, done: () => S.depth > 2 || (!!Z.gate && gateMet()) },
+  { id: "descend", when: () => pearlsAvailable() >= 1 && gateMet(), done: () => S.depth > 0 },
+  { id: "log", when: () => S.black > 0, done: () => S.logOpened },
 ];
 
 // HUD pieces appear when the player first needs them
@@ -49,7 +56,7 @@ const revealed = k => tut.reveal[k];
 
 function tutReset() {
   Object.assign(tut, { active: null, t: 0, slow: 1, moment: null, threadDone: false, sinceThread: 0,
-    heldFor: 0, replay: null, ghost: null, pair: null });
+    heldFor: 0, replay: null, ghost: null, pair: null, ventFor: 0 });
   for (const k in tut.reveal) tut.reveal[k] = revealTarget(k) ? 1 : 0;
 }
 
@@ -71,6 +78,7 @@ function tutUpdate(dt) {
   tut.t += dt;
   if (learned("thread")) tut.sinceThread += dt;
   tut.heldFor = currentLive() ? tut.heldFor + dt : 0;
+  if (ventCharged > 0) tut.ventFor += dt;
 
   for (const k in tut.reveal) {
     const d = (revealTarget(k) ? 1 : 0) - tut.reveal[k];
@@ -226,7 +234,7 @@ function drawTutorial() {
     pointAt(spore.x + 4, spore.y + 5, "CATCH");
   } else if (cue === "buy" || cue === "second") {
     const target = tut.replay ? SPECIES.find(x => bulkCost(x, 1) <= S.lumen) || SP.plankton
-      : cue === "buy" ? SP.plankton : SPECIES.find(x => x.index > 0 && !has(x.id)) || SP.jelly;
+      : cue === "buy" ? SP.plankton : shopSpecies().find(x => x !== SP.plankton && !has(x.id)) || SP.jelly;
     const h = bracketHot("s:" + target.id);
     if (h && bulkCost(target, 1) <= S.lumen) pointAtHot(h, "BUY");
   } else if (cue === "income") {
@@ -243,7 +251,29 @@ function drawTutorial() {
   else if (cue === "descend") {
     const h = bracketHot("descend");
     if (h && pearlsAvailable() >= 1) pointAt(h.x + 12, h.y + 16);
-  }
+  } else if (cue === "gulper" && gulper.on && !gulper.flee) {
+    pointAt(gulper.x + 4, gulper.y + 3, "TAP");
+  } else if (cue === "vents" && ventList.length) {
+    const v = ventList[0];
+    ctx.globalAlpha = 0.8; ring(v.px, v.py, v.r + (Math.floor(now * 3) % 2), C.gold, 3, Math.floor(now * 6)); ctx.globalAlpha = 1;
+    cueWord("WARM", v.px + v.r * 0.6, v.py - v.r - 4);
+  } else if (cue === "anchor") drawGhostDrag();
+  else if (cue === "gate") bracketHot("gate") || bracketHot("descend");
+  else if (cue === "log") { const h = bracketHot("log"); if (h) pointAt(h.x + 6, h.y + 8, "LOG", true, 1, [h.x - 26, h.y - 10]); }
+}
+
+// a ghost hand drags an anchored creature towards the busy water near the heart
+function drawGhostDrag() {
+  if (dragging) return;
+  const c = creatures.find(c => c.s.sessile === "floor" && c.born >= 1);
+  if (!c) return;
+  const ph = (now % 2.4) / 2.4, k = Math.max(0, Math.min(1, (ph - 0.2) / 0.6));
+  const tx = lerp(c.x, play.cx + (c.x < play.cx ? -50 : 50), k), ty = lerp(c.y, play.cy + 30, k);
+  ctx.globalAlpha = 0.5;
+  for (let i = 0; i < 6; i++) rect(Math.round(lerp(c.x, tx, i / 6)), Math.round(lerp(c.y, ty, i / 6)), 1, 1, C.gold);
+  ctx.globalAlpha = 1;
+  drawHand(tx, ty, ph > 0.15 && ph < 0.85, 0.85);
+  cueWord("DRAG", tx + 11, ty + 5);
 }
 
 // rings around both creatures of a thread, the thread traced twice as bright

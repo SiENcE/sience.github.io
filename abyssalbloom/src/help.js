@@ -30,6 +30,26 @@ const PAGES = [
     "Now and then a golden *spore* drifts across the water. Catch it before it leaves!",
     "It brings either a *Bloom Frenzy* - x7 light for 20 seconds - or a burst of lumen.",
   ] },
+  { id: "vents", name: "Vents", icon: "i_shrimp", lesson: "vents", art: artVents, late: true, text: [
+    "In the *Midnight Trench*, hot vents break through the floor. Threads inside a vent's plume are *charged*: they count double, like threads in a held current, but for free.",
+    "Warm water draws creatures in. *Ember Shrimp* love it most. Mutations open more vents and widen the plumes.",
+  ] },
+  { id: "anchors", name: "Anchors", icon: "i_sponge", lesson: "anchor", art: artAnchors, late: true, text: [
+    "Some creatures never swim. *Anchored* ones stay where they are and hold *2 extra threads*.",
+    "*Drag* an anchor to a busy stretch of water, where swimmers pass close, and it will weave them all together.",
+  ] },
+  { id: "gulper", name: "Gulper", icon: "i_tripod", lesson: "gulper", art: artGulper, late: true, text: [
+    "On the *Abyssal Plain* a *Gulper* eel slides through now and then, eating every thread its jaws cross. A bitten pair can't link again for a few seconds.",
+    "*Tap it three times* to drive it off. It flees and leaves a *Bloom Frenzy* behind.",
+  ] },
+  { id: "gate", name: "Way Down", icon: "i_pearl", lesson: "gate", art: artGate, late: true, text: [
+    "Deeper zones only open once you have *mastered* the one you are in. The Descend plate shows what the way down asks of you.",
+    "Pearls still gather while you work on it.",
+  ] },
+  { id: "log", name: "Depth Log", icon: "bpearl", lesson: "log", art: artLog, late: true, text: [
+    "*Black pearls* come from mastering zones, trials, secrets, the bestiary and shiny creatures. They are never lost.",
+    "Spend them on the *Abyssal Tree*, wear *relics* you have found, and see which trials are open. Open the log with the black pearl button, or L.",
+  ] },
   { id: "descend", name: "Descend", icon: "i_nautilus", lesson: "descend", art: artDescend, text: [
     "Once you have gathered *1M lumen* in total you can *Descend*: the reef is released and you sink into a deeper zone.",
     "You keep your *pearls*, and every pearl makes all light *+10%* brighter, forever. Each new pearl needs more light than the last.",
@@ -37,6 +57,8 @@ const PAGES = [
 ];
 
 const pageUnlocked = p => learned(p.lesson);
+// the zone pages stay out of the book until their zone has been reached
+const pagesShown = () => PAGES.filter(p => !p.late || pageUnlocked(p) || ui.codex.page === p.id);
 const codexUnread = () => PAGES.some(p => pageUnlocked(p) && !S.read.includes(p.id));
 
 function openCodex(id) {
@@ -68,14 +90,18 @@ function drawCodex() {
 
   const narrow = w < 300;
   let cx, cy, cw;
+  const shown = pagesShown();
   if (!narrow) {
-    PAGES.forEach((p, i) => codexTab(p, x + 4, y + 18 + i * 20, 94, 19, true));
+    const th = Math.min(20, Math.floor((h - 52) / shown.length));
+    shown.forEach((p, i) => codexTab(p, x + 4, y + 18 + i * th, 94, th - 1, true));
     hintsToggle(x + 4, y + h - 17, 94);
+    realtimeToggle(x + 4, y + h - 31, 94);
     cx = x + 103; cy = y + 18; cw = w - 108;
   } else {
-    const tw = Math.min(22, Math.floor((w - 8) / PAGES.length));
-    PAGES.forEach((p, i) => codexTab(p, x + 4 + i * tw, y + 18, tw - 1, 20, false));
+    const tw = Math.min(22, Math.floor((w - 8) / shown.length));
+    shown.forEach((p, i) => codexTab(p, x + 4 + i * tw, y + 18, tw - 1, 20, false));
     hintsToggle(x + 5, y + h - 17, 80);
+    realtimeToggle(x + 88, y + h - 17, 90);
     cx = x + 5; cy = y + 41; cw = w - 10;
   }
 
@@ -105,8 +131,16 @@ function codexTab(p, x, y, w, h, wide) {
   buttonBox(x, y, w, h, { hover: hv, pressed: on || pressed(id, hv) });
   const d = on ? 1 : 0;
   spriteC(p.icon, x + (wide ? 10 : w / 2) + d, y + h / 2 + d);
-  if (wide) text(p.name.toUpperCase(), x + 21 + d, y + 6 + d, { font: "caps", colour: on ? C.cyan : C.dim });
+  if (wide) text(p.name.toUpperCase(), x + 21 + d, y + Math.round(h / 2) - 4 + d, { font: "caps", colour: on ? C.cyan : C.dim });
   if (pageUnlocked(p) && !S.read.includes(p.id)) rect(x + w - 5, y + 3, 2, 2, C.gold);
+}
+
+function realtimeToggle(x, y, w) {
+  const hv = hotspot(x, y, w, 13, "cx:realtime", () => { S.realtime = !S.realtime; save(); },
+    { tip: ["REAL-TIME EVENTS", "When on, the night tide comes on your local clock, after midnight. When off, it comes every two hours of play."] });
+  buttonBox(x, y, w, 13, { hover: hv, pressed: pressed("cx:realtime", hv) });
+  text("CLOCK", x + 5, y + 3, { font: "caps", colour: C.dim });
+  text(S.realtime ? "ON" : "OFF", x + w - 5, y + 3, { font: "caps", colour: S.realtime ? C.cyan : C.faint, align: "right" });
 }
 
 function hintsToggle(x, y, w) {
@@ -237,10 +271,89 @@ function artDescend(b) {
     rect(b.x, Math.round(b.y + i * bh), b.w, Math.ceil(bh), c);
     ctx.fillStyle = ditherPattern(6, bands[Math.min(i + 1, bands.length - 1)]);
     ctx.fillRect(b.x, Math.round(b.y + (i + 1) * bh) - 4, b.w, 4);
-    text(ZONES[i].toUpperCase(), b.x + b.w - 4, Math.round(b.y + i * bh) + 4, { colour: C.dim, align: "right", shadow: false });
+    text(ZONE_DEFS[i].name.toUpperCase(), b.x + b.w - 4, Math.round(b.y + i * bh) + 4, { colour: C.dim, align: "right", shadow: false });
   });
   const t = (now * 0.3) % 1, px = b.x + 30, py = b.y + 4 + t * (b.h - 12);
   artGlow("#c3a0ff", px, py + 6, 12, 0.5);
   ctx.globalCompositeOperation = "source-over";
   sprite("pearl", px - 6, py);
+}
+
+function artVents(b) {
+  const vx = b.x + b.w / 2, fy = b.y + b.h - 4, py = fy - 26;
+  rect(b.x, fy, b.w, 2, "#1b2740");
+  artGlow("#ff7a3a", vx, fy - 3, 12, 0.6);
+  for (let i = 0; i < 10; i++) {
+    const t = (now * 0.5 + i / 10) % 1;
+    rect(Math.round(vx + Math.sin(i * 7 + t * 6) * 4), Math.round(fy - 2 - t * 44), 1, 1, EMBER[Math.min(3, Math.floor(t * 4))]);
+  }
+  ctx.globalAlpha = 0.5; ring(vx, py, 22, "#ff9a52", 4, Math.floor(now * 3)); ctx.globalAlpha = 1;
+  // a thread inside the plume burns orange; one outside stays cool
+  const ax = vx - 14, bx = vx + 14, ay = py + Math.round(Math.sin(now * 2) * 2);
+  curve(ax, ay, vx, ay - 6, bx, ay, "#ff7a3a", "#ffb347");
+  const ox = b.x + 22, oy = b.y + 18;
+  curve(ox, oy, ox + 18, oy - 6, ox + 36, oy, SP.jelly.glow, SP.seahorse.glow);
+  ctx.globalCompositeOperation = "source-over";
+  spriteC("shrimp", ax, ay); spriteC("jelly0", bx, ay);
+  spriteC("jelly1", ox, oy); spriteC("seahorse", ox + 36, oy);
+  text("x2", vx + 26, py - 20, { font: "caps", colour: C.gold });
+}
+
+function artAnchors(b) {
+  const ph = (now % 3) / 3, k = Math.max(0, Math.min(1, (ph - 0.15) / 0.5));
+  const sx = lerp(b.x + 24, b.x + b.w / 2, k), sy = lerp(b.y + b.h - 14, b.y + b.h / 2 + 4, k);
+  // swimmers pass by; once the anchor sits among them, they all link to it
+  const swim = [0, 1, 2].map(i => {
+    const a = now * 0.8 + i * 2.1;
+    return [b.x + b.w / 2 + Math.cos(a) * 34, b.y + b.h / 2 + Math.sin(a) * 16, ["jelly0", "seahorse", "shrimp"][i]];
+  });
+  if (k >= 1) for (const [x, y] of swim) curve(sx, sy, (sx + x) / 2, (sy + y) / 2 - 4, x, y, SP.sponge.glow, "#ffffff");
+  artGlow(SP.sponge.glow, sx, sy, 12, 0.4);
+  ctx.globalCompositeOperation = "source-over";
+  for (const [x, y, spr] of swim) spriteC(spr, x, y);
+  spriteC("sponge", sx, sy);
+  if (ph < 0.7) drawHand(sx + 2, sy + 2, ph > 0.1, 0.9);
+}
+
+function artGulper(b) {
+  const t = (now * 0.2) % 1, gx = b.x - 40 + t * (b.w + 80), gy = b.y + b.h / 2 + Math.sin(now) * 5;
+  const cutX = b.x + b.w / 2;
+  // a thread across its path, bitten through once the jaws pass
+  if (gx + 22 < cutX) curve(cutX - 20, b.y + 10, cutX, b.y + b.h / 2, cutX + 20, b.y + b.h - 10, SP.jelly.glow, SP.angler.glow);
+  else {
+    ctx.fillStyle = C.red;
+    for (let i = -2; i <= 2; i++) { ctx.fillRect(cutX + i, b.y + b.h / 2 - 12 + i, 1, 1); ctx.fillRect(cutX + i, b.y + b.h / 2 - 12 - i, 1, 1); }
+  }
+  ctx.globalCompositeOperation = "source-over";
+  spriteC("gulper", gx, gy);
+  const taps = Math.floor(((now * 0.2) % 1) * 6) % 4;
+  for (let i = 0; i < 3; i++) rect(b.x + 6 + i * 5, b.y + 6, 3, 3, i < taps ? C.gold : C.winHi);
+}
+
+function artGate(b) {
+  const w = Math.min(130, b.w - 20), x = b.x + (b.w - w) / 2, y = b.y + b.h / 2 - 12;
+  const k = (now * 0.25) % 1.3, open = k >= 1;
+  if (open) buttonBox(x, y, w, 24, { accent: C.violet });
+  else bevel(x, y, w, 24, C.winLo, C.win, C.winLo);
+  sprite("pearl", x + 5, y + 6);
+  text("DESCEND", x + 22, y + 4, { font: "caps", colour: open ? C.violet : C.faint });
+  if (!open) {
+    rect(x + 22, y + 16, w - 26, 1, C.winHi);
+    rect(x + 22, y + 16, Math.round((w - 26) * k), 1, C.gold);
+  } else text("the way is open", x + 22, y + 13, { colour: C.text });
+}
+
+function artLog(b) {
+  // a little tree: three branches of nodes, lighting up one by one
+  const grown = Math.floor(now * 1.5) % 9;
+  TREE.forEach((br, ci) => {
+    const cx = b.x + b.w / 2 + (ci - 1) * 40;
+    for (let i = 0; i < 4; i++) {
+      const y = b.y + 8 + i * 15, on = i * 3 + ci < grown;
+      if (i < 3) rect(cx, y + 12, 1, 3, on ? br.colour : C.winHi);
+      (on ? bevel : slotBox)(cx - 6, y, 12, 12, "#2a2150", br.colour, C.winLo);
+    }
+  });
+  spriteC("bpearl", b.x + 14, b.y + 12);
+  text(String(9 - grown), b.x + 22, b.y + 8, { colour: C.violet });
 }

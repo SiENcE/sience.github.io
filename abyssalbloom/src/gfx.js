@@ -11,7 +11,7 @@ const ATLAS = window.ATLAS;
 const cvs = document.getElementById("screen");
 const ctx = cvs.getContext("2d", { alpha: false });
 let VW = 480, VH = 270, PX = 1; // logical size, device pixels per logical pixel
-const IMG = { atlas: null, bg: null };
+const IMG = { atlas: null, bg: null, bgs: {} };
 
 function loadImage(src) {
   return new Promise(res => {
@@ -76,9 +76,10 @@ function spriteC(name, cx, cy, flip) {
 // silhouettes for locked shop entries, cached per sprite
 const silCache = new Map();
 function silhouette(name, x, y, colour) {
-  const key = name + colour;
+  const key = name + colour, r = ATLAS.sprites[name];
+  if (!r) return;
   if (!silCache.has(key)) {
-    const [w, h] = spriteSize(name), r = ATLAS.sprites[name];
+    const [w, h] = spriteSize(name);
     const c = document.createElement("canvas"); c.width = w; c.height = h;
     const g = c.getContext("2d");
     g.drawImage(IMG.atlas, r[0], r[1], w, h, 0, 0, w, h);
@@ -115,22 +116,67 @@ const lineHeight = (font = "small") => ATLAS.fonts[font].line;
 // share a 5px cap height, so mixed lines line up on one baseline
 const capTop = font => ATLAS.fonts[font].glyphs.H.oy;
 
-function drawGlyphs(str, x, y, font, colour) {
+function drawGlyphs(str, x, y, font, colour, g2 = ctx) {
   const f = ATLAS.fonts[font], src = tintedAtlas(colour);
   y += 1 - capTop(font);
   for (const ch of str) {
     const g = f.glyphs[ch] || f.glyphs["?"];
-    if (g.r) ctx.drawImage(src, g.r[0], g.r[1], g.r[2], g.r[3], x + g.ox, y + g.oy, g.r[2], g.r[3]);
+    if (g.r) g2.drawImage(src, g.r[0], g.r[1], g.r[2], g.r[3], x + g.ox, y + g.oy, g.r[2], g.r[3]);
     x += g.adv;
   }
+}
+
+// how far a font's glyphs reach around the pen position, for the text cache
+const fontBoxes = {};
+function fontBox(font) {
+  if (!fontBoxes[font]) {
+    const f = ATLAS.fonts[font], dy = 1 - capTop(font);
+    let top = 0, bottom = 0, left = 0;
+    for (const g of Object.values(f.glyphs)) {
+      if (!g.r) continue;
+      top = Math.min(top, dy + g.oy); bottom = Math.max(bottom, dy + g.oy + g.r[3]); left = Math.min(left, g.ox);
+    }
+    fontBoxes[font] = { top, bottom, left };
+  }
+  return fontBoxes[font];
+}
+
+// every distinct string is rendered once (with its shadow) and then drawn as
+// one image: the menus redraw every frame, and glyph by glyph was the slow part
+// A string is only cached the second time it is drawn: counters change every
+// frame, and a canvas per frame would cost more than drawing their glyphs.
+const textCache = new Map(), textSeen = new Set();
+function textImage(str, font, colour, shadow, w) {
+  const key = font + colour + (shadow || "") + "\u0001" + str;
+  let c = textCache.get(key);
+  if (!c) {
+    if (!textSeen.has(key)) {
+      if (textSeen.size > 4000) textSeen.clear();
+      textSeen.add(key);
+      return null;
+    }
+    if (textCache.size > 1000) textCache.clear();
+    const b = fontBox(font);
+    c = document.createElement("canvas");
+    c.width = Math.max(1, w - b.left + 2); c.height = Math.max(1, b.bottom - b.top + 2);
+    const g = c.getContext("2d");
+    if (shadow) drawGlyphs(str, 1 - b.left, 1 - b.top, font, shadow, g);
+    drawGlyphs(str, -b.left, -b.top, font, colour, g);
+    c.ox = b.left; c.oy = b.top;
+    textCache.set(key, c);
+  }
+  return c;
 }
 
 // y is the top of the line; a 1px drop shadow keeps text readable over the reef
 function text(str, x, y, { font = "small", colour = C.text, align = "left", shadow = C.ink } = {}) {
   str = String(str);
   const w = textWidth(str, font);
+  if (!str.trim()) return w;
   x = Math.round(align === "center" ? x - w / 2 : align === "right" ? x - w : x);
   y = Math.round(y);
+  const c = textImage(str, font, colour, shadow, w);
+  if (c) { ctx.drawImage(c, x + c.ox, y + c.oy); return w; }
   if (shadow) drawGlyphs(str, x + 1, y + 1, font, shadow);
   drawGlyphs(str, x, y, font, colour);
   return w;
@@ -191,21 +237,20 @@ function glowSprite(colour, r) {
   r = Math.max(2, Math.round(r));
   const key = colour + r;
   if (glowCache.has(key)) return glowCache.get(key);
-  const c = document.createElement("canvas");
-  c.width = c.height = r * 2 + 1;
-  const g = c.getContext("2d");
-  for (let y = 0; y <= r * 2; y++) {
-    for (let x = 0; x <= r * 2; x++) {
+  const c = document.createElement("canvas"), n = r * 2 + 1;
+  c.width = c.height = n;
+  const g = c.getContext("2d"), img = g.createImageData(n, n), u = new Uint32Array(img.data.buffer);
+  // written as pixels: a big halo is tens of thousands of dots
+  const tint = rgbWord(colour, 1), white = rgbWord("#ffffff", 0.5);
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
       const d = Math.hypot(x - r, y - r) / r;
       if (d >= 1) continue;
       const t = Math.pow(1 - d, 1.4) * 16;
-      if (t > BAYER[(y & 3) * 4 + (x & 3)] + 0.5) {
-        g.fillStyle = t > 9 ? "#ffffff" : colour;
-        g.globalAlpha = t > 9 ? 0.5 : 1;
-        g.fillRect(x, y, 1, 1);
-      }
+      if (t > BAYER[(y & 3) * 4 + (x & 3)] + 0.5) u[y * n + x] = t > 9 ? white : tint;
     }
   }
+  g.putImageData(img, 0, 0);
   glowCache.set(key, c);
   return c;
 }
@@ -235,17 +280,58 @@ function plot(x, y) { ctx.fillRect(Math.round(x), Math.round(y), 1, 1); }
 
 // quadratic curve plotted one pixel at a time; colour switches half way
 function curve(ax, ay, mx, my, bx, by, ca, cb) {
-  const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) * 1.2));
+  const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) * 1.2)), half = n >> 1;
   let lx = NaN, ly = NaN;
+  ctx.fillStyle = ca;
   for (let i = 0; i <= n; i++) {
+    if (i === half + 1) ctx.fillStyle = cb;
     const t = i / n, u = 1 - t;
     const x = Math.round(u * u * ax + 2 * u * t * mx + t * t * bx);
     const y = Math.round(u * u * ay + 2 * u * t * my + t * t * by);
     if (x === lx && y === ly) continue;
     lx = x; ly = y;
-    ctx.fillStyle = t < 0.5 ? ca : cb;
     ctx.fillRect(x, y, 1, 1);
   }
+}
+
+// a screen-sized pixel layer for things plotted by the thousand (the threads):
+// writing words into an ImageData and drawing it once is far cheaper than a
+// fillRect per pixel. Colours are "#rrggbb", alpha 0..1.
+const plotLayer = { cv: null, g: null, img: null, u32: null, w: 0, h: 0 };
+const rgbCache = new Map();
+function rgbWord(colour, a) {
+  let n = rgbCache.get(colour);
+  if (n === undefined) { const v = parseInt(colour.slice(1), 16); n = ((v & 0xff) << 16) | (v & 0xff00) | (v >> 16); rgbCache.set(colour, n); }
+  return ((Math.max(0, Math.min(255, Math.round(a * 255))) << 24) | n) >>> 0;
+}
+function plotBegin() {
+  const L = plotLayer;
+  if (L.w !== VW || L.h !== VH || !L.cv) {
+    L.w = VW; L.h = VH;
+    L.cv = document.createElement("canvas"); L.cv.width = VW; L.cv.height = VH;
+    L.g = L.cv.getContext("2d"); L.img = L.g.createImageData(VW, VH); L.u32 = new Uint32Array(L.img.data.buffer);
+  }
+  L.u32.fill(0);
+}
+function plotRect(x, y, w, h, word) {
+  const L = plotLayer;
+  for (let j = Math.max(0, y); j < Math.min(L.h, y + h); j++) {
+    for (let i = Math.max(0, x); i < Math.min(L.w, x + w); i++) L.u32[j * L.w + i] = word;
+  }
+}
+// the same quadratic as curve(), into the plot layer
+function plotCurve(ax, ay, mx, my, bx, by, wa, wb) {
+  const L = plotLayer, u32 = L.u32, W = L.w, H = L.h;
+  const n = Math.max(2, Math.ceil(Math.hypot(bx - ax, by - ay) * 1.2)), half = n >> 1;
+  for (let i = 0; i <= n; i++) {
+    const t = i / n, u = 1 - t;
+    const x = Math.round(u * u * ax + 2 * u * t * mx + t * t * bx), y = Math.round(u * u * ay + 2 * u * t * my + t * t * by);
+    if (x >= 0 && y >= 0 && x < W && y < H) u32[y * W + x] = i <= half ? wa : wb;
+  }
+}
+function plotEnd() {
+  plotLayer.g.putImageData(plotLayer.img, 0, 0);
+  ctx.drawImage(plotLayer.cv, 0, 0);
 }
 
 // dotted circle (midpoint-style sampling), `gap` skips every nth point
