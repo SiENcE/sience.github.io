@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Footfall</title>
+<link rel="icon" href="assets/favicon.png">
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #4a9fc0; }
+  /* two low-res canvases (the island, and the menus over it), each scaled up by a whole number with no smoothing */
+  #screen, #ui {
+    position: fixed;
+    image-rendering: pixelated;
+    image-rendering: crisp-edges;
+    touch-action: none;
+  }
+</style>
+</head>
+<body>
+<canvas id="screen" aria-hidden="true"></canvas>
+<canvas id="ui" aria-label="Footfall — a turn-based village builder where villagers wear their own roads"></canvas>
+<script src="assets/atlas.js"></script>
+<script src="src/data.js"></script>
+<script src="src/rules.js"></script>
+<script src="src/state.js"></script>
+<script src="src/weather.js"></script>
+<script src="src/voyage.js"></script>
+<script src="src/save.js"></script>
+<script src="src/gfx.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/sim.js"></script>
+<script src="src/events.js"></script>
+<script src="src/shapes.js"></script>
+<script src="src/world.js"></script>
+<script src="src/day.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/tutorial.js"></script>
+<script src="src/help.js"></script>
+<script src="src/cards.js"></script>
+<script src="src/stats.js"></script>
+<script src="src/setup.js"></script>
+<script src="src/chart.js"></script>
+<script src="src/bot.js"></script>
+<script src="src/dev.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
