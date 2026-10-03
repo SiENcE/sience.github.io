@@ -1,0 +1,319 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#f8f7f0" />
+    <meta
+      name="description"
+      content="Wörterwiese: kurze Lernspiele für Buchstaben, Laute und Reihenfolgen. Mit Momo, dem Hasen, zum Versorgen. Ohne Werbung, ohne Anmeldung."
+    />
+    <title>Wörterwiese · Lernen mit Momo</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="garden.css" />
+    <script src="core.js" defer></script>
+    <script src="garden.js" defer></script>
+    <script src="report.js" defer></script>
+    <script src="app.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Zum Inhalt</a>
+    <header class="site-header">
+      <a class="brand" href="#" aria-label="Wörterwiese, zur Startseite"
+        ><span class="brand-icon" aria-hidden="true">🌱</span
+        ><span>Wörter<span class="brand-green">wiese</span></span></a
+      >
+      <nav class="main-nav" aria-label="Hauptnavigation">
+        <button class="nav-button active" data-view="home" aria-current="page">
+          <span aria-hidden="true">🎲</span> Spielen
+        </button>
+        <button class="nav-button" data-view="garden">
+          <span aria-hidden="true">🌷</span> Garten
+          <span class="nav-alert" id="garden-alert" hidden>!</span>
+        </button>
+      </nav>
+      <span class="star-counter" title="Deine Sterne"
+        ><span aria-hidden="true">⭐</span> <span id="total-stars">0</span
+        ><span class="sr-only"> Sterne</span></span
+      >
+    </header>
+
+    <main id="main" tabindex="-1">
+      <section id="home-view" class="view" aria-labelledby="home-title">
+        <div class="home-hero">
+          <div class="home-momo" id="home-momo" aria-hidden="true"></div>
+          <div class="home-copy">
+            <h1 id="home-title" class="sr-only">Wörterwiese</h1>
+            <p class="momo-says" id="home-momo-says">Hallo! Ich bin Momo.</p>
+            <div class="needs" id="home-needs"></div>
+            <div class="home-actions">
+              <button id="start-button" class="button primary big">
+                <span aria-hidden="true">▶</span> Spielen
+              </button>
+              <button class="button secondary" data-view="garden">
+                <span aria-hidden="true">🌱</span> Zu Momo
+              </button>
+            </div>
+          </div>
+        </div>
+        <h2 class="grid-title">Oder such dir ein Spiel aus:</h2>
+        <div class="activity-grid" id="activity-grid"></div>
+      </section>
+
+      <section id="game-view" class="view" hidden aria-labelledby="game-title">
+        <div class="game-top">
+          <button
+            id="leave-game"
+            class="icon-button"
+            aria-label="Spiel beenden, zurück zur Startseite"
+          >
+            ✕
+          </button>
+          <div
+            id="game-stars"
+            class="round-stars"
+            role="img"
+            aria-label="0 von 3 Sternen"
+          ></div>
+        </div>
+        <div class="game-card">
+          <div class="game-head">
+            <span id="game-icon" class="game-icon" aria-hidden="true"></span>
+            <h1 id="game-title" tabindex="-1"></h1>
+            <span id="game-level" class="level-chip"></span>
+          </div>
+          <div class="instruction-row">
+            <p id="game-instruction" class="game-instruction"></p>
+            <button
+              id="listen-button"
+              class="listen-button"
+              aria-label="Noch einmal anhören"
+              title="Noch einmal anhören"
+            >
+              🔊
+            </button>
+          </div>
+          <p id="speech-notice" class="speech-notice" role="status" hidden></p>
+          <details class="adult-cue" id="adult-cue" hidden>
+            <summary>Für Erwachsene: Vorlesetext</summary>
+            <div class="cue-text" id="cue-text"></div>
+          </details>
+          <div id="task-area" class="task-area"></div>
+          <div class="momo-feedback">
+            <span class="mini-momo" id="game-momo" aria-hidden="true"></span>
+            <p
+              id="feedback"
+              class="feedback"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            ></p>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="result-view"
+        class="view"
+        hidden
+        aria-labelledby="result-title"
+      >
+        <div class="result-card">
+          <div class="result-momo" id="result-momo" aria-hidden="true"></div>
+          <h1 id="result-title" tabindex="-1">Geschafft!</h1>
+          <div id="result-stars" class="result-stars" aria-hidden="true"></div>
+          <p id="result-description"></p>
+          <div id="unlocked-rewards"></div>
+          <div class="result-actions">
+            <button class="button primary" data-view="garden">
+              <span aria-hidden="true">🌱</span> Zu Momo
+            </button>
+            <button class="button secondary" id="play-again">
+              <span aria-hidden="true">↻</span> Noch eine Runde
+            </button>
+            <button class="button secondary" data-view="home">
+              <span aria-hidden="true">🎲</span> Anderes Spiel
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section
+        id="garden-view"
+        class="view"
+        hidden
+        aria-labelledby="garden-title"
+      >
+        <h1 id="garden-title" class="garden-title" tabindex="-1">
+          Momos Garten
+        </h1>
+        <div id="garden-root"></div>
+      </section>
+
+      <section
+        id="report-view"
+        class="view"
+        hidden
+        aria-labelledby="report-title"
+      >
+        <div class="report-top">
+          <button class="text-button" data-view="home">← Zur Startseite</button>
+          <button class="button secondary small" id="print-report">
+            <span aria-hidden="true">🖨️</span> Drucken
+          </button>
+        </div>
+        <h1 id="report-title" tabindex="-1">Lernstand</h1>
+        <div id="report-root"></div>
+      </section>
+
+      <div class="pause-banner" id="pause-banner" hidden role="status">
+        <span aria-hidden="true">🍵</span>
+        <p>Du hast schon toll geübt! Zeit für eine kleine Pause?</p>
+        <button class="button secondary small" id="take-break">
+          Pause machen</button
+        ><button
+          class="icon-button"
+          id="dismiss-break"
+          aria-label="Pausenhinweis schließen"
+        >
+          ×
+        </button>
+      </div>
+    </main>
+    <footer>
+      <button id="parents-button" class="text-button">
+        Für Erwachsene
+      </button>
+    </footer>
+    <div id="storage-warning" class="storage-warning" hidden role="status">
+      Dieser Browser kann gerade nicht speichern. Du kannst trotzdem spielen;
+      der Fortschritt bleibt nur bis zum Schließen dieser Seite.
+    </div>
+
+    <dialog id="settings-dialog" aria-labelledby="settings-title">
+      <div class="dialog-header">
+        <h2 id="settings-title">Für Erwachsene</h2>
+        <button
+          class="icon-button"
+          id="close-settings"
+          aria-label="Einstellungen schließen"
+        >
+          ×
+        </button>
+      </div>
+      <p class="dialog-intro">
+        Die Schwierigkeit passt sich automatisch an: Gelingt eine Aufgabe
+        sofort, wird die nächste etwas kniffliger. Nach einem Fehler folgt eine
+        ähnliche Aufgabe auf derselben Stufe, nach zwei wird es wieder leichter.
+      </p>
+      <div class="settings-section">
+        <h3>Lernstand</h3>
+        <p class="field-note">
+          Fortschritt, Stärken und was sich zu üben lohnt – laufend aus allen
+          gespielten Aufgaben berechnet.
+        </p>
+        <button id="open-report" class="button primary small">
+          <span aria-hidden="true">📊</span> Lernstand ansehen
+        </button>
+      </div>
+      <div class="settings-section">
+        <h3>Stufen</h3>
+        <p class="field-note">
+          Nur ändern, wenn die automatische Stufe gar nicht passt.
+        </p>
+        <div id="level-settings" class="level-settings"></div>
+      </div>
+      <div class="settings-section">
+        <h3>Vorlesen</h3>
+        <label for="voice-select">Deutsche Stimme</label
+        ><select id="voice-select">
+          <option value="">Automatisch auswählen</option>
+        </select>
+        <p
+          class="field-note"
+          id="voice-status"
+          role="status"
+          aria-live="polite"
+        ></p>
+        <div class="settings-row">
+          <label for="speech-rate">Tempo</label
+          ><select id="speech-rate">
+            <option value="0.65">Sehr langsam</option>
+            <option value="0.8">Ruhig</option>
+            <option value="0.95">Normal</option>
+          </select>
+        </div>
+        <button id="test-voice" class="button secondary small">
+          🔊 Stimme ausprobieren</button
+        ><label class="check-row"
+          ><input type="checkbox" id="auto-speak" /> Aufgaben automatisch
+          vorlesen</label
+        ><label class="check-row"
+          ><input type="checkbox" id="lowercase" /> Kleine Buchstaben anzeigen
+          (a statt A)</label
+        >
+      </div>
+      <div class="settings-section">
+        <h3>Laute anhören</h3>
+        <p class="field-note">
+          Die Spiele sprechen Laute („mmm“), keine Buchstabennamen („Emm“). Die
+          Aufnahmen stammen aus dem freien KDE-Lernprogramm KLettres (GPL);
+          eigene Aufnahmen können sie ersetzen (siehe README). C, Q, V, X und Y
+          werden nicht als Laut abgefragt.
+        </p>
+        <div class="laute-grid" id="laute-grid"></div>
+        <p class="field-note" id="laut-info" role="status" aria-live="polite"></p>
+      </div>
+      <div class="settings-section">
+        <h3>Gut zu wissen</h3>
+        <ul class="parent-tips">
+          <li>
+            Eine Runde hat 3 Sterne. Einen Stern gibt es nur, wenn die Aufgabe
+            beim ersten Versuch klappt. Nach einem Fehler hilft Momo Schritt
+            für Schritt; danach folgt eine ähnliche Aufgabe.
+          </li>
+          <li>
+            Mit Sternen kauft das Kind im Garten Samen, gießt und erntet und
+            füttert damit Momo. Momo wird langsam hungrig, aber nie krank. Es
+            gibt keine Strafen und keine täglichen Pflichten.
+          </li>
+          <li>
+            Die Spiele mit 👥 spielt ihr gemeinsam: Ihr entscheidet, ob das
+            Nachsprechen oder Nachmachen geklappt hat. Die App hört nicht mit.
+          </li>
+          <li>
+            5–10 Minuten am Stück reichen. Nach etwa 5 Minuten schlägt Momo eine
+            Pause vor. Das Spiel stellt keine Diagnose.
+          </li>
+        </ul>
+      </div>
+      <div class="settings-section">
+        <h3>Privat & ohne Anmeldung</h3>
+        <p>
+          Alles wird nur in diesem Browser gespeichert, auch der Lernstand.
+          Keine Werbung, keine Analyse-Dienste, kein Mikrofon. Je nach gewählter Stimme kann die
+          Sprachausgabe des Geräts einen Online-Dienst nutzen.
+        </p>
+        <button id="reset-progress" class="text-button danger">
+          Fortschritt zurücksetzen …
+        </button>
+        <div id="reset-confirm" class="reset-confirm" hidden>
+          <p>
+            Wirklich alle Sterne, Stufen, Beete, Momos Futter und den
+            Lernstand auf diesem Gerät löschen?
+          </p>
+          <button id="confirm-reset" class="button danger-button small">
+            Ja, alles löschen</button
+          ><button id="cancel-reset" class="button secondary small">
+            Behalten
+          </button>
+        </div>
+      </div>
+    </dialog>
+    <noscript
+      ><p class="storage-warning">
+        Bitte aktiviere JavaScript, damit die Lernspiele funktionieren.
+      </p></noscript
+    >
+  </body>
+</html>

@@ -1,0 +1,409 @@
+/* Momo's garden: scene, needs, food and beds. */
+.garden-title {
+  font-size: 1.8rem;
+  margin: 4px 0 14px;
+}
+.garden-scene {
+  position: relative;
+  height: 340px;
+  border-radius: 30px;
+  overflow: hidden;
+  isolation: isolate;
+  background: linear-gradient(#b4dde2, #eef3cf);
+  border: 1px solid #d5dfc6;
+  touch-action: manipulation;
+}
+.garden-sky {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.garden-sun {
+  position: absolute;
+  right: 9%;
+  top: 12%;
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  background: #ffdd87;
+  box-shadow:
+    0 0 0 11px #ffdf8426,
+    0 0 65px #ffe59ca6;
+}
+.living-cloud {
+  position: absolute;
+  color: #fffdf2;
+  line-height: 1;
+  opacity: 0.85;
+  font-size: 110px;
+  animation: cloud-drift 26s ease-in-out infinite alternate;
+}
+.cloud-a {
+  left: 6%;
+  top: -2%;
+}
+.cloud-b {
+  left: 52%;
+  top: 4%;
+  font-size: 80px;
+  animation-duration: 33s;
+}
+.garden-ridge {
+  position: absolute;
+  left: -15%;
+  bottom: -10%;
+  width: 100%;
+  height: 62%;
+  background: #a9c591;
+  border-radius: 50% 65% 0 0;
+  transform: rotate(-6deg);
+}
+.garden-meadow {
+  position: absolute;
+  left: -4%;
+  bottom: -24%;
+  width: 114%;
+  height: 72%;
+  background: #92b77c;
+  border-radius: 60% 46% 0 0;
+  transform: rotate(5deg);
+  box-shadow: inset 0 20px 55px #c8dbaa55;
+}
+.pet-bubble {
+  position: absolute;
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  z-index: 6;
+  max-width: min(460px, 86%);
+  background: #fffef7;
+  border-radius: 20px;
+  padding: 12px 18px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  text-align: center;
+  box-shadow: 0 6px 20px #3d532e1c;
+}
+.garden-decor {
+  position: absolute;
+  z-index: 3;
+  font-size: 2.8rem;
+  transform: translate(-50%, -50%);
+  padding: 0;
+  line-height: 1;
+}
+.garden-decor span {
+  display: block;
+  animation: plant-sway 6s ease-in-out infinite alternate;
+  transform-origin: 50% 90%;
+}
+.living-momo {
+  --facing: 1;
+  position: absolute;
+  z-index: 5;
+  width: 100px;
+  height: 128px;
+  padding: 0;
+  transform: translate(-50%, -88%);
+  border-radius: 40%;
+  transition:
+    left 0.1s linear,
+    top 0.1s linear;
+}
+.living-momo .momo-body {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: block;
+  transform-origin: 50% 94%;
+  transform: scaleX(var(--facing));
+  filter: drop-shadow(0 3px 1px #52723c19);
+}
+.momo-shadow {
+  position: absolute;
+  width: 68%;
+  height: 9%;
+  left: 16%;
+  bottom: 0;
+  border-radius: 50%;
+  background: #42653c26;
+}
+.living-momo.hopping .momo-body {
+  animation: momo-hop 0.38s ease-in-out infinite;
+}
+.living-momo.eating .momo-body {
+  animation: momo-chomp 0.25s ease-in-out 5;
+}
+#garden-effects {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  overflow: hidden;
+}
+.garden-particle {
+  position: absolute;
+  font-size: 30px;
+  transform: translate(-50%, -50%);
+  animation: garden-delight 1.7s ease-out forwards;
+}
+
+.pet-panel {
+  display: grid;
+  grid-template-columns: minmax(240px, 1fr) 1.4fr;
+  gap: 20px;
+  align-items: center;
+  margin: 16px 0 6px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  padding: 16px 20px;
+}
+.food-row h2,
+.beds-title {
+  font-size: 1.2rem;
+  margin-bottom: 8px;
+}
+.food-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.food-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 60px;
+  padding: 8px 16px;
+  border-radius: 18px;
+  background: #fff3df;
+  border: 2px solid #f1d9b0;
+  box-shadow: 0 3px 0 #f1d9b0;
+  font-size: 1.9rem;
+}
+.food-button b {
+  font-size: 1.1rem;
+}
+.food-button:hover {
+  transform: translateY(-2px);
+}
+.food-empty {
+  color: var(--muted);
+  font-size: 1rem;
+}
+.garden-status {
+  margin: 10px 0 18px;
+  text-align: center;
+}
+.garden-status p {
+  display: inline-block;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #4f6a43;
+  background: #edf3e4;
+  border-radius: 16px;
+  padding: 10px 18px;
+}
+.beds {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 14px;
+}
+.bed {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  min-height: 150px;
+  padding: 12px 10px 14px;
+  border-radius: 24px;
+  background: linear-gradient(#fffdf5 0 38%, #b98f69 38% 100%);
+  border: 2px solid #d9c7a7;
+  box-shadow: 0 4px 0 #cbb48c;
+  transition: transform 0.15s;
+}
+.bed:hover:not(:disabled) {
+  transform: translateY(-3px);
+}
+.bed-plant {
+  font-size: 3.2rem;
+  line-height: 1;
+  filter: drop-shadow(0 3px 1px #4a3a2433);
+}
+.bed-label {
+  font-weight: 800;
+  font-size: 1rem;
+  color: #fffaf0;
+  text-shadow: 0 1px 0 #6d4f32;
+}
+.bed-progress {
+  width: 80%;
+  height: 8px;
+  border-radius: 99px;
+  background: #ffffff55;
+  overflow: hidden;
+}
+.bed-progress span {
+  display: block;
+  height: 100%;
+  background: #b7e08b;
+  transition: width 0.9s linear;
+}
+.bed[data-state="empty"] .bed-progress,
+.bed[data-state="locked"] .bed-progress {
+  visibility: hidden;
+}
+.bed[data-state="empty"] .bed-plant {
+  font-size: 2rem;
+  opacity: 0.8;
+}
+.bed[data-state="dry"] {
+  border-color: #8cc0e0;
+  box-shadow: 0 4px 0 #8cc0e0;
+}
+.bed[data-state="dry"] .bed-label,
+.bed[data-state="ripe"] .bed-label {
+  animation: bob 0.7s ease-in-out infinite alternate;
+}
+.bed[data-state="ripe"] {
+  border-color: var(--gold);
+  box-shadow: 0 4px 0 var(--gold);
+}
+.bed[data-state="ripe"] .bed-plant {
+  font-size: 3.8rem;
+  animation: plant-sway 1.4s ease-in-out infinite alternate;
+}
+.bed[data-state="locked"] {
+  background: #eeeee6;
+  border-color: #dedfd3;
+  box-shadow: none;
+  cursor: default;
+}
+.bed[data-state="locked"] .bed-label {
+  color: var(--muted);
+  text-shadow: none;
+}
+.bed.selected {
+  outline: 4px solid #8db07a;
+  outline-offset: 3px;
+}
+.bed.pop {
+  animation: star-pop 0.5s ease;
+}
+.seed-picker {
+  margin-top: 16px;
+  background: var(--card);
+  border: 2px solid #d4e2c3;
+  border-radius: 24px;
+  padding: 14px 18px 18px;
+  animation: appear 0.25s ease;
+}
+.seed-picker-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 1.15rem;
+  margin-bottom: 10px;
+}
+.seed-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.seed-button {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 108px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: #f6f8ee;
+  border: 2px solid #dce3d1;
+  box-shadow: 0 3px 0 #dce3d1;
+  font-weight: 800;
+}
+.seed-button:hover {
+  background: #edf3e2;
+}
+.seed-button[aria-disabled="true"] {
+  opacity: 0.45;
+}
+.seed-icon {
+  font-size: 2.4rem;
+}
+.seed-cost {
+  font-size: 0.95rem;
+  color: #a17a1d;
+}
+.next-unlock {
+  text-align: center;
+  color: var(--muted);
+  font-weight: 700;
+  margin: 22px 0 0;
+}
+
+@keyframes cloud-drift {
+  to {
+    transform: translateX(45px);
+  }
+}
+@keyframes plant-sway {
+  from {
+    transform: rotate(-3deg);
+  }
+  to {
+    transform: rotate(3deg);
+  }
+}
+@keyframes momo-hop {
+  50% {
+    transform: scaleX(var(--facing)) translateY(-11px) rotate(-2deg);
+  }
+}
+@keyframes momo-chomp {
+  50% {
+    transform: scaleX(var(--facing)) scaleY(0.92) translateY(3px);
+  }
+}
+@keyframes garden-delight {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20%) scale(0.6);
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -170%) scale(1.25);
+  }
+}
+@media (max-width: 640px) {
+  .garden-scene {
+    height: 290px;
+    border-radius: 22px;
+  }
+  .pet-bubble {
+    font-size: 1rem;
+    padding: 10px 14px;
+  }
+  .living-momo {
+    width: 80px;
+    height: 104px;
+  }
+  .pet-panel {
+    grid-template-columns: 1fr;
+  }
+  .beds {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .bed {
+    min-height: 130px;
+  }
+  .seed-button {
+    min-width: 92px;
+  }
+}
