@@ -6,13 +6,14 @@
     <meta name="theme-color" content="#f8f7f0" />
     <meta
       name="description"
-      content="Wörterwiese: kurze Lernspiele für Buchstaben, Laute und Reihenfolgen. Mit Momo, dem Hasen, zum Versorgen. Ohne Werbung, ohne Anmeldung."
+      content="Wörterwiese: kurze Lernspiele für Deutsch (Laute, ABC, Merkwörter) und Mathe (Zehner und Einer). Mit Momo, dem Hasen, zum Versorgen. Ohne Werbung, ohne Anmeldung."
     />
     <title>Wörterwiese · Lernen mit Momo</title>
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="garden.css" />
     <script src="core.js" defer></script>
     <script src="garden.js" defer></script>
+    <script src="math.js" defer></script>
     <script src="report.js" defer></script>
     <script src="app.js" defer></script>
   </head>
@@ -56,8 +57,17 @@
             </div>
           </div>
         </div>
-        <h2 class="grid-title">Oder such dir ein Spiel aus:</h2>
-        <div class="activity-grid" id="activity-grid"></div>
+        <h2 class="grid-title">Was möchtest du üben?</h2>
+        <div class="subject-grid" id="subject-grid"></div>
+      </section>
+
+      <section id="menu-view" class="view" hidden aria-labelledby="menu-title">
+        <div class="menu-top">
+          <button class="text-button back-button" id="menu-back"></button>
+          <span class="menu-path" id="menu-path"></span>
+        </div>
+        <h1 id="menu-title" class="menu-title" tabindex="-1"></h1>
+        <div class="activity-grid" id="menu-grid"></div>
       </section>
 
       <section id="game-view" class="view" hidden aria-labelledby="game-title">
@@ -65,7 +75,7 @@
           <button
             id="leave-game"
             class="icon-button"
-            aria-label="Spiel beenden, zurück zur Startseite"
+            aria-label="Spiel beenden, zurück zur Auswahl"
           >
             ✕
           </button>
@@ -131,7 +141,7 @@
             <button class="button secondary" id="play-again">
               <span aria-hidden="true">↻</span> Noch eine Runde
             </button>
-            <button class="button secondary" data-view="home">
+            <button class="button secondary" id="other-game">
               <span aria-hidden="true">🎲</span> Anderes Spiel
             </button>
           </div>
@@ -280,6 +290,10 @@
           <li>
             Die Spiele mit 👥 spielt ihr gemeinsam: Ihr entscheidet, ob das
             Nachsprechen oder Nachmachen geklappt hat. Die App hört nicht mit.
+          </li>
+          <li>
+            In Mathe übt Momo Zehner und Einer im Zahlenraum bis 100: mit
+            Zehnerstangen und Einerwürfeln, im Zahlenhaus und beim Zahlenbauen.
           </li>
           <li>
             5–10 Minuten am Stück reichen. Nach etwa 5 Minuten schlägt Momo eine

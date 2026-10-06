@@ -78,7 +78,112 @@
       color: "peach",
       together: true,
     },
+    { id: "bundle", icon: "👀", title: "Zahlen-Blick", color: "sky" },
+    { id: "place", icon: "🏠", title: "Zahlenhaus", color: "mint" },
+    { id: "build", icon: "🏗️", title: "Zahlen bauen", color: "peach" },
+    { id: "line", icon: "📏", title: "Zahlenstrahl", color: "sky" },
+    { id: "chart", icon: "🟩", title: "Hundertertafel", color: "mint" },
+    { id: "steps", icon: "👣", title: "Weiterzählen", color: "yellow" },
+    { id: "compare", icon: "🐊", title: "Krokodil-Vergleich", color: "mint" },
+    { id: "sort", icon: "🪜", title: "Zahlen ordnen", color: "lavender" },
+    { id: "adjacent", icon: "🏘️", title: "Zahlen-Nachbarn", color: "peach" },
+    { id: "calc", icon: "🔟", title: "Zehner rechnen", color: "rose" },
+    { id: "graph", icon: "📶", title: "Säulen lesen", color: "yellow" },
   ];
+  // Menu: subject → category → game. "report" names the category for adults.
+  const SUBJECTS = [
+    { id: "deutsch", icon: "📖", title: "Deutsch", color: "mint" },
+    { id: "mathe", icon: "🔢", title: "Mathe", color: "sky" },
+  ];
+  const CATEGORIES = [
+    {
+      id: "hearing",
+      subject: "deutsch",
+      icon: "👂",
+      title: "Laute üben",
+      report: "Laute hören",
+      color: "peach",
+      games: ["type", "initial", "blend"],
+    },
+    {
+      id: "abc",
+      subject: "deutsch",
+      icon: "🔤",
+      title: "ABC üben",
+      report: "ABC & Reihenfolge",
+      color: "lavender",
+      games: ["missing", "neighbor", "order"],
+    },
+    {
+      id: "spelling",
+      subject: "deutsch",
+      icon: "🧠",
+      title: "Merkwörter",
+      report: "Merkwörter",
+      color: "yellow",
+      games: ["merk"],
+    },
+    {
+      id: "memory",
+      subject: "deutsch",
+      icon: "👥",
+      title: "Zu zweit",
+      report: "Merken & Nachsprechen",
+      color: "rose",
+      games: ["memory", "echo", "movement"],
+    },
+    {
+      id: "tens",
+      subject: "mathe",
+      icon: "🧮",
+      title: "Zehner und Einer",
+      report: "Zehner & Einer",
+      color: "sky",
+      games: ["bundle", "place", "build"],
+    },
+    {
+      id: "space",
+      subject: "mathe",
+      icon: "🔎",
+      title: "Zahlen finden",
+      report: "Zahlenstrahl & Hundertertafel",
+      color: "mint",
+      games: ["line", "chart", "steps"],
+    },
+    {
+      id: "compare",
+      subject: "mathe",
+      icon: "⚖️",
+      title: "Vergleichen",
+      report: "Vergleichen & Ordnen",
+      color: "lavender",
+      games: ["compare", "sort", "adjacent"],
+    },
+    {
+      id: "calc",
+      subject: "mathe",
+      icon: "➕",
+      title: "Rechnen",
+      report: "Rechnen mit Zehnern",
+      color: "rose",
+      games: ["calc"],
+    },
+    {
+      id: "charts",
+      subject: "mathe",
+      icon: "📊",
+      title: "Diagramme",
+      report: "Diagramme lesen",
+      color: "yellow",
+      games: ["graph"],
+    },
+  ];
+  const MATH_GAMES = CATEGORIES.filter((x) => x.subject === "mathe").flatMap(
+    (x) => x.games,
+  );
+  function categoryOf(mode) {
+    return CATEGORIES.find((category) => category.games.includes(mode)) || null;
+  }
 
   // Every game gets gradually harder. Each first-try success climbs one step.
   const LEVELS = {
@@ -240,6 +345,156 @@
       { length: 3, reverse: true, label: "3 Bewegungen rückwärts" },
       { length: 5, label: "5 Bewegungen" },
       { length: 4, reverse: true, label: "4 Bewegungen rückwärts" },
+    ],
+    // Base-ten blocks (rods of ten, single cubes) → pick the number.
+    bundle: [
+      { min: 11, max: 20, choices: 3, label: "bis 20, 3 Karten" },
+      { min: 20, max: 50, choices: 3, label: "bis 50" },
+      { min: 10, max: 99, choices: 3, label: "bis 99" },
+      { min: 10, max: 99, choices: 4, swap: true, label: "bis 99, mit Zahlendreher" },
+      {
+        min: 10,
+        max: 99,
+        choices: 4,
+        swap: true,
+        mixed: true,
+        label: "Einer manchmal vor den Zehnern",
+      },
+      {
+        min: 10,
+        max: 100,
+        choices: 4,
+        swap: true,
+        mixed: true,
+        round: true,
+        label: "auch volle Zehner und 100",
+      },
+    ],
+    // Place value: digits ↔ tens and ones.
+    place: [
+      { ask: ["tens"], min: 11, max: 50, choices: 3, label: "Zehner finden, bis 50" },
+      { ask: ["ones"], min: 11, max: 50, choices: 3, label: "Einer finden, bis 50" },
+      { ask: ["tens", "ones"], min: 11, max: 99, choices: 4, label: "Zehner oder Einer, bis 99" },
+      { ask: ["compose"], min: 11, max: 99, choices: 3, label: "Zehner und Einer → Zahl" },
+      { ask: ["swapped"], min: 11, max: 99, choices: 4, label: "erst die Einer, dann die Zehner" },
+      {
+        ask: ["tens", "ones", "compose", "swapped"],
+        min: 10,
+        max: 99,
+        choices: 4,
+        label: "alles gemischt",
+      },
+      { ask: ["bundle"], choices: 4, label: "mehr als 9 Einer bündeln" },
+      { ask: ["split"], min: 11, max: 99, choices: 4, label: "zerlegen: 47 = 40 + 7" },
+      {
+        ask: ["tens", "ones", "compose", "swapped", "bundle", "split"],
+        min: 10,
+        max: 99,
+        choices: 4,
+        label: "alles gemischt, auch zerlegen",
+      },
+    ],
+    // Lay a number with rods and cubes in the place-value house.
+    build: [
+      { min: 11, max: 20, label: "bis 20 legen" },
+      { min: 20, max: 50, label: "bis 50 legen" },
+      { min: 10, max: 99, label: "bis 99 legen" },
+      { min: 10, max: 99, hidden: true, label: "Zahl nur hören" },
+      { change: [10, -10], label: "10 mehr oder 10 weniger" },
+      { change: [1, -1], label: "1 mehr oder 1 weniger" },
+      { change: [1, -1, 10, -10], hidden: true, label: "gemischt, Zahl nicht sichtbar" },
+    ],
+    // A balloon on a number line: which number is it?
+    line: [
+      { span: 20, labels: 10, at: "any", choices: 3, label: "0 bis 20" },
+      { span: 100, labels: 50, at: "tens", choices: 3, label: "0 bis 100, volle Zehner" },
+      { span: 100, labels: 10, at: "fives", choices: 3, label: "0 bis 100, Fünfer" },
+      { span: 20, labels: 10, at: "any", choices: 3, label: "Ausschnitt, 20 Zahlen" },
+      { span: 20, labels: 20, at: "any", choices: 4, label: "nur Anfang und Ende beschriftet" },
+      { span: 30, labels: 30, at: "any", choices: 4, label: "30 Zahlen, nur Anfang und Ende" },
+      { span: 50, labels: 10, at: "any", choices: 4, label: "50 Zahlen" },
+    ],
+    // Pieces of the hundred chart: right is 1 more, down is 10 more.
+    chart: [
+      { shape: "row", max: 50, choices: 3, label: "Reihe: 1 mehr, 1 weniger" },
+      { shape: "column", choices: 3, label: "Spalte: 10 mehr, 10 weniger" },
+      { shape: "cross", choices: 3, label: "Kreuz um eine Zahl" },
+      { shape: "window", choices: 4, label: "3×3-Ausschnitt" },
+      { shape: "corner", choices: 4, label: "Ecken: schräg daneben" },
+      { shape: "sparse", choices: 4, label: "nur eine Zahl gegeben" },
+    ],
+    // Counting on and back in steps.
+    steps: [
+      { steps: [1], length: 4, choices: 3, label: "immer 1 weiter" },
+      { steps: [-1], length: 4, choices: 3, label: "immer 1 zurück" },
+      { steps: [10, -10], length: 4, choices: 3, label: "10er-Schritte" },
+      { steps: [2], length: 4, choices: 3, label: "2er-Schritte" },
+      { steps: [5, -5], length: 4, choices: 4, label: "5er-Schritte" },
+      { steps: [1, -1, 2, -2, 10], length: 5, gap: true, choices: 4, label: "Lücke in der Reihe" },
+      { steps: [2, -2, 3, 5, -5, 10, -10], length: 5, gap: true, choices: 4, label: "alles gemischt" },
+    ],
+    // The crocodile always eats the bigger number: <, > (and =).
+    compare: [
+      { kind: "far", choices: 2, label: "ganz verschiedene Zehner" },
+      { kind: "near", choices: 2, label: "Zehner direkt nebeneinander" },
+      { kind: "sameTens", choices: 2, label: "gleiche Zehner" },
+      { kind: "swapped", choices: 2, label: "Zahlendreher: 62 und 26" },
+      { kind: "mixed", equal: true, choices: 3, label: "gemischt, auch =" },
+      { kind: "sum", equal: true, choices: 3, label: "30 + 5 mit einer Zahl vergleichen" },
+    ],
+    // Tap the numbers in order.
+    sort: [
+      { count: 3, far: true, label: "3 Zahlen" },
+      { count: 4, label: "4 Zahlen" },
+      { count: 4, sameTens: true, label: "4 Zahlen, manche mit gleichen Zehnern" },
+      { count: 5, label: "5 Zahlen" },
+      { count: 4, swap: true, label: "mit Zahlendreher (46, 64)" },
+      { count: 4, reverse: true, label: "von der größten zur kleinsten" },
+      { count: 6, swap: true, sameTens: true, label: "6 Zahlen" },
+    ],
+    // Predecessor, successor and the neighbouring tens.
+    adjacent: [
+      { ask: ["after"], max: 50, choices: 3, label: "danach (Nachfolger), bis 50" },
+      { ask: ["before"], max: 50, choices: 3, label: "davor (Vorgänger), bis 50" },
+      { ask: ["after", "before"], cross: true, choices: 3, label: "über den Zehner: 39, 40" },
+      { ask: ["between"], choices: 4, label: "dazwischen" },
+      { ask: ["tenBelow"], choices: 3, label: "Nachbarzehner davor" },
+      { ask: ["tenAbove"], choices: 3, label: "Nachbarzehner danach" },
+      {
+        ask: ["tenBelow", "tenAbove", "after", "before"],
+        cross: true,
+        choices: 4,
+        label: "alles gemischt",
+      },
+    ],
+    // Adding and subtracting tens, and on to the next full ten.
+    calc: [
+      { ops: ["T+T"], choices: 3, label: "Zehner plus Zehner: 50 + 30" },
+      { ops: ["T-T"], choices: 3, label: "Zehner minus Zehner: 70 − 20" },
+      { ops: ["N+T"], choices: 3, label: "Zahl plus Zehner: 52 + 30" },
+      { ops: ["N-T"], choices: 3, label: "Zahl minus Zehner: 76 − 20" },
+      { ops: ["fillUp"], choices: 4, label: "bis zum Nachbarzehner: 32 + _ = 40" },
+      { ops: ["fillDown"], choices: 4, label: "zurück zum Nachbarzehner: 33 − _ = 30" },
+      {
+        ops: ["T+T", "T-T", "N+T", "N-T", "fillUp", "fillDown"],
+        choices: 4,
+        label: "alles gemischt",
+      },
+    ],
+    // Bar charts with one box per child.
+    graph: [
+      { bars: 3, ask: ["value"], choices: 3, label: "3 Säulen ablesen" },
+      { bars: 4, ask: ["value"], choices: 4, label: "4 Säulen ablesen" },
+      { bars: 3, ask: ["most", "least"], choices: 3, label: "am meisten, am wenigsten" },
+      { bars: 4, ask: ["value", "most", "least"], choices: 4, label: "gemischt, 4 Säulen" },
+      { bars: 3, ask: ["diff"], choices: 3, label: "Wie viele mehr?" },
+      { bars: 3, ask: ["sum"], choices: 3, label: "Wie viele zusammen?" },
+      {
+        bars: 4,
+        ask: ["value", "most", "least", "diff", "sum"],
+        choices: 4,
+        label: "alles gemischt",
+      },
     ],
   };
 
@@ -649,15 +904,133 @@
   }
   const capitalize = (text) => text[0].toUpperCase() + text.slice(1);
 
+  /*
+   * Numbers are spoken as German words, so every voice says them the same
+   * way. German says the ones first ("sieben-und-vierzig") but writes the tens
+   * first – the classic source of swapped digits (74 for 47).
+   */
+  const UNIT_WORDS = ["null", "eins", "zwei", "drei", "vier", "fünf", "sechs", "sieben", "acht", "neun"];
+  const TEEN_WORDS = ["zehn", "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn", "siebzehn", "achtzehn", "neunzehn"];
+  const TEN_WORDS = ["", "zehn", "zwanzig", "dreißig", "vierzig", "fünfzig", "sechzig", "siebzig", "achtzig", "neunzig"];
+  function numberWord(n) {
+    if (!Number.isInteger(n) || n < 0 || n > 100) return String(n);
+    if (n === 100) return "hundert";
+    if (n < 10) return UNIT_WORDS[n];
+    if (n < 20) return TEEN_WORDS[n - 10];
+    const ones = n % 10;
+    const tens = TEN_WORDS[Math.floor(n / 10)];
+    return ones ? `${ones === 1 ? "ein" : UNIT_WORDS[ones]}und${tens}` : tens;
+  }
+  // "ein Zehner", "vier Einer"
+  const countWord = (n) => (n === 1 ? "ein" : numberWord(n));
+  const between = (min, max, random) => min + Math.floor(random() * (max - min + 1));
+  const placeOf = (n) => ({ tens: Math.floor(n / 10), ones: n % 10 });
+  function placeExplain(n) {
+    const { tens, ones } = placeOf(n);
+    return {
+      text: `${n} = ${tens} Zehner und ${ones} Einer.`,
+      speech: `${capitalize(numberWord(n))} sind ${countWord(tens)} Zehner und ${countWord(ones)} Einer.`,
+    };
+  }
+  /*
+   * Typical mistakes make the best distractors: swapped digits (74 for 47),
+   * every piece counted as a one (4 + 7 = 11), one ten or one one off.
+   * "forced" distractors are always included.
+   */
+  function numberChoices(n, forced, count, random) {
+    const { tens, ones } = placeOf(n);
+    return numberOptions(
+      n,
+      forced,
+      [n + 1, n - 1, n + 10, n - 10, tens + ones, ones * 10 + tens],
+      count,
+      random,
+    );
+  }
+  /*
+   * Answer, forced typical mistakes, then distractors from the pool (1–100).
+   * Near the ends of the number range the pool can run short; then the
+   * closest free numbers fill up (never one of "exclude", e.g. shown ones).
+   */
+  function numberOptions(answer, forced, pool, count, random, exclude = []) {
+    const free = (x) =>
+      Number.isInteger(x) && x >= 1 && x <= 100 && x !== answer && !exclude.includes(x);
+    const must = [
+      ...new Set(forced.filter((x) => Number.isInteger(x) && x >= 0 && x !== answer)),
+    ].slice(0, count - 1);
+    const rest = shuffle(
+      [...new Set(pool.filter(free))].filter((x) => !must.includes(x)),
+      random,
+    );
+    for (let k = 1; must.length + rest.length < count - 1 && k < 100; k++)
+      for (const x of [answer + k, answer - k])
+        if (free(x) && !must.includes(x) && !rest.includes(x)) rest.push(x);
+    return shuffle([answer, ...must, ...rest.slice(0, count - 1 - must.length)], random).map(
+      String,
+    );
+  }
+  const sign = (n) => (n < 0 ? "−" : "+");
+  const signWord = (n) => (n < 0 ? "minus" : "plus");
+  // "34 + 10 = 44." with the spoken twin.
+  function sumExplain(from, delta, result) {
+    return {
+      text: `${from} ${sign(delta)} ${Math.abs(delta)} = ${result}.`,
+      speech: `${capitalize(numberWord(from))} ${signWord(delta)} ${numberWord(Math.abs(delta))} ist ${numberWord(result)}.`,
+    };
+  }
+  const GRAPH_TOPICS = [
+    {
+      title: "Lieblingsobst",
+      items: [
+        { word: "Apfel", plural: "Äpfel", icon: "🍎" },
+        { word: "Banane", plural: "Bananen", icon: "🍌" },
+        { word: "Erdbeere", plural: "Erdbeeren", icon: "🍓" },
+        { word: "Birne", plural: "Birnen", icon: "🍐" },
+        { word: "Trauben", plural: "Trauben", icon: "🍇" },
+      ],
+    },
+    {
+      title: "Lieblingstiere",
+      items: [
+        { word: "Hund", plural: "Hunde", icon: "🐶" },
+        { word: "Katze", plural: "Katzen", icon: "🐱" },
+        { word: "Hase", plural: "Hasen", icon: "🐰" },
+        { word: "Pferd", plural: "Pferde", icon: "🐴" },
+        { word: "Fisch", plural: "Fische", icon: "🐟" },
+      ],
+    },
+    {
+      title: "Lieblingssport",
+      items: [
+        { word: "Fußball", plural: "Fußball", icon: "⚽" },
+        { word: "Schwimmen", plural: "Schwimmen", icon: "🏊" },
+        { word: "Tanzen", plural: "Tanzen", icon: "💃" },
+        { word: "Judo", plural: "Judo", icon: "🥋" },
+        { word: "Turnen", plural: "Turnen", icon: "🤸" },
+      ],
+    },
+  ];
+  function digitChoices(answer, other, count, random) {
+    // The other digit of the number is the typical mix-up; near digits fill up.
+    const pool = [...Array(10).keys()]
+      .filter((x) => x !== answer && x !== other)
+      .sort((a, b) => Math.abs(a - answer) - Math.abs(b - answer))
+      .slice(0, count);
+    return withChoices([answer, other], pool, count, random).map(String);
+  }
+
   function makeQuestion(mode, level = 0, previous = null, random = Math.random) {
     if (!LEVELS[mode]) throw new Error("Unbekanntes Spiel: " + mode);
     const config = LEVELS[mode][clampLevel(mode, level)];
     for (let attempt = 0; attempt < 8; attempt++) {
       const question = generate(mode, config, previous, random);
+      // Merkwörter share letters, comparisons share symbols: those compare the task.
       const same =
         mode === "merk"
           ? question.word === previous?.word
-          : question.answer === previous?.answer;
+          : mode === "compare"
+            ? question.key === previous?.key
+            : question.answer === previous?.answer;
       if (!previous || !same)
         return { ...question, mode, level: clampLevel(mode, level) };
     }
@@ -944,6 +1317,636 @@
         cue: `Vorlesen: ${moves.map((x) => x.word).join(", ")}`,
       };
     }
+    if (mode === "bundle") {
+      const roundTens = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100].filter(
+        (x) => x >= config.min && x <= config.max,
+      );
+      let number;
+      do
+        number =
+          config.round && random() < 0.3
+            ? pick(roundTens, random)
+            : between(config.min, Math.min(config.max, 99), random);
+      while (String(number) === previous?.answer);
+      const { tens, ones } = placeOf(number);
+      const swap = ones * 10 + tens;
+      return {
+        answer: String(number),
+        number,
+        tens,
+        ones,
+        onesFirst: Boolean(config.mixed) && random() < 0.5,
+        swap: String(swap),
+        choices: numberChoices(number, config.swap ? [swap] : [], config.choices, random),
+        explain:
+          number === 100
+            ? { text: "100 = 10 Zehner.", speech: "Hundert sind zehn Zehner." }
+            : placeExplain(number),
+      };
+    }
+    if (mode === "place") {
+      let question;
+      do {
+        const kind = pick(config.ask, random);
+        let tens;
+        let ones;
+        if (kind === "bundle") {
+          // More than nine ones: ten of them make one more ten (3 Z + 12 E = 42).
+          tens = between(1, 8, random);
+          ones = between(10, 19, random);
+        } else
+          do ({ tens, ones } = placeOf(between(config.min, config.max, random)));
+          while (tens === ones || (["swapped", "split"].includes(kind) && ones === 0));
+        const number = tens * 10 + ones;
+        if (kind === "split") {
+          // 47 = 40 + ? or 47 = ? + 7. Typical slips: 4 for 40, swapped digits.
+          const findTens = random() < 0.5;
+          const answer = findTens ? tens * 10 : ones;
+          question = {
+            kind,
+            tens,
+            ones,
+            number,
+            findTens,
+            answer: String(answer),
+            swap: String(findTens ? ones * 10 : tens),
+            choices: numberOptions(
+              answer,
+              [tens, ones * 10],
+              findTens ? [answer + 10, answer - 10, number] : [ones + 1, ones - 1, 10 - ones],
+              config.choices,
+              random,
+            ),
+            speech: findTens
+              ? `${numberWord(number)} ist wie viel plus ${numberWord(ones)}?`
+              : `${numberWord(number)} ist ${numberWord(tens * 10)} plus wie viel?`,
+            explain: {
+              text: `${number} = ${tens * 10} + ${ones}.`,
+              speech: `${capitalize(numberWord(number))} ist ${numberWord(tens * 10)} plus ${numberWord(ones)}.`,
+            },
+            cue: `Vorlesen: ${number} = ${findTens ? "?" : tens * 10} + ${findTens ? ones : "?"}`,
+          };
+        } else if (kind === "tens" || kind === "ones") {
+          const answer = kind === "tens" ? tens : ones;
+          const other = kind === "tens" ? ones : tens;
+          question = {
+            kind,
+            tens,
+            ones,
+            number,
+            answer: String(answer),
+            swap: String(other),
+            choices: digitChoices(answer, other, config.choices, random),
+            speech: numberWord(number),
+            explain: placeExplain(number),
+            cue: `Zahl: ${number}`,
+          };
+        } else {
+          const swap = kind === "bundle" ? Number(`${tens}${ones}`) : ones * 10 + tens;
+          const parts = [
+            { n: tens, text: `${tens} Zehner`, speech: `${countWord(tens)} Zehner` },
+            { n: ones, text: `${ones} Einer`, speech: `${countWord(ones)} Einer` },
+          ];
+          if (kind === "swapped") parts.reverse();
+          question = {
+            kind,
+            tens,
+            ones,
+            number,
+            answer: String(number),
+            swap: String(swap),
+            choices: numberChoices(
+              number,
+              kind === "bundle" ? [swap, number - 10] : [swap],
+              config.choices,
+              random,
+            ),
+            speech: `${parts[0].speech} und ${parts[1].speech}`,
+            explain:
+              kind === "bundle"
+                ? {
+                    text: `${tens} Zehner und ${ones} Einer sind ${number}. Denn 10 Einer sind 1 Zehner.`,
+                    speech: `${capitalize(countWord(tens))} Zehner und ${numberWord(ones)} Einer sind ${numberWord(number)}. Denn zehn Einer sind ein Zehner.`,
+                  }
+                : placeExplain(number),
+            cue: `Vorlesen: ${parts[0].text} und ${parts[1].text}`,
+          };
+        }
+      } while (question.answer === previous?.answer);
+      return question;
+    }
+    if (mode === "build") {
+      let start = 0;
+      let delta = 0;
+      let number;
+      do {
+        if (config.change) {
+          delta = pick(config.change, random);
+          // ±1 never crosses a ten here, so no rod has to be broken up.
+          const fits = (from) =>
+            from + delta >= 10 &&
+            from + delta <= 99 &&
+            (Math.abs(delta) === 10 || placeOf(from).tens === placeOf(from + delta).tens);
+          do start = between(11, 99, random);
+          while (!fits(start));
+          number = start + delta;
+        } else number = between(config.min, config.max, random);
+      } while (String(number) === previous?.answer);
+      const target = placeOf(number);
+      const amount = Math.abs(delta);
+      return {
+        answer: String(number),
+        number,
+        startNumber: start,
+        start: placeOf(start),
+        target,
+        delta,
+        hidden: Boolean(config.hidden),
+        swap: target.tens !== target.ones ? String(target.ones * 10 + target.tens) : null,
+        speech: delta ? null : numberWord(number),
+        explain: delta
+          ? {
+              text: `${start} ${delta > 0 ? "+" : "−"} ${amount} = ${number}.`,
+              speech: `${capitalize(numberWord(start))} ${delta > 0 ? "plus" : "minus"} ${numberWord(amount)} ist ${numberWord(number)}.`,
+            }
+          : placeExplain(number),
+        cue: delta
+          ? `Es liegt ${start}. Gesucht: ${amount} ${delta > 0 ? "mehr" : "weniger"} – Lösung: ${number}`
+          : `Zahl: ${number}`,
+      };
+    }
+    if (mode === "line") {
+      const span = config.span;
+      const from = span >= 100 ? 0 : 10 * between(0, (100 - span) / 10, random);
+      const to = from + span;
+      const step = { tens: 10, fives: 5 }[config.at] || 1;
+      const labelled = (x) => (x - from) % config.labels === 0;
+      const spots = [];
+      for (let x = from + step; x < to; x += step)
+        if (!labelled(x) && (config.at !== "fives" || x % 10)) spots.push(x);
+      const number = pick(
+        spots.filter((x) => String(x) !== previous?.answer),
+        random,
+      );
+      const labels = [];
+      for (let x = from; x <= to; x += config.labels) labels.push(x);
+      // Help shows every ten and five; the nearest one below is where to count on.
+      const helpLabels = [];
+      for (let x = from; x <= to; x += 5)
+        if (!labels.includes(x) && x !== number) helpLabels.push(x);
+      const base = Math.max(...[...labels, ...helpLabels].filter((x) => x <= number));
+      return {
+        from,
+        to,
+        ticks: span > 50 ? 5 : 1,
+        labels,
+        helpLabels,
+        base,
+        number,
+        answer: String(number),
+        choices: numberOptions(
+          number,
+          [],
+          [number + step, number - step, number + 2 * step, number - 2 * step, number + 10, number - 10, number + 1, number - 1].filter(
+            (x) => x >= from && x <= to && x % step === 0,
+          ),
+          config.choices,
+          random,
+        ),
+        explain: {
+          text: `Der Ballon zeigt ${number}.`,
+          speech: `Der Ballon zeigt ${numberWord(number)}.`,
+        },
+      };
+    }
+    if (mode === "chart") {
+      const shapes = {
+        row: [[0, -1], [0, 0], [0, 1]],
+        column: [[-1, 0], [0, 0], [1, 0]],
+        cross: [[-1, 0], [0, -1], [0, 0], [0, 1], [1, 0]],
+      };
+      const all = [];
+      for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) all.push([dr, dc]);
+      const corners = all.filter(([dr, dc]) => dr && dc);
+      let question;
+      do {
+        const row =
+          config.shape === "row" ? between(0, (config.max || 100) / 10 - 1, random) : between(1, 8, random);
+        const col = config.shape === "column" ? between(0, 9, random) : between(1, 8, random);
+        const value = ([dr, dc]) => (row + dr) * 10 + col + dc + 1;
+        const key = ([dr, dc]) => `${dr},${dc}`;
+        let shown;
+        let gap;
+        if (shapes[config.shape]) {
+          const cells = shapes[config.shape];
+          gap = pick(config.shape === "cross" ? cells.filter(([dr, dc]) => dr || dc) : cells, random);
+          shown = cells.filter((cell) => cell !== gap);
+        } else if (config.shape === "window") {
+          gap = pick(all, random);
+          shown = all.filter((cell) => cell !== gap);
+        } else if (config.shape === "corner") {
+          gap = pick(corners, random);
+          shown = shapes.cross;
+        } else {
+          gap = pick(all.filter(([dr, dc]) => dr || dc), random);
+          shown = [[0, 0]];
+        }
+        const shownKeys = shown.map(key);
+        // A single given number still shows the whole 3×3 window around it.
+        const frame = config.shape === "sparse" ? all : [...shown, gap];
+        const rows = [...new Set(frame.map(([dr]) => dr))].sort((a, b) => a - b);
+        const cols = [...new Set(frame.map(([, dc]) => dc))].sort((a, b) => a - b);
+        // A full rectangle, so empty cells keep the chart's shape.
+        const grid = [];
+        for (let dr = rows[0]; dr <= rows.at(-1); dr++) {
+          const line = [];
+          for (let dc = cols[0]; dc <= cols.at(-1); dc++) {
+            const cell = [dr, dc];
+            line.push({
+              n: value(cell),
+              state:
+                key(cell) === key(gap) ? "gap" : shownKeys.includes(key(cell)) ? "shown" : "empty",
+            });
+          }
+          grid.push(line);
+        }
+        // Explain from the centre if shown, else from the first shown cell.
+        const ref = shownKeys.includes("0,0") ? [0, 0] : shown[0];
+        const answer = value(gap);
+        const [odr, odc] = [gap[0] - ref[0], gap[1] - ref[1]];
+        // Typical slip: rows and columns mixed up (1 instead of 10).
+        const confused = value(ref) + odr + odc * 10;
+        question = {
+          grid,
+          answer: String(answer),
+          number: answer,
+          ref: value(ref),
+          shown: shown.map(value),
+          choices: numberOptions(
+            answer,
+            confused !== answer && confused >= 1 && confused <= 100 ? [confused] : [],
+            [answer + 1, answer - 1, answer + 10, answer - 10, answer + 11, answer - 11, answer + 9, answer - 9],
+            config.choices,
+            random,
+          ),
+          explain: sumExplain(value(ref), answer - value(ref), answer),
+        };
+      } while (question.answer === previous?.answer);
+      return question;
+    }
+    if (mode === "steps") {
+      let question;
+      do {
+        const step = pick(config.steps, random);
+        const span = Math.abs(step) * (config.length - 1);
+        const align = [2, 5].includes(Math.abs(step)) ? Math.abs(step) : 1;
+        const starts = [];
+        for (let x = step > 0 ? 1 : span + 1; x <= (step > 0 ? 100 - span : 100); x++)
+          if (x % align === 0) starts.push(x);
+        const start = pick(starts, random);
+        const sequence = Array.from({ length: config.length }, (_, i) => start + i * step);
+        const gap = config.gap ? between(1, config.length - 2, random) : config.length - 1;
+        const answer = sequence[gap];
+        const words = sequence.map((x, i) =>
+          i === gap ? (gap === config.length - 1 ? "und dann?" : "Lücke") : numberWord(x),
+        );
+        question = {
+          sequence,
+          gap,
+          step,
+          number: answer,
+          answer: String(answer),
+          choices: numberOptions(
+            answer,
+            [],
+            [answer + 1, answer - 1, answer + step, answer - 2 * step, answer + 10, answer - 10],
+            config.choices,
+            random,
+            sequence,
+          ),
+          speech: words.join(", "),
+          explain: {
+            text: `Immer ${sign(step)} ${Math.abs(step)}: ${answer}.`,
+            speech: `Immer ${signWord(step)} ${numberWord(Math.abs(step))}. Also ${numberWord(answer)}.`,
+          },
+          cue: `Vorlesen: ${sequence.map((x, i) => (i === gap ? "?" : x)).join(", ")}`,
+        };
+      } while (question.answer === previous?.answer);
+      return question;
+    }
+    if (mode === "compare") {
+      const kind =
+        config.kind === "mixed" ? pick(["far", "near", "sameTens", "swapped"], random) : config.kind;
+      const digit = () => between(1, 9, random);
+      const side = (value) => ({ text: String(value), value, speech: numberWord(value) });
+      let left;
+      let right;
+      let swapped = false;
+      if (kind === "sum") {
+        // 30 + 5 against 35 (equal), 53 (swapped digits) or a near number.
+        let tens;
+        let ones;
+        do [tens, ones] = [digit(), digit()];
+        while (tens === ones);
+        const value = tens * 10 + ones;
+        left = {
+          text: `${tens * 10} + ${ones}`,
+          value,
+          speech: `${numberWord(tens * 10)} plus ${numberWord(ones)}`,
+        };
+        const other = pick([value, ones * 10 + tens, value + 1, value - 1], random);
+        swapped = other === ones * 10 + tens;
+        right = side(other);
+      } else {
+        let a;
+        let b;
+        if (config.equal && random() < 0.2) a = b = between(10, 99, random);
+        else if (kind === "swapped") {
+          let tens;
+          let ones;
+          do [tens, ones] = [digit(), digit()];
+          while (tens === ones);
+          [a, b] = [tens * 10 + ones, ones * 10 + tens];
+          swapped = true;
+        } else {
+          let ta;
+          let tb;
+          do [ta, tb] = [digit(), digit()];
+          while (
+            kind === "far" ? Math.abs(ta - tb) < 3 : kind === "near" ? Math.abs(ta - tb) !== 1 : ta !== tb
+          );
+          let oa;
+          let ob;
+          do [oa, ob] = [between(0, 9, random), between(0, 9, random)];
+          // Near tens: the smaller number gets the bigger ones (37 and 41).
+          while (
+            (kind === "sameTens" && oa === ob) ||
+            (kind === "near" && (ta < tb ? oa <= ob : oa >= ob))
+          );
+          [a, b] = [ta * 10 + oa, tb * 10 + ob];
+        }
+        if (random() < 0.5) [a, b] = [b, a];
+        left = side(a);
+        right = side(b);
+      }
+      const answer = left.value < right.value ? "<" : left.value > right.value ? ">" : "=";
+      const words = { "<": "ist kleiner als", ">": "ist größer als", "=": "ist genauso viel wie" };
+      return {
+        kind,
+        left,
+        right,
+        key: `${left.text}|${right.text}`,
+        answer,
+        swap: swapped && answer !== "=" ? (answer === "<" ? ">" : "<") : null,
+        choices: config.equal ? ["<", "=", ">"] : ["<", ">"],
+        speech: `${left.speech} und ${right.speech}`,
+        explain: {
+          text: `${left.text} ${words[answer]} ${right.text}.`,
+          speech: `${capitalize(left.speech)} ${words[answer]} ${right.speech}.`,
+        },
+        cue: `Vorlesen: ${left.text} und ${right.text}`,
+      };
+    }
+    if (mode === "sort") {
+      const set = new Set();
+      const tensUsed = () => [...set].map((x) => Math.floor(x / 10));
+      if (config.swap) {
+        let tens;
+        let ones;
+        do [tens, ones] = [between(1, 9, random), between(1, 9, random)];
+        while (tens === ones);
+        set.add(tens * 10 + ones).add(ones * 10 + tens);
+      }
+      if (config.sameTens) {
+        const tens = between(1, 9, random);
+        while ([...set].filter((x) => Math.floor(x / 10) === tens).length < 2)
+          set.add(tens * 10 + between(0, 9, random));
+      }
+      while (set.size < config.count) {
+        const x = between(10, 99, random);
+        if (!config.far || !tensUsed().includes(Math.floor(x / 10))) set.add(x);
+      }
+      const numbers = [...set];
+      const order = [...numbers].sort((a, b) => (config.reverse ? b - a : a - b)).map(String);
+      let cards = shuffle(order, random);
+      if (cards.join() === order.join()) cards = [...cards.slice(1), cards[0]];
+      const joiner = config.reverse ? " > " : " < ";
+      return {
+        order,
+        cards,
+        reverse: Boolean(config.reverse),
+        answer: order.join(joiner),
+        explain: {
+          text: `${order.join(joiner)}.`,
+          speech: `${config.reverse ? "Von groß nach klein" : "Von klein nach groß"}: ${order.map((x) => numberWord(Number(x))).join(", ")}.`,
+        },
+      };
+    }
+    if (mode === "adjacent") {
+      let question;
+      do {
+        const kind = pick(config.ask, random);
+        const max = config.max || 100;
+        let n;
+        if (kind === "tenBelow" || kind === "tenAbove")
+          do n = between(11, 99, random);
+          while (n % 10 === 0);
+        else if (config.cross && random() < 0.5)
+          // Across a ten: 39 → 40, 40 → 39.
+          n = kind === "after" ? between(1, 9, random) * 10 + 9 : between(1, 9, random) * 10;
+        else n = between(11, kind === "before" ? max : max - 1, random);
+        const below = Math.floor(n / 10) * 10;
+        const answer = {
+          after: n + 1,
+          before: n - 1,
+          between: n,
+          tenBelow: below,
+          tenAbove: below + 10,
+        }[kind];
+        const forced = {
+          after: n % 10 === 9 ? [below] : [],
+          before: n % 10 === 0 && n + 9 <= 99 ? [n + 9] : [],
+          between: [],
+          tenBelow: [below + 10],
+          tenAbove: [below],
+        }[kind];
+        const pool = {
+          after: [n - 1, n + 2, n + 10],
+          before: [n + 1, n - 2, n - 10],
+          between: [n + 2, n - 2, n + 10, n - 10],
+          tenBelow: [n, below - 10, n - 1, below + 20],
+          tenAbove: [n + 1, below + 20, below - 10, n],
+        }[kind];
+        const shown = kind === "between" ? [n - 1, n + 1] : [n];
+        const lineFrom = Math.floor(Math.min(n, answer) / 10) * 10;
+        const explain =
+          kind === "after" || kind === "before"
+            ? sumExplain(n, answer - n, answer)
+            : kind === "between"
+              ? {
+                  text: `${n} liegt zwischen ${n - 1} und ${n + 1}.`,
+                  speech: `${capitalize(numberWord(n))} liegt zwischen ${numberWord(n - 1)} und ${numberWord(n + 1)}.`,
+                }
+              : {
+                  text: `Die Nachbarzehner von ${n} sind ${below} und ${below + 10}.`,
+                  speech: `Die Nachbarzehner von ${numberWord(n)} sind ${numberWord(below)} und ${numberWord(below + 10)}.`,
+                };
+        question = {
+          kind,
+          number: n,
+          shown,
+          answer: String(answer),
+          choices: numberOptions(answer, forced, pool, config.choices, random),
+          line: { from: lineFrom, to: Math.min(100, lineFrom + 20) },
+          speech: shown.map(numberWord).join(" und "),
+          explain,
+          cue: `Vorlesen: ${shown.join(" und ")}`,
+        };
+      } while (question.answer === previous?.answer);
+      return question;
+    }
+    if (mode === "calc") {
+      let question;
+      do {
+        const op = pick(config.ops, random);
+        const nonRound = (min, max) => {
+          let x;
+          do x = between(min, max, random);
+          while (x % 10 === 0);
+          return x;
+        };
+        let a;
+        let b;
+        const minus = op.includes("-") || op === "fillDown";
+        if (op === "T+T") {
+          a = 10 * between(1, 8, random);
+          b = 10 * between(1, 10 - a / 10, random);
+        } else if (op === "T-T") {
+          a = 10 * between(2, 10, random);
+          b = 10 * between(1, a / 10 - 1, random);
+        } else if (op === "N+T") {
+          a = nonRound(11, 89);
+          b = 10 * between(1, Math.floor((99 - a) / 10), random);
+        } else if (op === "N-T") {
+          a = nonRound(21, 99);
+          b = 10 * between(1, Math.floor(a / 10) - 1, random);
+        } else if (op === "fillUp") {
+          a = nonRound(11, 99);
+          b = 10 - (a % 10);
+        } else {
+          a = nonRound(11, 99);
+          b = a % 10;
+        }
+        const result = minus ? a - b : a + b;
+        const fill = op.startsWith("fill");
+        const answer = fill ? b : result;
+        const word = minus ? "minus" : "plus";
+        // Typical slips: forgetting the zero (5 + 3 = 8), adding to the ones
+        // (52 + 3 = 55), or taking the ones digit when filling up.
+        const forced = {
+          "T+T": [a / 10 + b / 10],
+          "T-T": [a / 10 - b / 10],
+          "N+T": [a + b / 10],
+          "N-T": [a - b / 10],
+          fillUp: [a % 10],
+          fillDown: [10 - b],
+        }[op];
+        const pool = fill ? [b + 1, b - 1, 10, b + 10] : [result + 10, result - 10, result + 1, result - 1];
+        question = {
+          op,
+          a,
+          b,
+          minus,
+          result,
+          fill,
+          number: answer,
+          answer: String(answer),
+          choices: numberOptions(answer, forced, pool, config.choices, random),
+          speech: fill
+            ? `${numberWord(a)} ${word} wie viel ist ${numberWord(result)}?`
+            : `${numberWord(a)} ${word} ${numberWord(b)}`,
+          explain: sumExplain(a, minus ? -b : b, result),
+          cue: `Vorlesen: ${a} ${minus ? "−" : "+"} ${fill ? "?" : b} = ${fill ? result : "?"}`,
+        };
+      } while (question.answer === previous?.answer);
+      return question;
+    }
+    if (mode === "graph") {
+      let question;
+      do {
+        const topic = pick(GRAPH_TOPICS, random);
+        const values = shuffle([1, 2, 3, 4, 5, 6, 7, 8, 9], random).slice(0, config.bars);
+        const bars = shuffle(topic.items, random)
+          .slice(0, config.bars)
+          .map((item, i) => ({ ...item, value: values[i] }));
+        const kind = pick(config.ask, random);
+        const sorted = [...bars].sort((x, y) => y.value - x.value);
+        const total = values.reduce((sum, x) => sum + x, 0);
+        let answer;
+        let text;
+        let choices;
+        let target = null;
+        let pair = null;
+        let explain;
+        if (kind === "most" || kind === "least") {
+          const bar = kind === "most" ? sorted[0] : sorted.at(-1);
+          answer = bar.word;
+          text = `Was mögen die ${kind === "most" ? "meisten" : "wenigsten"} Kinder am liebsten?`;
+          choices = bars.map(({ word, icon }) => ({ word, icon }));
+          explain = {
+            text: `${bar.icon} ${bar.word}: ${bar.value} ${bar.value === 1 ? "Kind" : "Kinder"}.`,
+            speech: `${bar.word}: ${countWord(bar.value)} ${bar.value === 1 ? "Kind" : "Kinder"}.`,
+          };
+        } else if (kind === "value") {
+          target = between(0, bars.length - 1, random);
+          const bar = bars[target];
+          answer = String(bar.value);
+          text = `Wie viele Kinder mögen ${bar.plural} am liebsten?`;
+          choices = numberOptions(
+            bar.value,
+            [],
+            [bar.value + 1, bar.value - 1, bar.value + 2, bar.value - 2],
+            config.choices,
+            random,
+          );
+          explain = {
+            text: `${bar.value} ${bar.value === 1 ? "Kind mag" : "Kinder mögen"} ${bar.plural} am liebsten.`,
+            speech: `${capitalize(countWord(bar.value))} ${bar.value === 1 ? "Kind mag" : "Kinder mögen"} ${bar.plural} am liebsten.`,
+          };
+        } else if (kind === "diff") {
+          const [high, low] = shuffle(bars, random)
+            .slice(0, 2)
+            .sort((x, y) => y.value - x.value);
+          pair = [bars.indexOf(high), bars.indexOf(low)];
+          const diff = high.value - low.value;
+          answer = String(diff);
+          text = `Wie viele Kinder mehr mögen ${high.plural} als ${low.plural}?`;
+          // Typical slip: reading one bar instead of the difference.
+          choices = numberOptions(diff, [high.value], [diff + 1, diff - 1, low.value, diff + 2], config.choices, random);
+          explain = sumExplain(high.value, -low.value, diff);
+        } else {
+          answer = String(total);
+          text = "Wie viele Kinder sind es zusammen?";
+          choices = numberOptions(total, [], [total + 1, total - 1, total + 2, total - 2, total + 10], config.choices, random);
+          explain = {
+            text: `${values.join(" + ")} = ${total}.`,
+            speech: `Zusammen sind es ${numberWord(total)} Kinder.`,
+          };
+        }
+        question = {
+          kind,
+          topic: topic.title,
+          bars,
+          target,
+          pair,
+          question: text,
+          answer,
+          choices,
+          explain,
+        };
+      } while (question.answer === previous?.answer);
+      return question;
+    }
     throw new Error("Unbekanntes Spiel: " + mode);
   }
 
@@ -1051,18 +2054,9 @@
   const STATS_LEVEL_POINTS = 40;
   const SOUND_GAMES = ["type", "initial"];
   const ABC_GAMES = ["missing", "neighbor", "order"];
-  const AREAS = [
-    { id: "hearing", title: "Laute hören", games: ["type", "initial", "blend"] },
-    { id: "abc", title: "ABC & Reihenfolge", games: ABC_GAMES },
-    { id: "spelling", title: "Merkwörter", games: ["merk"] },
-    {
-      id: "memory",
-      title: "Merken & Nachsprechen",
-      games: ["memory", "echo", "movement"],
-    },
-  ];
+  const AREAS = CATEGORIES.map(({ id, report, games }) => ({ id, title: report, games }));
   function defaultStats() {
-    return { games: {}, sounds: {}, abc: {}, merk: {}, days: {} };
+    return { games: {}, sounds: {}, abc: {}, merk: {}, math: { swaps: 0 }, days: {} };
   }
   function dayKey(time) {
     const date = new Date(time);
@@ -1123,6 +2117,7 @@
           ok: Math.min(count(entry.ok), count(entry.seen)),
         };
     }
+    stats.math.swaps = count(raw.math?.swaps);
     const days = Object.keys(raw.days || {})
       .filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key))
       .sort()
@@ -1141,7 +2136,7 @@
   /*
    * Records one solved task. task = { mode, level (after progression),
    * firstTry, mistakes, ms, letters: asked sounds/letters, confusions:
-   * [[asked, chosen], …] }.
+   * [[asked, chosen], …], swaps: picks with tens and ones swapped }.
    */
   function recordTask(state, task, now) {
     const stats = state.stats;
@@ -1183,6 +2178,11 @@
       for (const [asked, chosen] of task.confusions || [])
         if (isLetter(asked) && isLetter(chosen) && asked !== chosen && stats.sounds[asked])
           stats.sounds[asked].wrong[chosen] = (stats.sounds[asked].wrong[chosen] || 0) + 1;
+    // Swapped tens and ones (74 for 47) are counted across all math games.
+    if (MATH_GAMES.includes(task.mode) && task.swaps > 0) {
+      const math = (stats.math ||= { swaps: 0 });
+      math.swaps = Math.min(math.swaps + task.swaps, 1000000);
+    }
     if (task.mode === "merk" && MERK_GROUPS[task.group]) {
       const entry = (stats.merk[task.group] ||= { seen: 0, ok: 0 });
       entry.seen++;
@@ -1217,7 +2217,14 @@
       "Merkwörter auf Kärtchen schreiben, den besonderen Buchstaben farbig markieren und jeden Tag einmal gemeinsam lesen.",
     memory:
       "Merkspiele im Alltag: Einkaufsliste mit 3–4 Dingen merken, „Ich packe meinen Koffer“ spielen.",
+    tens: "Zehner bündeln mit Alltagsdingen: je 10 Nudeln in einen Becher, die übrigen einzeln daneben. Dann gemeinsam sagen: „4 Zehner und 7 Einer sind 47.“",
+    space: "Zahlen verorten: auf einem Maßband oder Lineal zeigen lassen („Wo ist 37?“), eine Hundertertafel ausdrucken und Wege gehen – nach rechts 1 mehr, nach unten 10 mehr.",
+    compare: "Vergleichen im Alltag: Hausnummern, Preise oder Seitenzahlen – „Welche ist größer? Schau zuerst auf die Zehner.“ Das Krokodil frisst immer die größere Zahl.",
+    calc: "Mit Zehnern rechnen: 10-Cent-Münzen oder Zehnerstangen legen. Bei 52 + 30 bleiben die Einer gleich, nur die Zehner ändern sich.",
+    charts: "Selbst ein Diagramm machen: Wer mag welches Obst? Für jedes Kind ein Kästchen ausmalen, dann fragen: Was mögen die meisten? Wie viele mehr?",
   };
+  const SWAP_TIP =
+    "Gegen Zahlendreher: Beim Sprechen kommen die Einer zuerst („sieben-und-vierzig“), geschrieben wird aber der Zehner zuerst. Zahlen gemeinsam legen und dabei erst die Zehner, dann die Einer aufschreiben.";
   const rate = (ok, total) => (total ? ok / total : null);
 
   /* Everything the parents' report shows, computed from the stored state. */
@@ -1368,6 +2375,14 @@
           Object.values(MERK_RULES).find((rule) => rule.group === weak.group).text,
         );
     }
+    const mathTasks = games
+      .filter((game) => MATH_GAMES.includes(game.id))
+      .reduce((total, game) => total + game.tasks, 0);
+    const math = { tasks: mathTasks, swaps: stats.math?.swaps || 0 };
+    if (math.swaps >= 2) {
+      focus.push(`Zahlendreher: ${math.swaps}× Zehner und Einer vertauscht (z. B. 74 statt 47).`);
+      tips.push(SWAP_TIP);
+    }
     const stale = games.filter(
       (game) => !game.together && game.tasks > 0 && now - game.last > 7 * dayMs,
     );
@@ -1385,6 +2400,7 @@
       sounds,
       abc,
       merk,
+      math,
       strengths,
       focus,
       tips: [...new Set(tips)],
@@ -1510,6 +2526,9 @@
     LAUTE,
     AMBIGUOUS_LAUTE,
     ACTIVITIES,
+    SUBJECTS,
+    CATEGORIES,
+    MATH_GAMES,
     LEVELS,
     WORDS,
     BLEND_WORDS,
@@ -1524,6 +2543,9 @@
     ROUND_GOAL,
     ROUND_MAX_TASKS,
     shuffle,
+    GRAPH_TOPICS,
+    categoryOf,
+    numberWord,
     maxLevel,
     clampLevel,
     makeQuestion,

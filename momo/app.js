@@ -2,6 +2,7 @@
   "use strict";
   const C = window.Wiese;
   const G = window.WieseGarden;
+  const M = window.WieseMath;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const STORAGE_KEY = "woerterwiese.v1";
@@ -15,6 +16,8 @@
   }
   let game = null;
   let currentView = "home";
+  // Where the child is in the menu: subject → category → games.
+  let menu = { subject: "deutsch", category: null };
   let activeMilliseconds = 0;
   let lastTick = Date.now();
   let pauseSuggested = false;
@@ -67,6 +70,7 @@
       C.petMood(C.petAt(state.pet, now)) === "hungry"
     );
     if (currentView === "home") renderHome();
+    if (currentView === "menu") renderMenu();
     if (currentView === "report")
       window.WieseReport.render($("#report-root"), C.buildReport(state));
     if (currentView === "garden") G.render();
@@ -334,11 +338,47 @@
     $("#start-button").dataset.activity = next.id;
     $("#start-button").innerHTML =
       `<span aria-hidden="true">▶</span> Spielen<small>${next.icon} ${next.title}</small>`;
-    $("#activity-grid").innerHTML = C.ACTIVITIES.map((activity) => {
-      const level = state.levels[activity.id];
-      const max = C.maxLevel(activity.id);
-      return `<button class="activity-card ${activity.color}" data-activity="${activity.id}"><span class="activity-icon" aria-hidden="true">${activity.icon}</span><span class="activity-title">${activity.title}</span>${activity.together ? '<span class="together-badge" title="Mit einem Erwachsenen">👥 zu zweit</span>' : ""}<span class="activity-level"><span class="level-bar" aria-hidden="true"><span style="width:${((level + 1) / (max + 1)) * 100}%"></span></span>Stufe ${level + 1}</span></button>`;
+    $("#subject-grid").innerHTML = C.SUBJECTS.map((subject) => {
+      const icons = C.CATEGORIES.filter((x) => x.subject === subject.id)
+        .map((x) => x.icon)
+        .join(" ");
+      return `<button class="subject-card ${subject.color}" data-subject="${subject.id}"><span class="subject-icon" aria-hidden="true">${subject.icon}</span><span class="subject-title">${subject.title}</span><span class="subject-icons" aria-hidden="true">${icons}</span></button>`;
     }).join("");
+  }
+  function activityCard(activity) {
+    const level = state.levels[activity.id];
+    const max = C.maxLevel(activity.id);
+    return `<button class="activity-card ${activity.color}" data-activity="${activity.id}"><span class="activity-icon" aria-hidden="true">${activity.icon}</span><span class="activity-title">${activity.title}</span>${activity.together ? '<span class="together-badge" title="Mit einem Erwachsenen">👥 zu zweit</span>' : ""}<span class="activity-level"><span class="level-bar" aria-hidden="true"><span style="width:${((level + 1) / (max + 1)) * 100}%"></span></span>Stufe ${level + 1}</span></button>`;
+  }
+  function openMenu(subject, category = null) {
+    menu = { subject, category };
+    showView("menu");
+  }
+  function openMenuFor(mode) {
+    const category = C.categoryOf(mode);
+    if (category) openMenu(category.subject, category.id);
+    else showView("home");
+  }
+  // One view for both steps: the categories of a subject, or the games of a category.
+  function renderMenu() {
+    const subject = C.SUBJECTS.find((x) => x.id === menu.subject) || C.SUBJECTS[0];
+    const category = C.CATEGORIES.find((x) => x.id === menu.category);
+    $("#menu-title").textContent = category ? category.title : subject.title;
+    $("#menu-path").textContent = category ? `${subject.icon} ${subject.title}` : "";
+    $("#menu-back").textContent = category ? `← ${subject.title}` : "← Startseite";
+    $("#menu-grid").innerHTML = category
+      ? category.games
+          .map((id) => activityCard(C.ACTIVITIES.find((x) => x.id === id)))
+          .join("")
+      : C.CATEGORIES.filter((x) => x.subject === subject.id)
+          .map((x) => {
+            const icons = x.games
+              .map((id) => C.ACTIVITIES.find((activity) => activity.id === id).icon)
+              .join(" ");
+            const count = `${x.games.length} ${x.games.length === 1 ? "Spiel" : "Spiele"}`;
+            return `<button class="activity-card category-card ${x.color}" data-category="${x.id}"><span class="activity-icon" aria-hidden="true">${x.icon}</span><span class="activity-title">${x.title}</span><span class="category-games"><span aria-hidden="true">${icons}</span> ${count}</span></button>`;
+          })
+          .join("");
   }
 
   /* ---------- Game flow ---------- */
@@ -368,6 +408,7 @@
   }
   function instruction() {
     const q = game.question;
+    if (C.MATH_GAMES.includes(game.mode)) return M.instruction(q);
     const same = (text) => ({ text, speech: text });
     switch (game.mode) {
       case "type":
@@ -442,6 +483,8 @@
     game.filled = [];
     game.alternative = null;
     game.wrongPicks = [];
+    game.swaps = 0;
+    game.built = game.question.start ? { ...game.question.start } : null;
     game.tapLaut = null;
     game.taskStart = Date.now();
     setFeedback("", "");
@@ -505,6 +548,23 @@
       task.innerHTML = `<div class="neighbor-question">${row}</div><div class="answer-choices">${q.choices.map((letter) => letterButton(letter)).join("")}</div>${abcHelp(q.help)}`;
     } else if (mode === "order") {
       task.innerHTML = `<div class="order-slots" aria-label="Deine Reihe">${[...q.answer].map((_, i) => `<div class="order-slot" aria-label="Platz ${i + 1}, noch leer"><span>${i + 1}</span></div>`).join("")}</div><div class="order-cards">${q.cards.map((letter) => letterButton(letter)).join("")}</div>${abcHelp(q.help)}`;
+    } else if (C.MATH_GAMES.includes(mode)) {
+      task.innerHTML = M.markup(q, listenButton);
+      if (mode === "build") {
+        M.renderBuilt(task, game.built, false);
+        $$("#task-area [data-build]").forEach((button) =>
+          button.addEventListener("click", () => {
+            if (game.answered) return;
+            const place = button.dataset.build;
+            game.built[place] = Math.max(
+              0,
+              Math.min(9, game.built[place] + Number(button.dataset.step)),
+            );
+            M.renderBuilt(task, game.built, false);
+          }),
+        );
+        $("#build-done").addEventListener("click", () => checkBuild($("#build-done")));
+      }
     } else {
       const icon = { memory: "🎒", echo: "🦜", movement: "👏" }[mode];
       task.innerHTML = `<div class="echo-symbol" aria-hidden="true">${icon}</div>${listenButton("Anhören")}<p class="together-note"><span aria-hidden="true">👥</span> Ein Erwachsener hört zu und entscheidet.</p><div class="self-check"><button id="echo-done" class="button primary">✓ Hat geklappt</button><button id="echo-retry" class="button secondary">↺ Noch nicht ganz</button></div><button id="compare-echo" class="text-button" aria-expanded="false">Lösung zeigen</button><div id="echo-answer" hidden>${compareMarkup()}</div>`;
@@ -526,6 +586,14 @@
       button.addEventListener("click", () => answer(button.dataset.answer, button)),
     );
   }
+  function checkBuild(button) {
+    if (!game || game.answered) return;
+    const q = game.question;
+    const { tens, ones } = game.built;
+    if (tens === q.target.tens && ones === q.target.ones) return solved();
+    if (q.swap && String(ones * 10 + tens) === q.answer) game.swaps++;
+    mistake(null, button, String(tens * 10 + ones));
+  }
   // Picture (or word) cards; the word is the accessible name, shown as text when written.
   function pictureChoices(items, written = false) {
     return `<div class="picture-choices${written ? " written" : ""}">${items.map((item) => `<button class="picture-button" data-answer="${item.value}" aria-label="${item.word}">${written ? `<span class="choice-word">${item.word}</span>` : `<span class="choice-icon" aria-hidden="true">${item.icon}</span><span class="choice-caption">${item.word}</span>`}</button>`).join("")}</div>`;
@@ -541,16 +609,22 @@
   function answer(letter, button) {
     if (!game || game.answered) return;
     const q = game.question;
-    if (game.mode === "order") {
-      const expected = q.answer[game.filled.length];
+    if (game.mode === "order" || game.mode === "sort") {
+      const numbers = game.mode === "sort";
+      const sequence = numbers ? q.order : [...q.answer];
+      const expected = sequence[game.filled.length];
       if (letter !== expected) return mistake(null, button, letter);
       const slot = $$(".order-slot")[game.filled.length];
       slot.classList.add("filled");
-      slot.innerHTML = letterMarkup(letter);
-      slot.setAttribute("aria-label", `Platz ${game.filled.length + 1}: ${displayLetter(letter)}`);
+      if (numbers) slot.textContent = letter;
+      else slot.innerHTML = letterMarkup(letter);
+      slot.setAttribute(
+        "aria-label",
+        `Platz ${game.filled.length + 1}: ${numbers ? letter : displayLetter(letter)}`,
+      );
       game.filled.push(letter);
       button.disabled = true;
-      if (game.filled.length === q.answer.length) return solved();
+      if (game.filled.length === sequence.length) return solved();
       $("#task-area [data-answer]:not(:disabled)")?.focus({ preventScroll: true });
       return;
     }
@@ -577,10 +651,14 @@
       return;
     }
     const alternative = q.accept?.includes(letter);
-    if (letter !== q.answer && !alternative)
+    if (letter !== q.answer && !alternative) {
+      // Swapped tens and ones (74 for 47) are counted for the parents' report.
+      if (C.MATH_GAMES.includes(game.mode) && letter === q.swap) game.swaps++;
       return mistake(button, button, letter);
+    }
     button?.classList.add("chosen");
     if (alternative) game.alternative = letter;
+    if (C.MATH_GAMES.includes(game.mode)) M.reveal(q, $("#task-area"), letter);
     if (game.mode === "neighbor") {
       const hole = $(".neighbor-question .hole");
       hole.innerHTML = letterMarkup(letter);
@@ -676,6 +754,11 @@
         autoSpeak([`Tipp: ${rule.speech}`, q.speech]);
         return;
       }
+    } else if (C.MATH_GAMES.includes(game.mode)) {
+      const hint = M.hint(q, n, picked, $("#task-area"), game.built);
+      setFeedback(hint.text, "try-again");
+      autoSpeak([hint.speech, q.speech]);
+      return;
     } else if (game.mode === "blend") {
       // Shorter pauses melt the sounds together.
       message =
@@ -764,6 +847,7 @@
       confusions: ["type", "initial"].includes(game.mode)
         ? game.wrongPicks.map((picked) => [q.answer, picked])
         : [],
+      swaps: game.swaps,
     };
     await save((latest) => {
       C.recordTask(latest, task, Date.now());
@@ -788,24 +872,31 @@
     } else {
       message = "Geschafft! Jetzt üben wir das noch einmal. 💛";
     }
-    const spoken = [message.replace(/[^\p{L}\p{N}\s.,!?–]/gu, "")];
+    // What comes before the praise is said before it too, so voice and
+    // text keep the same order.
+    let praiseSpoken = [message.replace(/[^\p{L}\p{N}\s.,!?–]/gu, "")];
+    let before = [];
     if (game.mode === "blend") {
       message = `${game.question.answer}! ${message}`;
-      spoken.unshift(`${game.question.answer}!`);
+      before = [`${game.question.answer}!`];
     }
     if (game.mode === "merk") {
       // After solving, the rule is said once more so it sticks.
       const rule = C.MERK_RULES[game.question.rule];
       message = `${game.question.word}: ${rule.text} ${firstTry ? message : ""}`.trim();
-      spoken.unshift(`${game.question.word}!`);
-      spoken.push(rule.speech);
+      before = [`${game.question.word}!`, rule.speech];
+      if (!firstTry) praiseSpoken = [];
     }
     if (game.mode === "initial") {
       message = `${game.question.word} fängt mit ${displayLetter(game.question.answer)} an. ${message}`;
-      spoken.push(`${game.question.word} fängt so an:`, {
-        laut: game.question.answer,
-      });
+      before = [`${game.question.word} fängt so an:`, { laut: game.question.answer }];
     }
+    // Math: say the number once more as tens and ones.
+    if (q.explain) {
+      message = `${q.explain.text} ${message}`;
+      before = [q.explain.speech];
+    }
+    const spoken = [...before, ...praiseSpoken];
     if (game.alternative)
       message += ` So klingt auch ${displayLetter(game.alternative)}. Meistens schreibt man aber ${displayLetter(game.question.answer)}.`;
     setFeedback(message, "correct");
@@ -921,9 +1012,15 @@
     speak([{ laut: letter }], button);
   });
   function renderLevelSettings() {
-    $("#level-settings").innerHTML = C.ACTIVITIES.map(
-      (activity) =>
-        `<label class="level-row"><span>${activity.icon} ${activity.title}</span><select data-level-for="${activity.id}">${C.LEVELS[activity.id].map((level, i) => `<option value="${i}"${state.levels[activity.id] === i ? " selected" : ""}>Stufe ${i + 1}: ${level.label}</option>`).join("")}</select></label>`,
+    const row = (activity) =>
+      `<label class="level-row"><span>${activity.icon} ${activity.title}</span><select data-level-for="${activity.id}">${C.LEVELS[activity.id].map((level, i) => `<option value="${i}"${state.levels[activity.id] === i ? " selected" : ""}>Stufe ${i + 1}: ${level.label}</option>`).join("")}</select></label>`;
+    $("#level-settings").innerHTML = C.SUBJECTS.map(
+      (subject) =>
+        `<h4 class="level-group">${subject.icon} ${subject.title}</h4>${C.ACTIVITIES.filter(
+          (activity) => C.categoryOf(activity.id)?.subject === subject.id,
+        )
+          .map(row)
+          .join("")}`,
     ).join("");
   }
   $("#level-settings").addEventListener("change", (event) => {
@@ -938,6 +1035,10 @@
 
   /* ---------- Events ---------- */
   document.addEventListener("click", (event) => {
+    const subject = event.target.closest("[data-subject]");
+    if (subject) openMenu(subject.dataset.subject);
+    const category = event.target.closest("[data-category]");
+    if (category) openMenu(menu.subject, category.dataset.category);
     const activity = event.target.closest("[data-activity]");
     if (activity) beginGame(activity.dataset.activity);
     const viewButton = event.target.closest("[data-view]");
@@ -971,7 +1072,14 @@
   $("#listen-button").addEventListener("click", () =>
     speakTask($("#listen-button")),
   );
-  $("#leave-game").addEventListener("click", () => showView("home"));
+  $("#leave-game").addEventListener("click", () => openMenuFor(game?.mode));
+  $("#other-game").addEventListener("click", () =>
+    openMenuFor($("#play-again").dataset.activity),
+  );
+  $("#menu-back").addEventListener("click", () => {
+    if (menu.category) openMenu(menu.subject);
+    else showView("home");
+  });
   $("#parents-button").addEventListener("click", openSettings);
   $("#open-report").addEventListener("click", () => {
     $("#settings-dialog").close();

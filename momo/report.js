@@ -335,6 +335,23 @@
             : el("p", { class: "muted", text: "Noch nicht gespielt." }),
         ),
       ),
+      el(
+        "section",
+        { class: "report-card" },
+        el("h2", { text: "Mathe" }),
+        el("p", {
+          class: "muted",
+          text: "Aus allen Mathe-Spielen. Die Bereiche oben zeigen, wie sicher Zehner und Einer, Zahlenstrahl und Hundertertafel, Vergleichen, Rechnen und Diagramme schon sind.",
+        }),
+        el("h3", { text: "Zahlendreher (z. B. 74 statt 47)" }),
+        report.math.tasks
+          ? el("p", {
+              text: report.math.swaps
+                ? `${report.math.swaps}× wurden Zehner und Einer vertauscht – bei ${report.math.tasks} gelösten Aufgaben.`
+                : `Keine Zahlendreher bei ${report.math.tasks} gelösten Aufgaben.`,
+            })
+          : el("p", { class: "muted", text: "Noch nicht gespielt." }),
+      ),
     ];
     root.replaceChildren(...sections.filter(Boolean));
   }

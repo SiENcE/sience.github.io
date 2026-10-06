@@ -426,6 +426,82 @@ main {
   height: 100%;
   background: #8db07a;
 }
+/* ---------- Subjects and menu ---------- */
+.subject-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px;
+}
+.subject-card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  align-items: center;
+  column-gap: 18px;
+  padding: 22px 26px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  box-shadow: var(--shadow);
+  text-align: left;
+  transition: transform 0.15s;
+}
+.subject-card:hover {
+  transform: translateY(-3px);
+}
+.subject-card:active {
+  transform: translateY(1px);
+}
+.subject-icon {
+  grid-row: 1 / 3;
+  display: grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border-radius: 26px;
+  font-size: 3rem;
+}
+.subject-card.mint .subject-icon {
+  background: #dcf0e4;
+}
+.subject-card.sky .subject-icon {
+  background: #dcecf7;
+}
+.subject-title {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+.subject-icons {
+  font-size: 1.3rem;
+  letter-spacing: 0.1em;
+}
+.menu-top {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+.back-button {
+  min-height: 44px;
+  font-weight: 800;
+  font-size: 1.05rem;
+}
+.menu-path {
+  color: var(--muted);
+  font-weight: 700;
+}
+.menu-title {
+  font-size: 2rem;
+  margin: 4px 0 20px;
+}
+.category-games {
+  font-size: 0.9rem;
+  color: var(--muted);
+  font-weight: 700;
+}
+
 footer {
   text-align: center;
   padding: 10px 0 24px;
@@ -940,6 +1016,553 @@ footer .text-button {
   font-size: 0.75rem;
   color: #99a289;
 }
+/* ---------- Math: tens and ones ---------- */
+.blocks {
+  --unit: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 18px 26px;
+  min-height: calc(var(--unit) * 10 + 34px);
+  padding: 22px 0 8px;
+}
+.rods {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+/* A rod is ten cubes stacked; the stripes show the ten single units. */
+.rod {
+  position: relative;
+  width: calc(var(--unit) + 3px);
+  height: calc(var(--unit) * 10 + 18px);
+  border-radius: 4px;
+  background: repeating-linear-gradient(
+    to top,
+    #6fa3cf 0 var(--unit),
+    #4f84b2 var(--unit) calc(var(--unit) + 2px)
+  );
+  box-shadow: inset 0 0 0 1px #3f6f99;
+}
+.rod-label {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: #3f6f99;
+}
+.blocks.counting .rod-label {
+  display: block;
+}
+.cubes {
+  display: grid;
+  grid-template-columns: repeat(5, var(--unit));
+  gap: 4px;
+  align-content: end;
+}
+.cube {
+  width: var(--unit);
+  height: var(--unit);
+  border-radius: 3px;
+  background: #f0a35e;
+  box-shadow: inset 0 0 0 1px #c97a35;
+}
+.cube-ten {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(5, var(--unit));
+  gap: 4px;
+  padding: 4px;
+  margin: -6px -6px 2px;
+  border: 2px dashed #4f84b2;
+  border-radius: 8px;
+}
+.number-button {
+  min-width: 92px;
+  padding: 0 10px;
+}
+.answer-choices .number-button {
+  width: auto;
+  font-size: 2.4rem;
+}
+.math-help {
+  margin: 4px auto 8px;
+  width: fit-content;
+  max-width: 100%;
+  padding: 8px 16px;
+  background: var(--warm);
+  border-radius: 16px;
+  font-weight: 800;
+  font-size: 1.15rem;
+  text-align: center;
+}
+div.math-help .blocks {
+  padding-top: 8px;
+  min-height: 0;
+}
+.place-number {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  margin: 6px 0 4px;
+}
+.place-digit {
+  display: grid;
+  justify-items: center;
+  min-width: 84px;
+  padding: 4px 10px;
+  font-size: 4.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  background: #f0f3e4;
+  border: 2px solid #dfe6d3;
+  border-radius: 18px;
+  color: #45603e;
+}
+.place-label {
+  font-size: 1rem;
+  line-height: 1.2;
+}
+.place-number.marked .tens {
+  background: #dcecf7;
+  border-color: #6fa3cf;
+}
+.place-number.marked .ones {
+  background: #fde6d6;
+  border-color: #f0a35e;
+}
+.place-sum {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 6px;
+  font-size: 1.5rem;
+  font-weight: 800;
+}
+.place-chip {
+  padding: 8px 18px;
+  border-radius: 18px;
+  border: 2px solid;
+}
+.place-chip strong {
+  font-size: 2.2rem;
+}
+.place-chip.tens {
+  background: #dcecf7;
+  border-color: #6fa3cf;
+}
+.place-chip.ones {
+  background: #fde6d6;
+  border-color: #f0a35e;
+}
+.place-and {
+  color: var(--muted);
+  font-size: 1.15rem;
+}
+.number-target {
+  font-size: 4.2rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: #45603e;
+  margin: 0 auto 4px;
+}
+.number-target.no-picture {
+  opacity: 0.6;
+}
+/* Place-value house: one room for the tens, one for the ones. */
+.place-house {
+  display: grid;
+  /* Nine rods need more room than nine cubes in rows of five. */
+  grid-template-columns: 1.4fr 1fr;
+  max-width: 560px;
+  margin: 8px auto 14px;
+  border: 2px solid #dfe6d3;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #fafbf5;
+}
+.place-column {
+  --unit: 15px;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  justify-items: center;
+  gap: 8px;
+  padding: 0 8px 12px;
+}
+.place-column + .place-column {
+  border-left: 2px solid #dfe6d3;
+}
+.place-head {
+  width: calc(100% + 16px);
+  margin: 0;
+  padding: 6px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+.place-column.tens .place-head {
+  background: #dcecf7;
+}
+.place-column.ones .place-head {
+  background: #fde6d6;
+}
+.place-blocks {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  min-height: calc(var(--unit) * 10 + 22px);
+  padding-top: 4px;
+}
+.place-blocks .rods {
+  gap: 3px;
+}
+.place-count {
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+}
+.place-buttons {
+  display: flex;
+  gap: 10px;
+}
+.step-button {
+  width: 56px;
+  height: 56px;
+  border-radius: 18px;
+  font-size: 2rem;
+  font-weight: 800;
+  border: 2px solid #dce3d1;
+  box-shadow: 0 4px 0 #dce3d1;
+  background: #f8faef;
+  color: #45603e;
+}
+.step-button:hover:not(:disabled) {
+  background: #e9f0dd;
+}
+.step-button:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: none;
+}
+.step-button:disabled {
+  opacity: 0.35;
+  box-shadow: none;
+}
+.build-done {
+  display: flex;
+  margin: 0 auto 6px;
+  min-width: 180px;
+}
+.build-done.shake {
+  animation: shake 0.4s ease;
+}
+/* Number line */
+.number-line {
+  display: block;
+  width: 100%;
+  max-width: 620px;
+  margin: 4px auto 6px;
+  overflow: visible;
+}
+.number-line .axis,
+.number-line .tick {
+  stroke: #6f8a63;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.number-line .tick.ten {
+  stroke-width: 3;
+}
+.number-line text {
+  font-size: 17px;
+  font-weight: 800;
+  text-anchor: middle;
+  fill: var(--ink);
+}
+.number-line .help-label {
+  display: none;
+  fill: #7a5a12;
+}
+.number-line.helping .help-label {
+  display: inline;
+}
+.number-line .base {
+  fill: #b5560f;
+  text-decoration: underline;
+}
+.balloon line {
+  stroke: #9a6fb0;
+  stroke-width: 2;
+}
+.balloon circle {
+  fill: #e7d4f2;
+  stroke: #9a6fb0;
+  stroke-width: 2;
+}
+.number-line .balloon-text {
+  font-size: 15px;
+}
+/* Equations, tiles and gaps */
+.equation {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 10px 0 6px;
+  font-size: 2.6rem;
+  font-weight: 800;
+  color: #45603e;
+}
+.math-gap,
+.number-tile.hole {
+  display: inline-grid;
+  place-items: center;
+  min-width: 72px;
+  min-height: 64px;
+  padding: 0 8px;
+  border: 3px dashed #b9cba6;
+  border-radius: 16px;
+  background: #fafbf5;
+  color: #9caf87;
+}
+.math-gap.found,
+.number-tile.found {
+  border-style: solid;
+  border-color: #8fb575;
+  background: #dcedc6;
+  color: #45603e;
+  animation: star-pop 0.4s ease;
+}
+.number-row,
+.compare-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 8px;
+}
+.number-slot,
+.compare-side {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+}
+.number-tile {
+  display: inline-grid;
+  place-items: center;
+  min-width: 64px;
+  min-height: 64px;
+  padding: 0 8px;
+  font-size: 2rem;
+  font-weight: 800;
+  background: #f0f3e4;
+  border: 2px solid #dfe6d3;
+  border-radius: 16px;
+  color: #4f6d43;
+}
+.number-tile.wide {
+  min-width: 96px;
+  font-size: 2.2rem;
+}
+.compare-gap {
+  min-width: 72px;
+  font-size: 2.4rem;
+}
+.tile-caption {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+.step-arrow {
+  align-self: center;
+  font-weight: 800;
+  color: #b5560f;
+}
+.compare-help {
+  display: flex;
+  gap: 4px;
+  font-size: 0.95rem;
+}
+.compare-help .place-chip {
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.compare-help .place-chip strong {
+  font-size: 1.1rem;
+}
+/* Hundred chart */
+.hundred-piece {
+  display: grid;
+  grid-template-columns: repeat(var(--cols), 64px);
+  gap: 4px;
+  justify-content: center;
+  margin: 10px 0 6px;
+}
+.hundred-cell {
+  display: grid;
+  place-items: center;
+  height: 56px;
+  font-size: 1.6rem;
+  font-weight: 800;
+  background: #f0f3e4;
+  border: 2px solid #dfe6d3;
+  border-radius: 10px;
+  color: #4f6d43;
+}
+.hundred-cell.empty {
+  background: transparent;
+  border-style: dotted;
+}
+.hundred-cell.gap {
+  border: 3px dashed #b9cba6;
+  background: #fafbf5;
+  color: #9caf87;
+}
+.hundred-cell.found {
+  border-style: solid;
+  border-color: #8fb575;
+  background: #dcedc6;
+  color: #45603e;
+}
+.hundred-chart {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 2px;
+  width: min(100%, 360px);
+  margin: 0 auto;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.hundred-chart span {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  background: #fffef9;
+  border-radius: 4px;
+}
+.hundred-chart .marked {
+  background: #dcecf7;
+  outline: 2px solid #6fa3cf;
+}
+div.math-help {
+  font-size: 1rem;
+}
+/* Ordering numbers */
+.number-card {
+  grid-auto-flow: column;
+  justify-content: center;
+  gap: 0;
+}
+.order-cards .number-card {
+  width: auto;
+  min-width: 78px;
+  font-size: 2rem;
+}
+.order-cards.marked .digit-tens {
+  color: #3f6f99;
+  text-decoration: underline;
+}
+.sort-direction {
+  margin: -12px 0 10px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--muted);
+}
+.number-slots {
+  flex-wrap: wrap;
+}
+.number-slots .order-slot {
+  font-size: 1.9rem;
+}
+/* Ten frame: two rows of five */
+.ten-frame {
+  display: grid;
+  grid-template-columns: repeat(5, 32px);
+  gap: 4px;
+  justify-content: center;
+  margin: 4px auto;
+}
+.ten-frame span {
+  height: 32px;
+  border: 2px solid #c97a35;
+  border-radius: 6px;
+  background: #fffef9;
+}
+.ten-frame .full {
+  background: #f0a35e;
+}
+/* Bar charts: one box per child */
+.chart-title {
+  text-align: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  margin-top: 4px;
+}
+.bar-chart {
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 14px;
+  margin: 8px 0 4px;
+}
+.bar-col {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 64px;
+}
+.bar-value {
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+.bar-stack {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 2px;
+  padding: 2px;
+  border-bottom: 2px solid #6f8a63;
+}
+.bar-box {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 20px;
+  border: 1px solid #e3e7d8;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+.bar-box.full {
+  background: #6fa3cf;
+  border-color: #4f84b2;
+  color: white;
+}
+.bar-box.extra {
+  background: #f6d27a;
+  border-color: #c99b2a;
+  color: #5b4307;
+}
+.bar-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.bar-word {
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+.level-group {
+  margin: 10px 0 2px;
+  font-size: 0.95rem;
+}
+
 .momo-feedback {
   display: flex;
   align-items: center;
@@ -1812,6 +2435,111 @@ body:has(dialog[open]) {
   }
   .pause-banner {
     flex-wrap: wrap;
+  }
+  .subject-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .subject-card {
+    padding: 16px 18px;
+  }
+  .subject-icon {
+    width: 68px;
+    height: 68px;
+    font-size: 2.4rem;
+  }
+  .subject-title {
+    font-size: 1.5rem;
+  }
+  .menu-title {
+    font-size: 1.6rem;
+  }
+  .blocks {
+    --unit: 12px;
+  }
+  .place-column {
+    --unit: 10px;
+    padding: 0 4px 10px;
+  }
+  .place-head {
+    width: calc(100% + 8px);
+    font-size: 1rem;
+  }
+  .blocks {
+    gap: 14px 18px;
+  }
+  .rods {
+    gap: 4px;
+  }
+  .cubes,
+  .cube-ten {
+    gap: 3px;
+  }
+  .answer-choices .number-button {
+    min-width: 72px;
+    font-size: 1.9rem;
+  }
+  .place-digit,
+  .number-target {
+    font-size: 3.2rem;
+  }
+  .place-digit {
+    min-width: 66px;
+  }
+  .place-sum {
+    font-size: 1.2rem;
+  }
+  .place-chip strong {
+    font-size: 1.8rem;
+  }
+  .step-button {
+    width: 48px;
+    height: 48px;
+  }
+  .equation {
+    font-size: 2rem;
+    gap: 6px;
+  }
+  .math-gap,
+  .number-tile.hole {
+    min-width: 56px;
+    min-height: 52px;
+  }
+  .number-tile {
+    min-width: 52px;
+    min-height: 52px;
+    font-size: 1.6rem;
+  }
+  .number-tile.wide {
+    min-width: 80px;
+    font-size: 1.7rem;
+  }
+  .number-row {
+    gap: 4px;
+  }
+  .hundred-piece {
+    grid-template-columns: repeat(var(--cols), 56px);
+  }
+  .hundred-cell {
+    height: 48px;
+    font-size: 1.3rem;
+  }
+  .order-cards .number-card {
+    min-width: 64px;
+    font-size: 1.6rem;
+  }
+  .bar-chart {
+    gap: 6px;
+  }
+  .bar-col {
+    min-width: 56px;
+  }
+  .bar-box {
+    width: 28px;
+    height: 17px;
+  }
+  .bar-word {
+    font-size: 0.75rem;
   }
 }
 @media (prefers-reduced-motion: reduce) {
