@@ -1558,6 +1558,302 @@ div.math-help {
   font-size: 0.85rem;
   font-weight: 800;
 }
+/* Sets: ten frames, dice, tally marks, scattered things */
+.frames {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 14px 22px;
+  margin: 10px 0 6px;
+}
+.frame {
+  display: grid;
+  grid-template-columns: repeat(5, 34px) 28px;
+  gap: 4px;
+  align-items: center;
+}
+.frame .cell {
+  height: 34px;
+  border: 2px solid #c8d3b8;
+  border-radius: 6px;
+  background: #fffef9;
+  display: grid;
+  place-items: center;
+}
+.frame .cell.full::after {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #d9534f;
+}
+.row-label {
+  visibility: hidden;
+  font-weight: 800;
+  color: #b5560f;
+}
+.frames.helping .row-label {
+  visibility: visible;
+}
+.frames.lit .cell:not(.full) {
+  background: #fdf0c8;
+  border-color: #e0a92e;
+}
+.dice {
+  display: flex;
+  justify-content: center;
+  gap: 28px;
+  margin: 12px 0 6px;
+}
+.die-wrap {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  font-weight: 800;
+  font-size: 1.3rem;
+}
+.die {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  width: 96px;
+  height: 96px;
+  padding: 12px;
+  background: #fff;
+  border: 3px solid #6f8a63;
+  border-radius: 18px;
+}
+.die .pip {
+  border-radius: 50%;
+  background: #34483e;
+}
+.tally-row {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+  margin: 12px 0 6px;
+}
+.tally-group {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-weight: 800;
+  color: #b5560f;
+}
+.tally {
+  width: 44px;
+  height: 52px;
+  stroke: #34483e;
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.scatter {
+  position: relative;
+  width: min(100%, 360px);
+  aspect-ratio: 3 / 2;
+  margin: 10px auto 6px;
+  background: #fafbf5;
+  border: 2px solid #dfe6d3;
+  border-radius: 18px;
+}
+.scatter-item {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+.item-n {
+  position: absolute;
+  right: -10px;
+  top: -8px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  background: #fdf0c8;
+  border-radius: 99px;
+  padding: 0 4px;
+}
+/* Comparing two sets */
+.set-compare {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 12px;
+  max-width: 520px;
+  margin: 8px auto 6px;
+}
+.set-box {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 6px;
+  padding: 8px;
+  background: #fafbf5;
+  border: 2px solid #dfe6d3;
+  border-radius: 18px;
+}
+.set-head,
+.set-count {
+  font-weight: 800;
+  color: var(--muted);
+}
+.set-count {
+  font-size: 1.4rem;
+  color: var(--ink);
+}
+.set-items {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 2px 4px;
+  font-size: clamp(1rem, 5vw, 1.4rem);
+  line-height: 1.1;
+}
+.set-box.big .set-items {
+  grid-template-columns: repeat(3, 1fr);
+  font-size: clamp(1.7rem, 7vw, 2.4rem);
+}
+.set-item {
+  border-radius: 10px;
+  text-align: center;
+}
+.set-item.extra {
+  background: #fdf0c8;
+  box-shadow: 0 0 0 2px #e0a92e;
+}
+/* Higher specificity than the big letter keys, also on small screens. */
+.answer-choices .letter-button.side-button {
+  width: auto;
+  min-width: 88px;
+  height: 64px;
+  padding: 0 14px;
+  font-size: 1.15rem;
+  white-space: nowrap;
+}
+/* Set diagram: rings in a frame, the band below is "outside" */
+.venn-target {
+  font-size: 3.6rem;
+  line-height: 1.1;
+  text-align: center;
+}
+.venn-target.placed {
+  visibility: hidden;
+}
+.venn {
+  position: relative;
+  width: min(100%, 360px);
+  aspect-ratio: 6 / 5;
+  margin: 6px auto 10px;
+  border: 2px dashed #b9cba6;
+  border-radius: 18px;
+  background: #fffef9;
+}
+.venn-ring {
+  position: absolute;
+  top: 9%;
+  width: 58%;
+  height: 69.6%;
+  border-radius: 50%;
+  border: 3px solid;
+  pointer-events: none;
+}
+.ring-0 {
+  left: 4%;
+  border-color: #4f84b2;
+  background: #6fa3cf1f;
+}
+.ring-1 {
+  left: 38%;
+  border-color: #c97a35;
+  background: #f0a35e1f;
+}
+.venn.one .ring-0 {
+  left: 21%;
+}
+.venn-label {
+  position: absolute;
+  top: 1%;
+  padding: 0 8px;
+  border-radius: 99px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  background: #fffef9;
+}
+.label-0 {
+  left: 8%;
+  color: #3f6f99;
+}
+.label-1 {
+  right: 8%;
+  color: #a35f22;
+}
+.venn.one .label-0 {
+  left: 50%;
+  transform: translateX(-50%);
+}
+.venn-zone {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border-radius: 18px;
+  background: transparent;
+}
+button.venn-zone:hover:not(:disabled) {
+  background: #e9f0dd99;
+}
+.venn-zone.wrong {
+  opacity: 0.45;
+}
+.venn-zone.lit {
+  background: #fdf0c8cc;
+}
+.zone-a,
+.zone-b,
+.zone-both {
+  top: 20%;
+  height: 48%;
+}
+.zone-a {
+  left: 7%;
+  width: 29%;
+}
+.zone-both {
+  left: 39%;
+  width: 22%;
+}
+.zone-b {
+  left: 64%;
+  width: 29%;
+}
+.venn.one .zone-a {
+  left: 26%;
+  width: 48%;
+}
+.zone-none {
+  left: 2%;
+  bottom: 2%;
+  width: 96%;
+  height: 17%;
+  grid-auto-flow: column;
+  border: 2px dashed transparent;
+}
+.zone-items {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px;
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+.venn-thing.found {
+  animation: star-pop 0.4s ease;
+}
+.zone-caption {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--muted);
+}
 .level-group {
   margin: 10px 0 2px;
   font-size: 0.95rem;

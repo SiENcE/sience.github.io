@@ -89,6 +89,9 @@
     { id: "adjacent", icon: "🏘️", title: "Zahlen-Nachbarn", color: "peach" },
     { id: "calc", icon: "🔟", title: "Zehner rechnen", color: "rose" },
     { id: "graph", icon: "📶", title: "Säulen lesen", color: "yellow" },
+    { id: "count", icon: "✋", title: "Wie viele?", color: "peach" },
+    { id: "more", icon: "🍎", title: "Mehr oder weniger?", color: "rose" },
+    { id: "venn", icon: "⭕", title: "Mengen-Kreise", color: "lavender" },
   ];
   // Menu: subject → category → game. "report" names the category for adults.
   const SUBJECTS = [
@@ -131,6 +134,15 @@
       report: "Merken & Nachsprechen",
       color: "rose",
       games: ["memory", "echo", "movement"],
+    },
+    {
+      id: "sets",
+      subject: "mathe",
+      icon: "🧺",
+      title: "Mengen",
+      report: "Mengen & Zählen",
+      color: "peach",
+      games: ["count", "more", "venn"],
     },
     {
       id: "tens",
@@ -482,6 +494,49 @@
       },
     ],
     // Bar charts with one box per child.
+    // Grasp a quantity: ten frames, dice, tally marks, scattered things.
+    count: [
+      { show: "frame", max: 10, choices: 3, label: "bis 10 im Zehnerfeld" },
+      { show: "frame", max: 20, choices: 3, label: "bis 20 im Zwanzigerfeld" },
+      { show: "dice", choices: 3, label: "zwei Würfel" },
+      { show: "tally", max: 20, choices: 3, label: "Strichliste bis 20" },
+      { show: "scatter", max: 15, choices: 4, label: "durcheinander bis 15" },
+      { show: "tally", max: 50, choices: 4, label: "Strichliste bis 50" },
+      { show: "missing", choices: 4, label: "Wie viele fehlen bis 20?" },
+    ],
+    // Compare two sets: more, fewer, equal – and by how many.
+    more: [
+      { max: 10, gap: 3, ask: ["more"], choices: 2, label: "Wo sind mehr? bis 10" },
+      { max: 10, gap: 2, ask: ["fewer"], choices: 2, label: "Wo sind weniger?" },
+      { max: 10, gap: 1, ask: ["more", "fewer"], equal: true, choices: 3, label: "auch gleich viele" },
+      { max: 20, gap: 1, ask: ["more", "fewer"], equal: true, choices: 3, label: "bis 20" },
+      {
+        max: 12,
+        gap: 1,
+        ask: ["more", "fewer"],
+        equal: true,
+        trap: true,
+        choices: 3,
+        label: "Achtung: groß heißt nicht viel",
+      },
+      { max: 10, gap: 1, ask: ["diff"], choices: 4, label: "Wie viele mehr? bis 10" },
+      { max: 20, gap: 1, ask: ["diff"], trap: true, choices: 4, label: "Wie viele mehr? bis 20" },
+    ],
+    // Sorting into rings by two properties (set diagram with an intersection).
+    venn: [
+      { rings: 1, sets: [0], choices: 2, label: "ein Kreis: drin oder draußen" },
+      { rings: 2, sets: [0], noBoth: true, choices: 4, label: "zwei Kreise" },
+      { rings: 2, sets: [0], choices: 4, label: "zwei Kreise, auch die Mitte" },
+      { rings: 2, sets: [1, 2], choices: 4, label: "fliegen, Wasser, Tiere" },
+      { rings: 2, sets: [0, 1, 2], ask: ["ring"], choices: 4, label: "Wie viele sind im Kreis?" },
+      {
+        rings: 2,
+        sets: [0, 1, 2],
+        ask: ["both", "none", "only"],
+        choices: 4,
+        label: "Mitte, nur ein Kreis, draußen",
+      },
+    ],
     graph: [
       { bars: 3, ask: ["value"], choices: 3, label: "3 Säulen ablesen" },
       { bars: 4, ask: ["value"], choices: 4, label: "4 Säulen ablesen" },
@@ -978,6 +1033,84 @@
       speech: `${capitalize(numberWord(from))} ${signWord(delta)} ${numberWord(Math.abs(delta))} ist ${numberWord(result)}.`,
     };
   }
+  const SET_ICONS = ["🍎", "⭐", "🐞", "🌸", "🍓", "⚽", "🐟", "🦋", "🍄", "🐥"];
+  /*
+   * Set diagrams: two properties ("rings") and things with [icon, article,
+   * word, in ring 1, in ring 2]. Only clear cases, so every thing has one place.
+   */
+  const TIER = { label: "Tier", ask: "Ist es ein Tier?", yes: "ist ein Tier", no: "ist kein Tier" };
+  const VENN_SETS = [
+    {
+      rings: [
+        { label: "rot", ask: "Ist es rot?", yes: "ist rot", no: "ist nicht rot" },
+        { label: "Obst", ask: "Ist es Obst?", yes: "ist Obst", no: "ist kein Obst" },
+      ],
+      items: [
+        ["🍎", "der", "Apfel", 1, 1],
+        ["🍓", "die", "Erdbeere", 1, 1],
+        ["🍒", "die", "Kirsche", 1, 1],
+        ["🍅", "die", "Tomate", 1, 0],
+        ["🚒", "das", "Feuerwehrauto", 1, 0],
+        ["🌹", "die", "Rose", 1, 0],
+        ["🐞", "der", "Marienkäfer", 1, 0],
+        ["🍌", "die", "Banane", 0, 1],
+        ["🍐", "die", "Birne", 0, 1],
+        ["🍇", "die", "Traube", 0, 1],
+        ["🍋", "die", "Zitrone", 0, 1],
+        ["🥦", "der", "Brokkoli", 0, 0],
+        ["⚽", "der", "Ball", 0, 0],
+        ["🐸", "der", "Frosch", 0, 0],
+        ["🌳", "der", "Baum", 0, 0],
+      ],
+    },
+    {
+      rings: [
+        { label: "kann fliegen", ask: "Kann es fliegen?", yes: "kann fliegen", no: "kann nicht fliegen" },
+        TIER,
+      ],
+      items: [
+        ["🐦", "der", "Vogel", 1, 1],
+        ["🦋", "der", "Schmetterling", 1, 1],
+        ["🐝", "die", "Biene", 1, 1],
+        ["🦆", "die", "Ente", 1, 1],
+        ["✈️", "das", "Flugzeug", 1, 0],
+        ["🚁", "der", "Hubschrauber", 1, 0],
+        ["🎈", "der", "Luftballon", 1, 0],
+        ["🚀", "die", "Rakete", 1, 0],
+        ["🐶", "der", "Hund", 0, 1],
+        ["🐱", "die", "Katze", 0, 1],
+        ["🐢", "die", "Schildkröte", 0, 1],
+        ["🐘", "der", "Elefant", 0, 1],
+        ["🚗", "das", "Auto", 0, 0],
+        ["⚽", "der", "Ball", 0, 0],
+        ["🏠", "das", "Haus", 0, 0],
+        ["🧸", "der", "Teddy", 0, 0],
+      ],
+    },
+    {
+      rings: [
+        { label: "im Wasser", ask: "Ist es im Wasser?", yes: "ist im Wasser", no: "ist nicht im Wasser" },
+        TIER,
+      ],
+      items: [
+        ["🐟", "der", "Fisch", 1, 1],
+        ["🐳", "der", "Wal", 1, 1],
+        ["🐙", "der", "Krake", 1, 1],
+        ["🦀", "der", "Krebs", 1, 1],
+        ["⛵", "das", "Segelboot", 1, 0],
+        ["🚢", "das", "Schiff", 1, 0],
+        ["🛶", "das", "Kanu", 1, 0],
+        ["🐶", "der", "Hund", 0, 1],
+        ["🐴", "das", "Pferd", 0, 1],
+        ["🐘", "der", "Elefant", 0, 1],
+        ["🐱", "die", "Katze", 0, 1],
+        ["🚗", "das", "Auto", 0, 0],
+        ["🏠", "das", "Haus", 0, 0],
+        ["⚽", "der", "Ball", 0, 0],
+        ["🌳", "der", "Baum", 0, 0],
+      ],
+    },
+  ];
   const GRAPH_TOPICS = [
     {
       title: "Lieblingsobst",
@@ -1024,11 +1157,12 @@
     const config = LEVELS[mode][clampLevel(mode, level)];
     for (let attempt = 0; attempt < 8; attempt++) {
       const question = generate(mode, config, previous, random);
-      // Merkwörter share letters, comparisons share symbols: those compare the task.
+      // Merkwörter share letters; tasks with few possible answers (<, >, links,
+      // rechts …) carry a "key" and must not repeat the whole task instead.
       const same =
         mode === "merk"
           ? question.word === previous?.word
-          : mode === "compare"
+          : question.key != null
             ? question.key === previous?.key
             : question.answer === previous?.answer;
       if (!previous || !same)
@@ -1871,6 +2005,208 @@
       } while (question.answer === previous?.answer);
       return question;
     }
+    if (mode === "count") {
+      let question;
+      do {
+        let number;
+        let answer;
+        let forced = [];
+        let explain;
+        const extra = {};
+        if (config.show === "dice") {
+          const dice = [between(1, 6, random), between(1, 6, random)];
+          number = answer = dice[0] + dice[1];
+          extra.dice = dice;
+          explain = sumExplain(dice[0], dice[1], number);
+        } else if (config.show === "missing") {
+          number = between(8, 19, random);
+          answer = 20 - number;
+          forced = [number];
+          extra.frames = 2;
+          explain = sumExplain(number, answer, 20);
+        } else {
+          number = answer =
+            config.show === "frame"
+              ? config.max === 10
+                ? between(3, 10, random)
+                : between(11, 20, random)
+              : between(6, config.max, random);
+          if (config.show === "frame") {
+            extra.frames = config.max / 10;
+            explain =
+              number > 10
+                ? sumExplain(10, number - 10, number)
+                : number > 5
+                  ? sumExplain(5, number - 5, number)
+                  : { text: `Es sind ${number}.`, speech: `Es sind ${numberWord(number)}.` };
+          }
+          if (config.show === "tally") {
+            const bundles = Math.floor(number / 5);
+            const rest = number % 5;
+            // Typical slip: every bundle counted as one stroke.
+            forced = [bundles + rest];
+            explain = rest
+              ? {
+                  text: `${bundles} Fünferbündel und ${rest} ${rest === 1 ? "einzelner Strich" : "einzelne Striche"}: ${number}.`,
+                  speech: `${capitalize(countWord(bundles))} Fünferbündel und ${rest === 1 ? "ein einzelner Strich" : `${numberWord(rest)} einzelne Striche`} sind ${numberWord(number)}.`,
+                }
+              : {
+                  text: `${bundles} Fünferbündel: ${number}.`,
+                  speech: `${capitalize(countWord(bundles))} Fünferbündel sind ${numberWord(number)}.`,
+                };
+          }
+          if (config.show === "scatter") {
+            // Random spots on a 6×4 grid, a little shaken, never on top of each other.
+            extra.points = shuffle([...Array(24).keys()], random)
+              .slice(0, number)
+              .map((cell) => ({
+                x: Math.round((((cell % 6) + 0.5 + (random() - 0.5) * 0.5) / 6) * 1000) / 10,
+                y: Math.round(((Math.floor(cell / 6) + 0.5 + (random() - 0.5) * 0.5) / 4) * 1000) / 10,
+              }));
+            explain = { text: `Es sind ${number}.`, speech: `Es sind ${numberWord(number)}.` };
+          }
+        }
+        question = {
+          show: config.show,
+          icon: pick(SET_ICONS, random),
+          number,
+          answer: String(answer),
+          ...extra,
+          choices: numberOptions(
+            answer,
+            forced,
+            [answer + 1, answer - 1, answer + 2, answer - 2, answer + 5, answer - 5],
+            config.choices,
+            random,
+          ),
+          explain,
+        };
+      } while (question.answer === previous?.answer);
+      return question;
+    }
+    if (mode === "more") {
+      const kind = pick(config.ask, random);
+      let left;
+      let right;
+      if (config.equal && kind !== "diff" && random() < 0.2)
+        left = right = between(2, config.max, random);
+      else
+        do [left, right] = [between(1, config.max, random), between(1, config.max, random)];
+        while (left === right || Math.abs(left - right) < config.gap);
+      const bigger = left > right ? "links" : left < right ? "rechts" : "gleich";
+      const smaller = { links: "rechts", rechts: "links", gleich: "gleich" }[bigger];
+      const diff = Math.abs(left - right);
+      const answer = kind === "more" ? bigger : kind === "fewer" ? smaller : String(diff);
+      const side = capitalize(bigger);
+      return {
+        kind,
+        left,
+        right,
+        bigger,
+        key: `${left}|${right}|${kind}`,
+        icon: pick(SET_ICONS, random),
+        // Fewer things drawn bigger: the number decides, not the size.
+        bigSide: config.trap ? (smaller === "gleich" ? pick(["links", "rechts"], random) : smaller) : null,
+        answer,
+        choices:
+          kind === "diff"
+            ? numberOptions(diff, [Math.max(left, right)], [diff + 1, diff - 1, diff + 2, Math.min(left, right)], config.choices, random)
+            : config.equal
+              ? ["links", "gleich", "rechts"]
+              : ["links", "rechts"],
+        explain:
+          kind === "diff"
+            ? {
+                text: `${Math.max(left, right)} − ${Math.min(left, right)} = ${diff}. ${side} sind ${diff} mehr.`,
+                speech: `${capitalize(numberWord(Math.max(left, right)))} minus ${numberWord(Math.min(left, right))} ist ${numberWord(diff)}. ${side} sind ${numberWord(diff)} mehr.`,
+              }
+            : {
+                text: `Links ${left}, rechts ${right}. ${bigger === "gleich" ? "Gleich viele." : `${capitalize(kind === "more" ? bigger : smaller)} sind ${kind === "more" ? "mehr" : "weniger"}.`}`,
+                speech: `Links ${numberWord(left)}, rechts ${numberWord(right)}. ${bigger === "gleich" ? "Gleich viele." : `${capitalize(kind === "more" ? bigger : smaller)} sind ${kind === "more" ? "mehr" : "weniger"}.`}`,
+              },
+      };
+    }
+    if (mode === "venn") {
+      const set = VENN_SETS[pick(config.sets, random)];
+      const [ringA, ringB] = set.rings;
+      const one = config.rings === 1;
+      const items = set.items.map(([icon, article, word, a, b]) => {
+        const zone = one ? (a ? "a" : "none") : a && b ? "both" : a ? "a" : b ? "b" : "none";
+        return { icon, article, word, a: Boolean(a), b: Boolean(b), zone };
+      });
+      const rings = one ? [ringA] : [ringA, ringB];
+      if (!config.ask) {
+        const pool = config.noBoth ? items.filter((x) => x.zone !== "both") : items;
+        const item = pick(
+          pool.filter((x) => x.word !== previous?.item?.word),
+          random,
+        );
+        // A few things already sorted show how the diagram works.
+        const placed = shuffle(
+          pool.filter((x) => x !== item),
+          random,
+        ).slice(0, 4);
+        const facts = rings.map((ring, i) => ([item.a, item.b][i] ? ring.yes : ring.no));
+        const sentence = `${capitalize(item.article)} ${item.word} ${facts.join(" und ")}.`;
+        return {
+          ask: "place",
+          rings,
+          item,
+          placed,
+          key: `${ringA.label}|${item.word}`,
+          answer: item.zone,
+          choices: one ? ["a", "none"] : ["a", "both", "b", "none"],
+          explain: { text: `${item.icon} ${sentence}`, speech: sentence },
+        };
+      }
+      // Counting in a filled diagram; every region holds at least one thing.
+      let placed;
+      do placed = shuffle(items, random).slice(0, between(7, 10, random));
+      while (["a", "b", "both", "none"].some((zone) => !placed.some((x) => x.zone === zone)));
+      const kind = pick(config.ask, random);
+      const ringIndex = between(0, 1, random);
+      const ring = rings[ringIndex];
+      const inRing = (x) => (ringIndex === 0 ? x.a : x.b);
+      let answer;
+      let text;
+      let forced = [];
+      if (kind === "ring") {
+        answer = placed.filter(inRing).length;
+        // Typical slip: forgetting the things in the middle.
+        forced = [placed.filter((x) => inRing(x) && x.zone !== "both").length];
+        text = `Wie viele Dinge sind im Kreis „${ring.label}“?`;
+      } else if (kind === "only") {
+        answer = placed.filter((x) => inRing(x) && x.zone !== "both").length;
+        forced = [placed.filter(inRing).length];
+        text = `Wie viele Dinge sind nur im Kreis „${ring.label}“?`;
+      } else if (kind === "both") {
+        answer = placed.filter((x) => x.zone === "both").length;
+        text = "Wie viele Dinge sind in beiden Kreisen?";
+      } else {
+        answer = placed.filter((x) => x.zone === "none").length;
+        text = "Wie viele Dinge sind in keinem Kreis?";
+      }
+      const where = {
+        ring: `im Kreis „${ring.label}“`,
+        only: `nur im Kreis „${ring.label}“`,
+        both: "in beiden Kreisen",
+        none: "in keinem Kreis",
+      }[kind];
+      return {
+        ask: kind,
+        rings,
+        ring: ringIndex,
+        placed,
+        question: text,
+        key: `${ringA.label}|${placed.map((x) => x.word).join()}|${kind}|${ringIndex}`,
+        answer: String(answer),
+        choices: numberOptions(answer, forced, [answer + 1, answer - 1, answer + 2], config.choices, random),
+        explain: {
+          text: `${capitalize(where)} sind ${answer} ${answer === 1 ? "Ding" : "Dinge"}.`,
+          speech: `${capitalize(where)} sind ${numberWord(answer)} ${answer === 1 ? "Ding" : "Dinge"}.`,
+        },
+      };
+    }
     if (mode === "graph") {
       let question;
       do {
@@ -2221,6 +2557,7 @@
     space: "Zahlen verorten: auf einem Maßband oder Lineal zeigen lassen („Wo ist 37?“), eine Hundertertafel ausdrucken und Wege gehen – nach rechts 1 mehr, nach unten 10 mehr.",
     compare: "Vergleichen im Alltag: Hausnummern, Preise oder Seitenzahlen – „Welche ist größer? Schau zuerst auf die Zehner.“ Das Krokodil frisst immer die größere Zahl.",
     calc: "Mit Zehnern rechnen: 10-Cent-Münzen oder Zehnerstangen legen. Bei 52 + 30 bleiben die Einer gleich, nur die Zehner ändern sich.",
+    sets: "Mengen im Alltag: Besteck oder Murmeln zählen, Paare bilden („Wer hat mehr?“), eine Strichliste führen und Spielzeug nach zwei Merkmalen sortieren – z. B. rot und rund. Was gehört in beide Gruppen?",
     charts: "Selbst ein Diagramm machen: Wer mag welches Obst? Für jedes Kind ein Kästchen ausmalen, dann fragen: Was mögen die meisten? Wie viele mehr?",
   };
   const SWAP_TIP =
@@ -2544,6 +2881,7 @@
     ROUND_MAX_TASKS,
     shuffle,
     GRAPH_TOPICS,
+    VENN_SETS,
     categoryOf,
     numberWord,
     maxLevel,

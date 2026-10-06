@@ -16,6 +16,13 @@
   const signWord = (n) => (n < 0 ? "minus" : "plus");
   const gap = '<span class="math-gap" data-reveal>?</span>';
   const COMPARE_WORDS = { "<": "kleiner als", ">": "größer als", "=": "gleich" };
+  const SIDES = {
+    links: ["⬅️ Links", "Links"],
+    gleich: ["Gleich viele", "Gleich viele"],
+    rechts: ["Rechts ➡️", "Rechts"],
+  };
+  // Pips of a die on a 3×3 grid.
+  const PIPS = { 1: [4], 2: [0, 8], 3: [0, 4, 8], 4: [0, 2, 6, 8], 5: [0, 2, 4, 6, 8], 6: [0, 2, 3, 5, 6, 8] };
 
   /* ---------- Building blocks ---------- */
   /*
@@ -68,6 +75,38 @@
   // The whole hundred chart as help; the given numbers are marked.
   function hundredChart(marked) {
     return `<div class="hundred-chart" aria-hidden="true">${Array.from({ length: 100 }, (_, i) => `<span class="${marked.includes(i + 1) ? "marked" : ""}">${i + 1}</span>`).join("")}</div>`;
+  }
+  // Ten frames (2 rows of 5) filled row by row; full rows get a running total as help.
+  function frames(count, filled) {
+    const frame = (f) => {
+      let cells = "";
+      for (let row = 0; row < 2; row++) {
+        for (let i = 0; i < 5; i++)
+          cells += `<span class="cell${f * 10 + row * 5 + i < filled ? " full" : ""}"></span>`;
+        const total = f * 10 + row * 5 + 5;
+        cells += `<span class="row-label">${total <= filled ? total : ""}</span>`;
+      }
+      return `<span class="frame">${cells}</span>`;
+    };
+    return `<div class="frames" role="img" aria-label="${count === 1 ? "Zehnerfeld" : "Zwanzigerfeld"}">${Array.from({ length: count }, (_, f) => frame(f)).join("")}</div>`;
+  }
+  function die(n) {
+    return `<span class="die-wrap"><span class="die" role="img" aria-label="Würfel">${Array.from({ length: 9 }, (_, i) => `<span class="${PIPS[n].includes(i) ? "pip" : ""}"></span>`).join("")}</span><span class="die-label" hidden>${n}</span></span>`;
+  }
+  // Tally marks: bundles of five (four strokes, one across), then single strokes.
+  function tally(n) {
+    const stroke = (x) => `<line x1="${x}" y1="6" x2="${x}" y2="46"/>`;
+    const bundles = Math.floor(n / 5);
+    const groups = Array.from(
+      { length: bundles },
+      (_, i) =>
+        `<span class="tally-group"><svg viewBox="0 0 44 52" class="tally">${[8, 16, 24, 32].map(stroke).join("")}<line x1="2" y1="40" x2="40" y2="12"/></svg><span class="tally-label" hidden>${(i + 1) * 5}</span></span>`,
+    );
+    if (n % 5)
+      groups.push(
+        `<span class="tally-group"><svg viewBox="0 0 ${8 * (n % 5) + 8} 52" class="tally" style="width:${8 * (n % 5) + 8}px">${Array.from({ length: n % 5 }, (_, i) => stroke(8 + 8 * i)).join("")}</svg><span class="tally-label" hidden></span></span>`,
+      );
+    return `<div class="tally-row" role="img" aria-label="Strichliste">${groups.join("")}</div>`;
   }
   function tile(text, { hole = false, caption = "" } = {}) {
     return `<span class="number-slot"><span class="number-tile${hole ? " hole" : ""}"${hole ? " data-reveal" : ""}>${hole ? "?" : text}</span>${caption ? `<span class="tile-caption">${caption}</span>` : ""}</span>`;
@@ -130,6 +169,20 @@
             tenAbove: "Welcher volle Zehner kommt danach?",
           }[q.kind],
         );
+      case "count":
+        return same(
+          q.show === "missing"
+            ? "Wie viele fehlen bis 20?"
+            : q.show === "dice"
+              ? "Wie viele Augen sind es zusammen?"
+              : "Wie viele sind es?",
+        );
+      case "more":
+        return same(
+          { more: "Wo sind mehr?", fewer: "Wo sind weniger?", diff: `Wie viele sind ${q.bigger} mehr?` }[q.kind],
+        );
+      case "venn":
+        return same(q.ask === "place" ? `Wohin gehört ${q.item.article} ${q.item.word}?` : q.question);
       case "calc":
         return same(
           q.op === "fillUp"
@@ -222,6 +275,58 @@
           : `${blocks(Math.floor(q.a / 10), q.a % 10)}<p>${op} ${q.b / 10} Zehner</p>`;
         return `<div class="equation">${task}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${help}</div>`;
       }
+      case "count": {
+        const shown =
+          q.show === "dice"
+            ? `<div class="dice">${q.dice.map(die).join("")}</div>`
+            : q.show === "tally"
+              ? tally(q.number)
+              : q.show === "scatter"
+                ? `<div class="scatter" role="img" aria-label="Durcheinander">${q.points.map((point, i) => `<span class="scatter-item" style="left:${point.x}%;top:${point.y}%">${q.icon}<span class="item-n" hidden>${i + 1}</span></span>`).join("")}</div>`
+                : frames(q.frames, q.number);
+        return `${shown}${numberButtons(q.choices)}`;
+      }
+      case "more": {
+        const side = (name, count) =>
+          `<div class="set-box${q.bigSide === name ? " big" : ""}" data-side="${name}"><span class="set-head">${SIDES[name][1]}</span><span class="set-items" role="img" aria-label="${SIDES[name][1]}">${Array.from({ length: count }, () => `<span class="set-item">${q.icon}</span>`).join("")}</span><span class="set-count" hidden>${count}</span></div>`;
+        const answers =
+          q.kind === "diff"
+            ? numberButtons(q.choices)
+            : `<div class="answer-choices">${q.choices.map((choice) => `<button class="letter-button side-button" data-answer="${choice}" aria-label="${SIDES[choice][1]}">${SIDES[choice][0]}</button>`).join("")}</div>`;
+        return `<div class="set-compare">${side("links", q.left)}${side("rechts", q.right)}</div>${answers}`;
+      }
+      case "venn": {
+        // Two overlapping rings (or one) in a frame; the band below is "outside".
+        const one = q.rings.length === 1;
+        const [ringA, ringB] = q.rings;
+        const zones = one ? ["a", "none"] : ["a", "both", "b", "none"];
+        const caption = {
+          a: one ? "drin" : `nur ${ringA.label}`,
+          b: `nur ${ringB?.label}`,
+          both: "beide",
+          none: "draußen",
+        };
+        const aria = {
+          a: one ? `In den Kreis ${ringA.label}` : `Nur in den Kreis ${ringA.label}`,
+          b: `Nur in den Kreis ${ringB?.label}`,
+          both: "In die Mitte, in beide Kreise",
+          none: "Nach draußen, in keinen Kreis",
+        };
+        const place = q.ask === "place";
+        const zone = (name) => {
+          const inner = `<span class="zone-items">${q.placed
+            .filter((x) => x.zone === name)
+            .map((x) => `<span class="venn-thing" title="${x.word}">${x.icon}</span>`)
+            .join("")}</span><span class="zone-caption"${name === "none" ? "" : " hidden"}>${caption[name]}</span>`;
+          return place
+            ? `<button class="venn-zone zone-${name}" data-answer="${name}" aria-label="${aria[name]}">${inner}</button>`
+            : `<div class="venn-zone zone-${name}">${inner}</div>`;
+        };
+        const diagram = `<div class="venn${one ? " one" : ""}">${q.rings.map((ring, i) => `<span class="venn-ring ring-${i}"></span><span class="venn-label label-${i}">${ring.label}</span>`).join("")}${zones.map(zone).join("")}</div>`;
+        return place
+          ? `<div class="venn-target" aria-hidden="true">${q.item.icon}</div>${diagram}`
+          : `${diagram}${numberButtons(q.choices)}`;
+      }
       case "graph": {
         const max = Math.max(9, ...q.bars.map((bar) => bar.value));
         const chart = `<div class="bar-chart" role="img" aria-label="${q.topic}: ${q.bars.map((bar) => `${bar.word} ${bar.value}`).join(", ")}">${q.bars
@@ -256,6 +361,13 @@
 
   // After a right answer the gap shows it (equation, tile, balloon, chart cell).
   function reveal(q, root, value) {
+    if (q.mode === "venn" && q.ask === "place") {
+      root
+        .querySelector(`[data-answer="${value}"] .zone-items`)
+        .insertAdjacentHTML("beforeend", `<span class="venn-thing found">${q.item.icon}</span>`);
+      root.querySelector(".venn-target").classList.add("placed");
+      return;
+    }
     const target = root.querySelector("[data-reveal]");
     if (!target) return;
     target.textContent = value;
@@ -269,6 +381,8 @@
       return { text: `${picked} ist noch nicht dran.`, speech: `${capitalize(W(Number(picked)))} ist noch nicht dran.` };
     if (q.mode === "compare")
       return { text: `${picked} passt nicht.`, speech: "Dieses Zeichen passt nicht." };
+    if (q.mode === "venn" && q.ask === "place") return same("Da passt es nicht hin.");
+    if (SIDES[picked]) return same(`${SIDES[picked][1]} stimmt nicht.`);
     if (/^\d+$/.test(picked))
       return { text: `${picked} passt nicht.`, speech: `${capitalize(W(Number(picked)))} passt nicht.` };
     return same(`${picked} passt nicht.`);
@@ -395,6 +509,12 @@
         );
       case "graph":
         return graphTip(q, n, { find, showAll });
+      case "count":
+        return countTip(q, n, { find, showAll });
+      case "more":
+        return moreTip(q, n, { find, showAll });
+      case "venn":
+        return vennTip(q, n, { find, showAll });
       default:
         return same("Versuch es noch einmal.");
     }
@@ -499,6 +619,89 @@
     return same(
       q.kind === "sum" ? "Rechne die Zahlen über den Säulen zusammen." : "Die Zahlen über den Säulen helfen dir.",
     );
+  }
+
+  function countTip(q, n, { find, showAll }) {
+    if (n === 1)
+      return same(
+        {
+          frame: "Eine volle Reihe hat 5. Ein volles Zehnerfeld hat 10.",
+          missing: "Wie viele Kästchen sind noch leer?",
+          dice: "Zähle die Augen von beiden Würfeln.",
+          tally: "Ein Bündel mit Querstrich sind 5 Striche. Zähle in Fünfern: 5, 10, 15 …",
+          scatter: "Zähle langsam und zeige auf jedes Ding.",
+        }[q.show],
+      );
+    if (q.show === "frame") {
+      find(".frames").classList.add("helping");
+      return same("Zähle in Fünfern und dann weiter.");
+    }
+    if (q.show === "missing") {
+      find(".frames").classList.add("lit");
+      return same("Zähle die leeren Kästchen.");
+    }
+    if (q.show === "dice") {
+      showAll(".die-label");
+      return same("Rechne: erster Würfel plus zweiter Würfel.");
+    }
+    if (q.show === "tally") {
+      showAll(".tally-label");
+      return same("Die Zahlen zeigen, wie viele es bis dahin sind. Zähle die einzelnen Striche dazu.");
+    }
+    showAll(".item-n");
+    return same("Die Zahlen helfen beim Zählen.");
+  }
+  function moreTip(q, n, { find, showAll }) {
+    if (n === 1)
+      return same(
+        q.kind === "diff"
+          ? "Bilde Paare: immer eins links und eins rechts. Wie viele bleiben übrig?"
+          : q.bigSide
+            ? "Achtung: Groß heißt nicht viel. Zähle genau!"
+            : "Zähle beide Seiten genau.",
+      );
+    // Pairs: the things without a partner light up.
+    if (q.bigger !== "gleich")
+      [...find(`[data-side="${q.bigger}"]`).querySelectorAll(".set-item")]
+        .slice(Math.min(q.left, q.right))
+        .forEach((item) => item.classList.add("extra"));
+    if (n >= 3) {
+      showAll(".set-count");
+      return same("Schau auf die Zahlen unter den Seiten.");
+    }
+    return same(
+      q.bigger === "gleich"
+        ? "Bilde Paare: Bleibt eins übrig?"
+        : "Bilde Paare: Die leuchtenden Dinge haben keinen Partner.",
+    );
+  }
+  function vennTip(q, n, { find, showAll }) {
+    const ringB = q.rings[1];
+    if (q.ask === "place") {
+      if (n === 1) return same(q.rings.map((ring) => ring.ask).join(" "));
+      showAll(".zone-caption");
+      if (n === 2)
+        return same(
+          ringB
+            ? "Passt es zu beiden, kommt es in die Mitte. Passt es zu keinem, kommt es nach draußen."
+            : "Passt es, kommt es in den Kreis. Sonst kommt es nach draußen.",
+        );
+      return { text: q.explain.text, speech: q.explain.speech };
+    }
+    const ring = q.rings[q.ring];
+    const side = q.ring === 0 ? "a" : "b";
+    if (n === 1)
+      return same(
+        {
+          ring: `Zähle alles im Kreis „${ring.label}“ – auch die Dinge in der Mitte!`,
+          only: "Nur in einem Kreis heißt: nicht in der Mitte.",
+          both: "Die Mitte gehört zu beiden Kreisen.",
+          none: "In keinem Kreis heißt: draußen.",
+        }[q.ask],
+      );
+    const lit = { ring: [side, "both"], only: [side], both: ["both"], none: ["none"] }[q.ask];
+    lit.forEach((zone) => find(`.zone-${zone}`).classList.add("lit"));
+    return same("Zähle die Dinge in den hellen Feldern.");
   }
 
   window.WieseMath = { instruction, markup, renderBuilt, reveal, hint };
