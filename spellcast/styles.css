@@ -1250,6 +1250,17 @@ code,
     flex-shrink: 0;
 }
 
+.link-preview-glyph {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+}
+
+.link-preview-load {
+    margin-top: 6px;
+}
+
 .link-preview-meta {
     min-width: 0;
 }

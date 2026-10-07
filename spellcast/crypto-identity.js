@@ -173,6 +173,30 @@ export async function verifyReaction(reactorKeyB64, signatureB64, fields) {
   }
 }
 
+// ---- Encryption-key binding — proves an ECDH key belongs to a signing identity ----
+// The handshake carries the peer's ECDH (encryption) key. Without a binding, a
+// peer could pair *any* signing key with its own encryption key, so circle posts
+// sealed "to Alice" would be readable by whoever holds Alice's peer id. The
+// signing key signs its enc key; a replayed binding only ever yields the real
+// owner's enc key, which the replayer cannot decrypt with.
+const ENC_KEY_PREFIX = 'spellcast-enckey-v1';
+
+function encKeyBytes(signingKeyB64, encKeyB64) {
+  return new TextEncoder().encode(JSON.stringify([ENC_KEY_PREFIX, signingKeyB64 || '', encKeyB64 || '']));
+}
+
+/** Verify that `encKeyB64` was signed by the identity `signingKeyB64`. */
+export async function verifyEncKeyBinding(signingKeyB64, encKeyB64, signatureB64) {
+  const s = subtle();
+  if (!s || !signingKeyB64 || !encKeyB64 || !signatureB64) return false;
+  try {
+    const pub = await s.importKey('raw', b64ToBuf(signingKeyB64), ALGO, true, ['verify']);
+    return await s.verify(SIGN_ALGO, pub, b64ToBuf(signatureB64), encKeyBytes(signingKeyB64, encKeyB64));
+  } catch (err) {
+    return false;
+  }
+}
+
 /** Verify a signature (base64) over a message's signed fields. */
 export async function verifySignature(publicKeyB64, signatureB64, fields) {
   const s = subtle();
@@ -421,6 +445,18 @@ export class CryptoIdentity {
       return bufToB64(await s.sign(SIGN_ALGO, this.privateKey, reactionBytes(fields)));
     } catch (err) {
       console.warn('Reaction signing error:', err);
+      return null;
+    }
+  }
+
+  /** Sign the binding of our enc key to our signing key; base64 signature (or null). */
+  async signEncKeyBinding() {
+    const s = subtle();
+    if (!s || !this.privateKey || !this.publicKeyB64 || !this.encPublicKeyB64) return null;
+    try {
+      return bufToB64(await s.sign(SIGN_ALGO, this.privateKey, encKeyBytes(this.publicKeyB64, this.encPublicKeyB64)));
+    } catch (err) {
+      console.warn('Enc-key binding signing error:', err);
       return null;
     }
   }

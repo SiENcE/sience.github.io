@@ -6,9 +6,12 @@
 // that would break SpellCast's serverless, decentralized model. So instead we
 // render previews using only techniques that work directly in the browser
 // without a proxy:
-//   • direct image links        → inline <img> (images load cross-origin)
-//   • YouTube links             → provider thumbnail (stable img URL, no CORS)
-//   • any other link            → a clean "link card" with favicon + domain
+//   • any link                  → a clean "link card" with the domain (no fetch)
+//   • direct image links        → inline <img>, loaded only on click
+//   • YouTube links             → provider thumbnail, loaded only on click
+// Loading anything from the link's host reveals the viewer's IP address to it,
+// and links arrive from arbitrary peers — so nothing remote is fetched until
+// the viewer explicitly asks (the same reason thumbnails must be inline data:).
 // Everything is built with DOM APIs + textContent (never innerHTML), so user
 // content can't inject markup.
 
@@ -120,7 +123,7 @@ function buildYouTubeCard(videoId, url) {
 
   const img = document.createElement('img');
   img.loading = 'lazy';
-  img.src = `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+  img.src = `https://img.youtube.com/vi/${encodeURIComponent(videoId)}/hqdefault.jpg`;
   img.alt = 'YouTube video';
   img.onerror = () => link.remove();
 
@@ -154,13 +157,11 @@ function buildGenericCard(parsed, url) {
   link.rel = 'noopener noreferrer';
   link.className = 'link-preview link-preview-generic';
 
-  // Favicon served by the target site itself (no third-party proxy/tracker)
-  const favicon = document.createElement('img');
-  favicon.className = 'link-preview-favicon';
-  favicon.loading = 'lazy';
-  favicon.src = `${parsed.origin}/favicon.ico`;
-  favicon.alt = '';
-  favicon.onerror = () => favicon.remove();
+  // A local glyph rather than the site's favicon: fetching /favicon.ico would
+  // reveal every viewer's IP to whatever host a peer chose to link.
+  const favicon = document.createElement('span');
+  favicon.className = 'link-preview-favicon link-preview-glyph';
+  favicon.textContent = '🔗';
 
   const meta = document.createElement('div');
   meta.className = 'link-preview-meta';
@@ -196,9 +197,24 @@ export function buildLinkPreview(url) {
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
 
   const ytId = getYouTubeId(parsed);
-  if (ytId) return buildYouTubeCard(ytId, url);
+  const generic = buildGenericCard(parsed, url);
+  if (!ytId && !isImageUrl(parsed)) return generic;
 
-  if (isImageUrl(parsed)) return buildImageCard(url);
+  // Image / YouTube previews are fetched from a remote host: show the plain
+  // card plus an opt-in button, and only build (and so load) the rich preview
+  // when the viewer clicks it.
+  const wrap = document.createElement('div');
+  wrap.className = 'link-preview-optin';
+  wrap.appendChild(generic);
 
-  return buildGenericCard(parsed, url);
+  const load = document.createElement('button');
+  load.type = 'button';
+  load.className = 'small-button link-preview-load';
+  load.textContent = ytId ? 'Show video thumbnail' : 'Show image';
+  load.title = `Loads it from ${ytId ? 'img.youtube.com' : parsed.hostname}, which will see your IP address.`;
+  load.addEventListener('click', () => {
+    wrap.replaceChildren(ytId ? buildYouTubeCard(ytId, url) : buildImageCard(url));
+  });
+  wrap.appendChild(load);
+  return wrap;
 }

@@ -34,6 +34,14 @@ export class CircleManager {
   }
 
   /**
+   * Forget all in-memory circles (used when credentials are deleted).
+   */
+  reset() {
+    this.circles = [];
+    this.notifyUpdated();
+  }
+
+  /**
    * Persist circles to storage
    */
   async saveCircles() {

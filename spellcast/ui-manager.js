@@ -309,7 +309,7 @@ export class UIManager {
 
     // Browser refresh/close events
     window.addEventListener('beforeunload', () => {
-      // Ensure we're saving state appropriately
+      // Ensure we're saving state appropriately (both are no-ops when logged out)
       this.tweetManager.saveTweets();
       this.peerManager.savePeers();
     });
@@ -946,21 +946,41 @@ export class UIManager {
   /**
    * Delete the user's credentials (identity keys + saved data) from this device.
    */
-  deleteCredentials() {
-    if (confirm('Are you sure you want to delete your credentials? This disconnects you from all peers and erases your saved identity, messages, and data on this device.')) {
-      // Close all connections
-      const connections = this.peerManager.getAllConnections();
-      connections.forEach(conn => {
-        this.peerManager.disconnectPeer(conn);
-      });
-
-      // Delete credentials and stored data through the user manager
-      this.userManager.deleteCredentials(() => {
-        // Reset UI
-        this.showIntroScreen();
-        alert('Your credentials have been deleted successfully.');
-      });
+  async deleteCredentials() {
+    if (!confirm('Are you sure you want to delete your credentials? This disconnects you from all peers and erases your saved identity, messages, and data on this device.')) {
+      return;
     }
+
+    // Stop networking first so nothing can arrive (or be re-persisted by a late
+    // connection event) during or after the wipe, then drop all in-memory state —
+    // otherwise e.g. the beforeunload save would write the old messages back.
+    this.peerManager.shutdown();
+    this.tweetManager.reset();
+    if (this.circleManager) this.circleManager.reset();
+
+    try {
+      // Resets the user synchronously (so every save path becomes a no-op), then
+      // wipes IndexedDB (incl. media), cookies and legacy localStorage.
+      await this.userManager.deleteCredentials();
+    } catch (error) {
+      console.error('Error deleting credentials:', error);
+      alert(`Could not fully delete stored data: ${error.message}`);
+      return;
+    }
+
+    // Reset UI left over from the old account (QR codes would otherwise keep
+    // showing the old peer id on the next sign-up).
+    this.seenTweetIds = null;
+    this.clearMediaPreview();
+    this.elements.tweetContentInput.value = '';
+    this.elements.qrcode.replaceChildren();
+    this.elements.profileQrcode.replaceChildren();
+    this.elements.peerIdDisplay.textContent = '';
+    this.elements.credentialsArea.style.display = 'none';
+    this.elements.usernameInput.value = '';
+
+    this.showIntroScreen();
+    alert('Your credentials have been deleted successfully.');
   }
 
   /**
@@ -1279,7 +1299,17 @@ export class UIManager {
    * @returns {HTMLElement}
    */
   buildTweetElement(tweet, myName) {
-    const isMine = tweet.username === myName;
+    // "Mine" is decided by the verified signing key, never the self-asserted
+    // username (anyone can post under any name).
+    const myKey = this.userManager.publicKey;
+    const isMine = !!(myKey && tweet.verified && tweet.authorKey === myKey);
+    // Legacy unsigned posts under our name can't be proven ours, but may still be
+    // deleted locally / not sparked.
+    const isOwn = isMine || (!tweet.authorKey && tweet.username === myName);
+
+    // Only a verified key may lend a post its identity (fingerprint + avatar
+    // colour); an unverified key is just a claim anyone can copy.
+    const verifiedKey = tweet.verified && tweet.authorKey ? tweet.authorKey : null;
 
     const tweetElement = document.createElement('div');
     tweetElement.className = 'tweet';
@@ -1290,9 +1320,9 @@ export class UIManager {
     tweetMain.className = 'tweet-main';
 
     // Avatar shows the username's initial but its COLOR is seeded by the
-    // author's KEY when we have one, so two users with the same name still look
-    // different (and impersonators don't inherit a victim's avatar colour).
-    const avatar = this.createAvatar(tweet.username, isMine, tweet.authorKey || tweet.username);
+    // author's verified KEY when we have one, so two users with the same name
+    // still look different (and impersonators don't inherit a victim's colour).
+    const avatar = this.createAvatar(tweet.username, isMine, verifiedKey || tweet.username);
     tweetMain.appendChild(avatar);
 
     const tweetBody = document.createElement('div');
@@ -1304,11 +1334,11 @@ export class UIManager {
     const tweetUser = document.createElement('div');
     tweetUser.className = 'tweet-user';
     tweetUser.textContent = tweet.username;
-    if (tweet.authorKey) {
+    if (verifiedKey) {
       // Append the short key fingerprint so the displayed handle is `name#abcd`.
       const fp = document.createElement('span');
       fp.className = 'tweet-fingerprint';
-      fp.textContent = `#${fingerprint(tweet.authorKey)}`;
+      fp.textContent = `#${fingerprint(verifiedKey)}`;
       tweetUser.appendChild(fp);
     }
     tweetHeader.appendChild(tweetUser);
@@ -1355,8 +1385,6 @@ export class UIManager {
 
     // ✨ Spark — cast a sparkle onto someone else's spell (a reaction). You can't
     // spark your own; on your own posts the button just shows the count.
-    const myKey = this.userManager.publicKey;
-    const isOwn = isMine || !!(tweet.authorKey && myKey && tweet.authorKey === myKey);
     const { count: sparkCount, mine: sparked } = this.tweetManager.getReactionState(tweet.id);
 
     const sparkButton = document.createElement('button');
@@ -1376,7 +1404,7 @@ export class UIManager {
     tweetActions.appendChild(sparkButton);
 
     // Only add delete button for user's own tweets
-    if (isMine) {
+    if (isOwn) {
       const deleteButton = document.createElement('button');
       deleteButton.className = 'delete-tweet-button';
       deleteButton.textContent = 'Delete';
@@ -1693,7 +1721,9 @@ export class UIManager {
           row.className = 'circle-member-row';
           const label = document.createElement('span');
           const peer = knownPeers.find(p => p.peerId === peerId);
-          label.textContent = peer ? `${peer.username} (${peerId})` : peerId;
+          // The `name#fingerprint` handle, never the raw peer id (a routing
+          // address that also works as a login credential).
+          label.textContent = peer ? handleFor(peer.username, peer.publicKey) : 'Unknown peer';
           const remove = document.createElement('button');
           remove.className = 'small-button danger-button';
           remove.textContent = 'Remove';
@@ -1718,7 +1748,7 @@ export class UIManager {
         addable.forEach(p => {
           const opt = document.createElement('option');
           opt.value = p.peerId;
-          opt.textContent = `${p.username} (${p.peerId})`;
+          opt.textContent = handleFor(p.username, p.publicKey);
           select.appendChild(opt);
         });
         select.addEventListener('change', () => {
@@ -1743,21 +1773,29 @@ export class UIManager {
 
   /**
    * Known peers = union of connected + saved peers (deduped), excluding self.
-   * @returns {Array<{peerId: string, username: string}>}
+   * `publicKey` prefers the TOFU-pinned key, so the shown handle can't be
+   * borrowed by whoever currently holds the peer id.
+   * @returns {Array<{peerId: string, username: string, publicKey: string|null}>}
    */
   getKnownPeers() {
     const map = new Map();
+    const pins = this.peerManager.peerKeyPins || {};
 
     this.peerManager.getAllConnections().forEach(conn => {
       map.set(conn.peer, {
         peerId: conn.peer,
-        username: (conn.metadata && conn.metadata.username) || 'Unknown user'
+        username: (conn.metadata && conn.metadata.username) || 'Unknown user',
+        publicKey: pins[conn.peer] || (conn.metadata && conn.metadata.publicKey) || null
       });
     });
 
     (this.peerManager.savedPeers || []).forEach(p => {
       if (!map.has(p.peerId)) {
-        map.set(p.peerId, { peerId: p.peerId, username: p.username || 'Unknown user' });
+        map.set(p.peerId, {
+          peerId: p.peerId,
+          username: p.username || 'Unknown user',
+          publicKey: pins[p.peerId] || p.publicKey || null
+        });
       }
     });
 
@@ -2149,7 +2187,7 @@ export class UIManager {
       const connectButton = document.createElement('button');
       connectButton.textContent = 'Connect';
       connectButton.addEventListener('click', () => {
-        this.peerManager.connectToPeer(peerInfo.peerId);
+        this.connectToPeerId(peerInfo.peerId); // surfaces rate-limit / offline errors
       });
       buttonContainer.appendChild(connectButton);
 
@@ -2174,6 +2212,19 @@ export class UIManager {
     peerInfoContainer.appendChild(nameElement);
     peerInfoContainer.appendChild(statusElement);
     peerInfoContainer.appendChild(lastSeenElement);
+
+    // Someone at this address presented a different key than the one we pinned:
+    // possibly a different person holding the peer id. Circle posts skip them.
+    if (connection && connection.metadata && connection.metadata.keyMismatch) {
+      const warning = document.createElement('div');
+      warning.className = 'peer-key-warning';
+      warning.style.color = 'var(--danger)';
+      warning.style.fontSize = '0.8em';
+      warning.textContent = '⚠ Different key than before — this may not be the same person. '
+        + 'Circle posts are not sent to them. If they really reset their identity, '
+        + 'disconnect, remove, and reconnect them.';
+      peerInfoContainer.appendChild(warning);
+    }
 
     const peerLeft = document.createElement('div');
     peerLeft.className = 'peer-left';

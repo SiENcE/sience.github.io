@@ -13,7 +13,8 @@ export class StorageManager {
     IDENTITY: 'p2p_identity',       // signing keypair { privateKey: CryptoKey, publicKeyB64 }
     NAME_REGISTRY: 'p2p_name_pins', // TOFU pins: username -> first verified public key
     REACTIONS: 'p2p_reactions',     // tweetId -> { reactorKey -> { name, active, ts, sig } }
-    REMOVED_PEERS: 'p2p_removed_peers' // peerIds the user explicitly removed (persistent blocklist)
+    REMOVED_PEERS: 'p2p_removed_peers', // peerIds the user explicitly removed (persistent blocklist)
+    PEER_KEY_PINS: 'p2p_peer_key_pins'  // TOFU pins: peerId -> first signing key seen at that address
   };
 
   // Database configuration
@@ -241,9 +242,15 @@ export class StorageManager {
         try {
           const localData = localStorage.getItem(storageKey);
           if (localData) {
-            const parsedData = JSON.parse(localData);
-            await this.saveToStorage(storageKey, parsedData);
-            console.log(`Migrated ${storageKey} from localStorage to IndexedDB`);
+            // Never overwrite newer IndexedDB data with the stale legacy copy, and
+            // drop the legacy copy once handled so it is not re-imported on every
+            // start (which would also resurrect data after "Delete Credentials").
+            const existing = await this.loadFromStorage(storageKey);
+            if (existing === undefined || existing === null) {
+              await this.saveToStorage(storageKey, JSON.parse(localData));
+              console.log(`Migrated ${storageKey} from localStorage to IndexedDB`);
+            }
+            localStorage.removeItem(storageKey);
           }
         } catch (e) {
           console.error(`Error migrating ${storageKey} from localStorage:`, e);
@@ -338,17 +345,27 @@ export class StorageManager {
     return (await this.loadFromStorage(StorageManager.KEYS.REACTIONS)) || {};
   }
 
-  // Clear all data (for credentials deletion)
+  /**
+   * Clear all data (for credentials deletion): cookies, every key in the main
+   * store, the whole media store, and any legacy localStorage copies (which the
+   * startup migration would otherwise re-import).
+   */
   async clearAllData() {
     await this.deleteUserCredentials();
-    await this.removeFromStorage(StorageManager.KEYS.TWEETS);
-    await this.removeFromStorage(StorageManager.KEYS.PEERS);
-    await this.removeFromStorage(StorageManager.KEYS.TWEET_RECIPIENTS);
-    await this.removeFromStorage(StorageManager.KEYS.UNSENT_TWEETS);
-    await this.removeFromStorage(StorageManager.KEYS.CIRCLES);
-    await this.removeFromStorage(StorageManager.KEYS.IDENTITY);
-    await this.removeFromStorage(StorageManager.KEYS.NAME_REGISTRY);
-    await this.removeFromStorage(StorageManager.KEYS.REACTIONS);
+
+    const db = await this.dbPromise;
+    await new Promise((resolve, reject) => {
+      const transaction = db.transaction([StorageManager.STORE_NAME, StorageManager.MEDIA_STORE_NAME], 'readwrite');
+      transaction.objectStore(StorageManager.STORE_NAME).clear();
+      transaction.objectStore(StorageManager.MEDIA_STORE_NAME).clear();
+      transaction.oncomplete = () => resolve(true);
+      transaction.onerror = (event) => reject(event.target.error);
+      transaction.onabort = (event) => reject(event.target.error);
+    });
+
+    for (const key of Object.values(StorageManager.KEYS)) {
+      try { localStorage.removeItem(key); } catch (_) { /* storage unavailable */ }
+    }
 
     console.log('All IndexedDB data cleared');
   }

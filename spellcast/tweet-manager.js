@@ -141,6 +141,10 @@ export class TweetManager {
 
 	// In saveTweets()
 	async saveTweets() {
+	  // Nothing to persist without an account (also stops late async writes after
+	  // the credentials were deleted).
+	  if (!this.userManager.isLoggedIn()) return;
+
 	  // Apply limit before saving to prevent storage overflow
 	  if (this.tweets.length > this.MAX_TWEETS_STORAGE) {
 		console.log(`Limiting tweets to ${this.MAX_TWEETS_STORAGE} before saving`);
@@ -153,8 +157,26 @@ export class TweetManager {
 
 	// In saveMessageDistributionState()
 	async saveMessageDistributionState() {
+	  if (!this.userManager.isLoggedIn()) return;
 	  await this.storageManager.saveToStorage(StorageManager.KEYS.TWEET_RECIPIENTS, this.tweetRecipients);
 	  await this.storageManager.saveToStorage(StorageManager.KEYS.UNSENT_TWEETS, this.unsentTweets);
+	}
+
+	/**
+	 * Forget all in-memory message state (used when credentials are deleted, so
+	 * nothing of the old account can be re-persisted or shown afterwards).
+	 */
+	reset() {
+		this.tweets = [];
+		this.tweetRecipients = {};
+		this.unsentTweets = {};
+		this.nameRegistry = {};
+		this.reactions = {};
+		this.rateLimiter = new RateLimiter();
+
+		if (typeof this.onTweetsUpdated === 'function') {
+			this.onTweetsUpdated();
+		}
 	}
 
 	/**
@@ -228,20 +250,27 @@ export class TweetManager {
 			: this.peerManager.getConnectedPeerIds();
 
 		// Sign the message with our private key so peers can verify it really
-		// came from this identity (and no relay tampered with it).
-		const authorKey = this.userManager.publicKey;
-		const signature = authorKey
+		// came from this identity (and no relay tampered with it). If signing
+		// fails, send no key at all: peers treat a key without a signature as a
+		// stripped/forged message and drop it.
+		const publicKey = this.userManager.publicKey;
+		const signature = publicKey
 			? await this.userManager.identity.sign(
-				this.signedFields({ authorKey, username, content, timestamp, id: tweetId, mediaId, circle: circleName }))
+				this.signedFields({ authorKey: publicKey, username, content, timestamp, id: tweetId, mediaId, circle: circleName }))
 			: null;
+		const authorKey = signature ? publicKey : null;
 
 		// Add tweet locally (with author id and, for circle posts, the audience name)
 		this.addTweet(username, content, timestamp, connectedPeerIds, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName,
 			{ authorKey, signature, verified: !!signature });
 
 		// Send to peers (awaits loading the full image for transfer)
-		await this.broadcastTweet(content, timestamp, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName, targetPeerIds,
+		const { undeliverable } = await this.broadcastTweet(content, timestamp, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName, targetPeerIds,
 			{ authorKey, signature });
+		if (undeliverable > 0) {
+			this.peerManager.updateStatus(
+				`Circle post not delivered to ${undeliverable} connected member(s): no verified encryption key yet.`);
+		}
 
 		// Notify listeners
 		if (typeof this.onTweetsUpdated === 'function') {
@@ -266,10 +295,17 @@ export class TweetManager {
 	  addTweet(username, content, timestamp, recipients = null, id = null, mediaId = null, mediaThumbnail = null, mediaType = null, authorId = null, circle = null, identity = {}) {
 		const tweetId = id || this.generateUniqueId(username, content, timestamp);
 
-		// Check if we already have this tweet
+		// Check if we already have this tweet. A verified copy supersedes an
+		// unverified one with the same id, so a relay that strips the signature
+		// (and edits the content) cannot pin its forgery in place of the genuine
+		// message.
 		const existingTweet = this.tweets.find(t => t.id === tweetId);
 		if (existingTweet) {
-		  return tweetId;
+		  if (existingTweet.verified || !identity.verified) {
+			return tweetId;
+		  }
+		  this.tweets = this.tweets.filter(t => t !== existingTweet);
+		  delete this.tweetRecipients[tweetId];
 		}
 
 		// Create new tweet object with media info
@@ -503,6 +539,20 @@ export class TweetManager {
 	}
 
 	/**
+	 * Send a message, throwing if the link is dead. PeerJS's send() does not throw
+	 * on a closed connection (it emits an 'error' event instead), so without this
+	 * check the unsent-queue fallbacks around these sends would never run.
+	 * @param {Object} conn - PeerJS connection
+	 * @param {Object} message
+	 */
+	sendOrThrow(conn, message) {
+		if (!this.peerManager.isConnectionOpen(conn)) {
+			throw new Error('Connection is not open');
+		}
+		conn.send(message);
+	}
+
+	/**
 	 * Forward a freshly received tweet to our other connected peers (multi-hop
 	 * relay). Peers that already have the tweet (per recipient tracking) and the
 	 * peer we received it from are skipped, which prevents loops/storms.
@@ -545,7 +595,7 @@ export class TweetManager {
 			}
 
 			try {
-				conn.send(relayData);
+				this.sendOrThrow(conn, relayData);
 				relayed++;
 
 				if (!this.tweetRecipients[tweetId]) {
@@ -697,13 +747,18 @@ export class TweetManager {
 			: allConnections;
 
 		// ---- Confidentiality for circle posts (P3) ----
-		// Circle (narrow-cast) posts are sealed to each recipient's encryption key,
-		// so the broker / any intermediary / a wrong-identity peer holding the peer
-		// id cannot read them. Public posts are sent in the clear (they are meant to
-		// propagate across the whole mesh). Peers without an enc key (legacy) are
-		// skipped for an encrypted post.
+		// Circle (narrow-cast) posts are sealed to each recipient's encryption key.
+		// That key is only accepted from the handshake when the peer's (TOFU-pinned)
+		// signing key has signed it (see PeerManager.handleHandshakeMessage), so
+		// the broker, an intermediary, or someone squatting a member's peer id
+		// cannot read them. Public posts are sent in the clear (they are meant to
+		// propagate across the whole mesh). There is NO cleartext fallback: members
+		// without a verified enc key (legacy client, handshake not finished yet,
+		// key mismatch) are simply skipped.
 		let encByPeer = null; // Map<peerId, sealedEnvelope> when encrypting
-		if (circleName && connections.length > 0) {
+		let undeliverable = 0;
+		if (circleName) {
+			encByPeer = new Map();
 			const recipients = connections
 				.map(conn => ({ peer: conn.peer, encKey: this.peerManager.getPeerEncKey(conn.peer) }))
 				.filter(r => r.encKey);
@@ -718,17 +773,14 @@ export class TweetManager {
 				});
 				// One sealed envelope per recipient (addressed to that one key), so a peer
 				// only ever receives a blob it alone can open.
-				encByPeer = new Map();
 				for (const r of recipients) {
 					const sealed = await sealForRecipients(plaintext, [r.encKey]);
 					if (sealed) encByPeer.set(r.peer, sealed);
 				}
-				const skipped = connections.filter(c => !encByPeer.has(c.peer)).map(c => c.peer);
-				if (skipped.length) {
-					console.warn('Encrypted circle post: skipping peers without an encryption key:', skipped);
-				}
-			} else {
-				console.warn('Circle post sent in cleartext: no recipient has an encryption key (legacy peers).');
+			}
+			undeliverable = connections.filter(c => !encByPeer.has(c.peer)).length;
+			if (undeliverable > 0) {
+				console.warn(`Circle post: skipped ${undeliverable} member(s) without a verified encryption key.`);
 			}
 		}
 
@@ -753,7 +805,7 @@ export class TweetManager {
 			}
 
 			try {
-				conn.send(payload);
+				this.sendOrThrow(conn, payload);
 
 				// Mark as sent to this peer
 				if (this.tweetRecipients[tweetId] && !this.tweetRecipients[tweetId].includes(conn.peer)) {
@@ -782,6 +834,8 @@ export class TweetManager {
 
 		// Save the updated recipient and unsent tweet information
 		this.saveMessageDistributionState();
+
+		return { undeliverable };
 	}
 
 	/**
@@ -896,6 +950,7 @@ export class TweetManager {
 	}
 
 	async saveReactions() {
+		if (!this.userManager.isLoggedIn()) return;
 		try { await this.storageManager.saveReactions(this.reactions); } catch (_) {}
 	}
 
@@ -1059,17 +1114,23 @@ export class TweetManager {
 	/**
 	 * Verify a received message's signature and resolve its trust state.
 	 * @param {Object} data - raw wire payload (has authorKey/signature or not)
-	 * @returns {Promise<{verified: boolean, nameConflict: boolean}>}
+	 * `invalid` means the message must be dropped: its signature does not verify,
+	 * or it carries only half of the proof (a key without a signature is what a
+	 * relay produces by stripping the signature to edit a signed post).
+	 * @returns {Promise<{verified: boolean, nameConflict: boolean, invalid: boolean}>}
 	 */
 	async resolveTrust(data) {
-		if (!data.authorKey || !data.signature) {
+		if (!data.authorKey && !data.signature) {
 			// Unsigned (legacy / un-upgraded peer): accepted but never "verified".
-			return { verified: false, nameConflict: false };
+			return { verified: false, nameConflict: false, invalid: false };
+		}
+		if (!data.authorKey || !data.signature) {
+			return { verified: false, nameConflict: false, invalid: true };
 		}
 		const ok = await verifySignature(data.authorKey, data.signature, this.signedFields(data));
-		if (!ok) return { verified: false, nameConflict: false };
+		if (!ok) return { verified: false, nameConflict: false, invalid: true };
 		const nameConflict = await this.pinAndCheckName(data.username, data.authorKey);
-		return { verified: true, nameConflict };
+		return { verified: true, nameConflict, invalid: false };
 	}
 
 	/**
@@ -1230,7 +1291,7 @@ export class TweetManager {
 					// image; omits local-only trust flags like `verified`).
 					const enrichedTweets = await Promise.all(batch.map(tweet => this.buildTweetPayload(tweet)));
 
-					conn.send({
+					this.sendOrThrow(conn, {
 						type: 'all_tweets',
 						tweets: enrichedTweets
 					});
@@ -1331,11 +1392,12 @@ export class TweetManager {
 			}
 
 			// Verify the signature (if any) and resolve trust state. A *present*
-			// but invalid signature means the message was forged or tampered with
-			// — drop it outright rather than show a forgery.
+			// but invalid signature (or a key with its signature stripped) means
+			// the message was forged or tampered with — drop it outright rather
+			// than show a forgery.
 			const trust = await this.resolveTrust(data);
-			if (data.signature && !trust.verified) {
-				console.warn('Dropping tweet with invalid signature from peer', conn.peer);
+			if (trust.invalid) {
+				console.warn('Dropping tweet with invalid or missing signature from peer', conn.peer);
 				this.peerManager.recordPeerStrike(conn.peer);
 				return;
 			}
@@ -1343,8 +1405,10 @@ export class TweetManager {
 			// If the tweet has an ID, use it, otherwise generate one
 			const tweetId = data.id || this.generateUniqueId(data.username, data.content, data.timestamp);
 
-			// Is this the first time we've seen this tweet? (drives relay)
-			const isNew = !this.tweets.some(t => t.id === tweetId);
+			// First time we've seen this tweet, or a verified copy replacing an
+			// unverified one? (drives relay — the genuine copy should propagate)
+			const existing = this.tweets.find(t => t.id === tweetId);
+			const isNew = !existing || (!existing.verified && trust.verified);
 
 			// Persist any full image that came along, into our own IndexedDB
 			await this.storeIncomingMedia(data);
@@ -1478,8 +1542,8 @@ export class TweetManager {
 
 					// Verify signature (if present); drop forged/tampered ones.
 					const trust = await this.resolveTrust(cleanTweet);
-					if (cleanTweet.signature && !trust.verified) {
-						console.warn('Skipping bulk tweet with invalid signature from peer', conn.peer);
+					if (trust.invalid) {
+						console.warn('Skipping bulk tweet with invalid or missing signature from peer', conn.peer);
 						suspicious = true;
 						continue;
 					}
@@ -1487,7 +1551,8 @@ export class TweetManager {
 					// Use the tweet's ID if provided, otherwise generate one
 					const tweetId = cleanTweet.id || this.generateUniqueId(cleanTweet.username, cleanTweet.content, cleanTweet.timestamp);
 
-					const isNew = !this.tweets.some(t => t.id === tweetId);
+					const existing = this.tweets.find(t => t.id === tweetId);
+					const isNew = !existing || (!existing.verified && trust.verified);
 
 					// Persist any full image that came along, into our own IndexedDB
 					if (cleanTweet.mediaId && fullImage) {

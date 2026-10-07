@@ -2,7 +2,7 @@
 
 import { StorageManager } from './storage-manager.js';
 import { RateLimiter } from './rate-limiter.js';
-import { randomToken } from './crypto-identity.js';
+import { randomToken, verifyEncKeyBinding, handleFor } from './crypto-identity.js';
 
 // ---------------------------------------------------------------------------
 // Optional self-hosted broker / TURN configuration (P2 — broker privacy).
@@ -29,9 +29,12 @@ export class PeerManager {
 
     // State
     this.peer = null;
-    this.connections = [];
+    this.connections = [];               // OPEN connections we accepted (at most one per peer)
     this.savedPeers = [];
-    this.handshakeCompleted = new Set(); // Track peers that completed handshake
+    this.pendingConnections = new Map(); // peerId -> { conn, startedAt } for outgoing attempts not yet open
+    this.connectionOpenedAt = new WeakMap(); // conn -> ms timestamp it opened (duplicate resolution)
+    this.handshakeSent = new WeakSet();  // connections we've already sent our handshake on
+    this.retryAttempts = {};             // peerId -> automatic retries since the last successful open
     this.peerStatus = {};                // Status of all known peers
     this.lastSeen = {};                  // When peers were last seen
     this.peerConnectionQuality = {};     // Connection quality for each peer
@@ -49,6 +52,11 @@ export class PeerManager {
     this.CONNECT_MAX_ATTEMPTS = 5;    // Maximum connection attempts
     this.CONNECT_TIME_WINDOW_MS = 60000; // 1 minute window
 
+    // Connection lifecycle
+    this.PENDING_TIMEOUT_MS = 30000;  // An outgoing attempt not open by then is abandoned
+    this.GLARE_WINDOW_MS = 5000;      // Two links to one peer opened this close together = simultaneous connect
+    this.MAX_PEER_RETRIES = 3;        // Automatic retries for an unavailable peer (10s, 20s, 40s)
+
     // Inbound-message abuse resistance (P2 — mesh hardening)
     this.INBOUND_MAX = 400;            // Max messages per peer per window...
     this.INBOUND_WINDOW_MS = 10000;    // ...10s (generous; normal sync bursts are fine)
@@ -62,6 +70,12 @@ export class PeerManager {
     // reconnected to, accepted from, or sent to again — until the user deliberately
     // connects to them anew. Loaded from / saved to storage so removal survives login.
     this.removedPeers = new Set();
+
+    // TOFU pins: peerId -> the first signing key seen at that address. A peer id
+    // is only a routing address anyone can claim while its owner is offline, so a
+    // later handshake from that id with a DIFFERENT key is flagged (keyMismatch)
+    // and never trusted with circle posts. Persisted with the peers.
+    this.peerKeyPins = {};
 
     // Message handlers
     this.messageHandlers = {};
@@ -87,17 +101,70 @@ export class PeerManager {
   }
 
   /**
+   * Create a PeerJS peer and install it as `this.peer`, destroying any previous
+   * one first. Every peer the app creates goes through here so that:
+   *  - exactly one peer is ever live (a superseded peer's late events are ignored);
+   *  - errors BEFORE 'open' go to `onInitError`, where the caller picks a single
+   *    fallback, while errors AFTER 'open' go to handlePeerError — a late network
+   *    error must not re-run the sign-up chain (which minted a new random id);
+   *  - connection / disconnected / close handlers are attached on every path,
+   *    including the auto-login one.
+   * @param {string|null} id - peer id to claim, or null for a broker-assigned one
+   * @param {Object|undefined} options - PeerJS options
+   * @param {(id: string) => void} onOpen
+   * @param {(err: Error) => void} onInitError
+   * @returns {Object} the new peer
+   */
+  createPeer(id, options, onOpen, onInitError) {
+    this.destroyPeer();
+
+    const peer = new Peer(id || undefined, options);
+    this.peer = peer;
+    let opened = false;
+
+    peer.on('open', (openedId) => {
+      if (peer !== this.peer) return;
+      opened = true;
+      onOpen(openedId);
+    });
+    peer.on('error', (err) => {
+      if (peer !== this.peer) return;
+      console.error('Peer error:', err);
+      if (opened) {
+        this.handlePeerError(err);
+      } else {
+        onInitError(err);
+      }
+    });
+    peer.on('connection', (conn) => {
+      if (peer === this.peer) this.handleConnection(conn);
+    });
+    peer.on('disconnected', () => {
+      if (peer === this.peer) this.handlePeerDisconnected();
+    });
+    peer.on('close', () => {
+      if (peer === this.peer) this.handlePeerClosed();
+    });
+    return peer;
+  }
+
+  /** Destroy the current peer (if any) without letting its teardown events fire into our handlers. */
+  destroyPeer() {
+    if (!this.peer) return;
+    const old = this.peer;
+    this.peer = null;
+    try { old.removeAllListeners(); } catch (_) {}
+    try { old.destroy(); } catch (_) {}
+    this.pendingConnections.clear();
+  }
+
+  /**
    * Initialize a new peer connection
    * @returns {Promise} Promise that resolves when peer is connected
    */
   initializePeer() {
     return new Promise((resolve, reject) => {
       try {
-        // Close any existing peer
-        if (this.peer) {
-          this.peer.destroy();
-        }
-
         // Use PeerJS public server with fallback options
         const peerConfig = {
           config: {
@@ -113,32 +180,21 @@ export class PeerManager {
 
         // Create a new peer with a random ID
         console.log('Attempting to create new peer with random ID...');
-        this.peer = new Peer(this.applyCustomServer(peerConfig));
-
-        // Setup event handlers
-        this.peer.on('open', (id) => {
+        this.createPeer(null, this.applyCustomServer(peerConfig), (id) => {
           console.log('Peer connection established with ID:', id);
           this.userManager.saveCredentials(this.userManager.username, id);
           this.updateStatus(`Connected with ID: ${id}`);
           resolve(id);
-        });
-
-        this.peer.on('error', (err) => {
-          console.error('Peer error:', err);
+        }, (err) => {
           if (err.type === 'server-error' || err.type === 'network') {
             // Try to use fallback server
             this.updateStatus('Connection error. Trying alternative server...');
-            this.peer.destroy();
             this.initializeWithFallbackServer().then(resolve).catch(reject);
           } else {
             this.handlePeerError(err);
             reject(err);
           }
         });
-
-        this.peer.on('connection', this.handleConnection);
-        this.peer.on('disconnected', this.handlePeerDisconnected.bind(this));
-        this.peer.on('close', this.handlePeerClosed.bind(this));
       } catch (error) {
         console.error('Error initializing peer:', error);
         reject(error);
@@ -170,32 +226,23 @@ export class PeerManager {
           }
         };
 
-        this.peer = new Peer(this.applyCustomServer(fallbackConfig));
-
-        this.peer.on('open', (id) => {
+        this.createPeer(null, this.applyCustomServer(fallbackConfig), (id) => {
           console.log('Fallback connection established with ID:', id);
           this.userManager.saveCredentials(this.userManager.username, id);
           this.updateStatus(`Connected with ID: ${id} (fallback server)`);
           this.usingFallbackServer = true;
           resolve(id);
-        });
-
-        this.peer.on('error', (err) => {
-          console.error('Fallback server error:', err);
-          this.handlePeerError(err);
-
-          // Try one last option - direct mode with no server
+        }, (err) => {
+          // Try one last option - direct mode. (Not handlePeerError: that would
+          // start switchToFallbackServer in parallel and leave two live peers.)
           if (err.type === 'server-error' || err.type === 'network') {
             this.updateStatus('Trying direct connection mode...');
             this.initializeDirectMode().then(resolve).catch(reject);
           } else {
+            this.handlePeerError(err);
             reject(err);
           }
         });
-
-        this.peer.on('connection', this.handleConnection);
-        this.peer.on('disconnected', this.handlePeerDisconnected.bind(this));
-        this.peer.on('close', this.handlePeerClosed.bind(this));
       } catch (error) {
         console.error('Error in fallback connection:', error);
         reject(error);
@@ -238,20 +285,16 @@ export class PeerManager {
             }
           };
 
-          this.peer = new Peer(randomId, this.applyCustomServer(directConfig));
-
-          this.peer.on('open', (id) => {
+          this.createPeer(randomId, this.applyCustomServer(directConfig), (id) => {
             console.log('Direct mode connection initialized with ID:', id);
             this.userManager.saveCredentials(this.userManager.username, id);
             this.updateStatus(`Connected with ID: ${id} (direct mode)`);
             resolve(id);
-          });
-
-          this.peer.on('error', (err) => {
+          }, (err) => {
             console.error(`Direct mode error (attempt ${this.directModeAttempts}/${MAX_DIRECT_MODE_ATTEMPTS}):`, err);
-            this.handlePeerError(err);
 
             // Try again with exponential backoff if we haven't exceeded max attempts
+            // (createPeer destroys this failed peer before the next one is made).
             if (this.directModeAttempts < MAX_DIRECT_MODE_ATTEMPTS) {
               const backoffTime = Math.pow(2, this.directModeAttempts) * 1000;
               console.log(`Retrying direct mode in ${backoffTime / 1000} seconds...`);
@@ -259,11 +302,12 @@ export class PeerManager {
 
               setTimeout(attemptDirectConnection, backoffTime);
             } else {
+              // Out of options: report it, but don't hand a network error to
+              // handlePeerError (it would start yet another fallback peer).
+              this.updateStatus(`Connection error: ${err.message}`);
               reject(err);
             }
           });
-
-          this.peer.on('connection', this.handleConnection);
         };
 
         // Start the first attempt
@@ -373,6 +417,28 @@ export class PeerManager {
     }
   }
 
+  /** Load the peerId -> signing-key pins from storage. */
+  async loadPeerKeyPins() {
+    try {
+      const pins = await this.storageManager.loadFromStorage(StorageManager.KEYS.PEER_KEY_PINS);
+      if (pins && typeof pins === 'object') {
+        this.peerKeyPins = pins;
+      }
+    } catch (e) {
+      console.error('Error loading peer key pins:', e);
+    }
+  }
+
+  /** Persist the peerId -> signing-key pins. */
+  async savePeerKeyPins() {
+    if (!this.userManager.isLoggedIn()) return;
+    try {
+      await this.storageManager.saveToStorage(StorageManager.KEYS.PEER_KEY_PINS, this.peerKeyPins);
+    } catch (e) {
+      console.error('Error saving peer key pins:', e);
+    }
+  }
+
   /**
    * Clear a peer from the removed blocklist. Called when the user deliberately
    * connects to a peer again, so an explicit re-add overrides a prior removal.
@@ -398,31 +464,23 @@ export class PeerManager {
           return;
         }
 
-        // Close any existing peer
-        if (this.peer) {
-          this.peer.destroy();
-        }
-
         // Create new peer with saved ID. Pass options only when a custom broker/
         // TURN is configured, so default (public-cloud) behaviour is unchanged.
-        this.peer = this.hasCustomServer()
-          ? new Peer(peerId, this.applyCustomServer({ debug: 1, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], iceCandidatePoolSize: 10 } }))
-          : new Peer(peerId);
+        // (createPeer also wires the disconnected/close handlers, so a logged-in
+        // session recovers from a broker drop the same way a new one does.)
+        const options = this.hasCustomServer()
+          ? this.applyCustomServer({ debug: 1, config: { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }], iceCandidatePoolSize: 10 } })
+          : undefined;
 
-        this.peer.on('open', (id) => {
+        this.createPeer(peerId, options, (id) => {
           console.log('Logged in with ID:', id);
-
-          // Set up connection handlers
-          this.peer.on('connection', this.handleConnection);
 
           // Connect to saved peers after login
           this.loadPeers();
           setTimeout(() => this.connectToSavedPeers(), 1000);
 
           resolve(id);
-        });
-
-        this.peer.on('error', (err) => {
+        }, (err) => {
           console.error('Peer login error:', err);
           if (err.type === 'unavailable-id') {
             reject(new Error('This Peer ID is unavailable. It might be in use or invalid.'));
@@ -446,11 +504,25 @@ export class PeerManager {
     console.error('Peer error:', err);
 
     switch (err.type) {
-      case 'peer-unavailable':
-        // Target peer not available
-        this.updateStatusWithRetry(`Peer ${err.peer} not available. Retrying in 10 seconds...`);
-        this.schedulePeerRetry(err.peer);
+      case 'peer-unavailable': {
+        // Target peer not available. PeerJS does not expose which peer on the
+        // error object — only in the message ("Could not connect to peer <id>").
+        const match = /Could not connect to peer (\S+)/.exec(err.message || '');
+        const peerId = match ? match[1] : null;
+        if (!peerId) {
+          this.updateStatus('A peer is not available right now.');
+          break;
+        }
+        // The attempt is dead; drop it so a retry (or the user) can try afresh.
+        this.abandonPendingConnection(peerId);
+        const delayMs = this.schedulePeerRetry(peerId);
+        if (delayMs) {
+          this.updateStatusWithRetry(`${this.peerLabel(peerId)} is not available. Retrying in ${delayMs / 1000} seconds...`);
+        } else {
+          this.updateStatus(`${this.peerLabel(peerId)} is not available.`);
+        }
         break;
+      }
 
       case 'network':
       case 'server-error':
@@ -533,13 +605,10 @@ export class PeerManager {
       return; // Already in fallback mode
     }
 
-    // Close existing connection
-    if (this.peer) {
-      this.peer.destroy();
-    }
-
-    // Clear all handshake tracking when switching servers - add this line
-    this.handshakeCompleted.clear();
+    // Create new peer with the original ID for consistent identity. Without an
+    // id yet (still signing up) the init chain owns the fallback instead.
+    const { peerId } = this.userManager.getUserInfo();
+    if (!peerId) return;
 
     this.usingFallbackServer = true;
     this.updateStatus('Reconnecting with fallback configuration...');
@@ -560,19 +629,139 @@ export class PeerManager {
       }
     };
 
-    // Create new peer with the original ID for consistent identity
-    const { peerId } = this.userManager.getUserInfo();
-    this.peer = new Peer(peerId, this.applyCustomServer(fallbackConfig));
-
-    // Reconnect event handlers
-    this.peer.on('open', (id) => {
+    // createPeer destroys the old peer first (its connections close with it).
+    this.createPeer(peerId, this.applyCustomServer(fallbackConfig), () => {
       this.updateStatus('Connected to fallback server');
       // Restore connections
       this.reconnectToPeers();
-    });
+    }, (err) => this.handlePeerError(err));
+  }
 
-    this.peer.on('error', this.handlePeerError.bind(this));
-    this.peer.on('connection', this.handleConnection);
+  // ---- Connection bookkeeping ----
+  // Invariant: `this.connections` holds only connections that have OPENED and
+  // that we accepted — at most one per peer. Outgoing attempts that have not
+  // opened yet live in `pendingConnections`. Every close/error handler acts on
+  // its own connection object (never "all connections with this peer id"), so
+  // a duplicate or stale link can't take the live one down with it.
+
+  /**
+   * Whether a connection can actually carry data. PeerJS's `send()` does NOT
+   * throw on a dead link (it emits an 'error' event instead), so liveness must be
+   * checked explicitly rather than by try/catch around a send.
+   * @param {Object} conn
+   * @returns {boolean}
+   */
+  isConnectionOpen(conn) {
+    return !!(conn && conn.open && (!conn.dataChannel || conn.dataChannel.readyState === 'open'));
+  }
+
+  /** Whether we hold an open connection to this peer. */
+  hasOpenConnection(peerId) {
+    return this.connections.some(c => c.peer === peerId && this.isConnectionOpen(c));
+  }
+
+  /**
+   * Whether an outgoing attempt to this peer is still in flight. Attempts that
+   * never opened within PENDING_TIMEOUT_MS (peer offline, ICE failure) are
+   * abandoned here so a fresh attempt can be made.
+   */
+  hasPendingConnection(peerId) {
+    const pending = this.pendingConnections.get(peerId);
+    if (!pending) return false;
+    if (Date.now() - pending.startedAt < this.PENDING_TIMEOUT_MS) return true;
+    this.abandonPendingConnection(peerId);
+    return false;
+  }
+
+  /** Drop (and close) an outgoing attempt that has not opened. */
+  abandonPendingConnection(peerId) {
+    const pending = this.pendingConnections.get(peerId);
+    if (!pending) return;
+    this.pendingConnections.delete(peerId);
+    try { pending.conn.removeAllListeners(); } catch (_) {}
+    try { pending.conn.close(); } catch (_) {}
+  }
+
+  /** Forget a connection's pending entry once it opened / closed / failed. */
+  clearPending(conn) {
+    const pending = this.pendingConnections.get(conn.peer);
+    if (pending && pending.conn === conn) {
+      this.pendingConnections.delete(conn.peer);
+    }
+  }
+
+  /**
+   * Open an outgoing connection and track it as pending until it opens, so the
+   * periodic reconnect can't stack duplicate attempts to the same peer.
+   * @param {string} peerId
+   * @param {Object} [metadata] - local-only metadata (e.g. the saved username)
+   * @returns {Object|null} the connection, or null if the peer can't connect now
+   */
+  openConnection(peerId, metadata = null) {
+    if (!this.peer) return null;
+    // PeerJS returns undefined (and emits an error) while we're disconnected
+    // from the broker.
+    const conn = this.peer.connect(peerId, { reliable: true });
+    if (!conn) return null;
+    if (metadata) conn.metadata = metadata;
+    this.pendingConnections.set(peerId, { conn, startedAt: Date.now() });
+    this.handleConnection(conn);
+    return conn;
+  }
+
+  /**
+   * Detach, close, and forget a connection. Listeners are removed first, so its
+   * 'close' cannot touch the peer's state — the caller decides what that is (it
+   * may be a duplicate whose peer stays connected via another link).
+   * @param {Object} conn
+   */
+  retireConnection(conn) {
+    try { conn.removeAllListeners(); } catch (_) {}
+    try { conn.close(); } catch (_) {}
+    this.connections = this.connections.filter(c => c !== conn);
+    this.clearPending(conn);
+  }
+
+  /**
+   * Two open connections to the same peer: pick the one to keep. Both sides
+   * must pick the SAME one, or each closes the link the other kept.
+   *  - If the existing link is older than GLARE_WINDOW_MS, the newcomer wins: an
+   *    old link that the peer replaced is usually half-dead (e.g. they reloaded
+   *    and our side hasn't noticed yet), and only we still hold it.
+   *  - Otherwise both sides connected at once ("glare"): keep the link with the
+   *    smaller connectionId, which both ends share.
+   * @returns {Object} the connection to keep
+   */
+  chooseConnection(existing, candidate) {
+    if (!this.isConnectionOpen(existing)) return candidate;
+    const existingAge = Date.now() - (this.connectionOpenedAt.get(existing) || 0);
+    if (existingAge > this.GLARE_WINDOW_MS) return candidate;
+    return existing.connectionId < candidate.connectionId ? existing : candidate;
+  }
+
+  /** Record that we no longer hold a connection to a peer, and refresh UI/storage. */
+  markPeerOffline(peerId, status = 'offline', message = null) {
+    this.peerStatus[peerId] = status;
+    this.lastSeen[peerId] = Date.now();
+    this.savePeers();
+    this.updateStatus(message || `Connected to ${this.connections.length} peer(s)`);
+    if (typeof this.onPeersUpdated === 'function') {
+      this.onPeersUpdated();
+    }
+  }
+
+  /**
+   * Label for a peer in status messages: the `name#fingerprint` handle, never
+   * the raw peer id (which is a routing address / login credential).
+   * @param {string} peerId
+   * @returns {string}
+   */
+  peerLabel(peerId) {
+    const conn = this.connections.find(c => c.peer === peerId);
+    const saved = this.savedPeers.find(p => p.peerId === peerId);
+    const username = (conn && conn.metadata && conn.metadata.username) || (saved && saved.username);
+    if (!username || username === 'Unknown user') return 'Peer';
+    return handleFor(username, this.peerKeyPins[peerId] || (saved && saved.publicKey) || null);
   }
 
   /**
@@ -615,34 +804,25 @@ export class PeerManager {
     }
 
     // Check if already connected to this peer
-    const existingConnIndex = this.connections.findIndex(conn => conn.peer === peerId);
-
-    if (existingConnIndex !== -1) {
-      console.log(`Already have a connection to peer: ${peerId}, testing if active...`);
-      const existingConn = this.connections[existingConnIndex];
-
-      try {
-        // Test if connection is still active
-        existingConn.send({ type: 'ping' });
-        this.updateStatus(`Already connected to ${peerId}`);
-        return existingConn;
-      } catch (e) {
-        console.log(`Existing connection to ${peerId} appears inactive, removing and creating new connection`);
-        // Remove the stale connection
-        this.connections.splice(existingConnIndex, 1);
-        this.handshakeCompleted.delete(peerId);
-
-        // Try to close it cleanly
-        try { existingConn.close(); } catch (err) { }
-      }
+    const existingConn = this.connections.find(conn => conn.peer === peerId);
+    if (existingConn && this.isConnectionOpen(existingConn)) {
+      this.updateStatus(`Already connected to ${this.peerLabel(peerId)}`);
+      return existingConn;
+    }
+    if (existingConn) {
+      console.log(`Existing connection to ${peerId} is dead; replacing it.`);
+      this.retireConnection(existingConn);
     }
 
-    // Create new connection
-    const conn = this.peer.connect(peerId, {
-      reliable: true
-    });
+    // A deliberate attempt replaces any automatic one still in flight and
+    // restarts the automatic retry budget.
+    this.abandonPendingConnection(peerId);
+    delete this.retryAttempts[peerId];
 
-    this.handleConnection(conn);
+    const conn = this.openConnection(peerId);
+    if (!conn) {
+      throw new Error('Not connected to the signaling server right now. Please try again shortly.');
+    }
     return conn;
   }
 
@@ -653,59 +833,53 @@ export class PeerManager {
     // (see connectToPeer), so this only fires for genuinely-removed peers.
     if (this.isPeerRemoved(conn.peer)) {
       console.log(`Refusing connection with removed peer: ${conn.peer}`);
-      try { conn.close(); } catch (_) {}
+      this.retireConnection(conn);
+      return;
+    }
+    // A peer blocklisted for abuse can't simply reconnect until the block expires.
+    if (this.isPeerBlocked(conn.peer)) {
+      console.log(`Refusing connection with blocklisted peer: ${conn.peer}`);
+      this.retireConnection(conn);
       return;
     }
 
-    // Check if already connected to this peer
-    const existingConnIndex = this.connections.findIndex(existingConn => existingConn.peer === conn.peer);
-
-    if (existingConnIndex !== -1) {
-      console.log(`Found existing connection to peer: ${conn.peer}, checking if still active...`);
-      const existingConn = this.connections[existingConnIndex];
-
-      // Check if the existing connection is working
-      try {
-        // Test if connection is open by sending a ping
-        existingConn.send({ type: 'ping' });
-
-        // If we get here without error, existing connection is working
-        console.log('Existing connection appears active, rejecting new connection');
-        conn.close();
-        return;
-      } catch (e) {
-        // Existing connection is likely broken
-        console.log('Existing connection appears broken, replacing with new connection');
-
-        // Try to close the old connection
-        try { existingConn.close(); } catch (err) { }
-
-        // Remove old connection
-        this.connections.splice(existingConnIndex, 1);
-
-        // Clear handshake state for this peer
-        this.handshakeCompleted.delete(conn.peer);
-      }
-    }
-
+    // Duplicate links to the same peer are resolved once this one opens (see
+    // chooseConnection) — deciding here would be premature, since an "existing"
+    // link that still looks open may be dead.
     conn.on('open', () => {
+      this.clearPending(conn);
+      this.connectionOpenedAt.set(conn, Date.now());
+
+      // The user may have removed this peer while the connection was opening.
+      if (this.isPeerRemoved(conn.peer)) {
+        this.retireConnection(conn);
+        return;
+      }
+
+      // At most one connection per peer.
+      const existing = this.connections.find(c => c !== conn && c.peer === conn.peer);
+      if (existing) {
+        if (this.chooseConnection(existing, conn) === existing) {
+          console.log(`Duplicate connection to ${conn.peer}; keeping the existing one.`);
+          this.retireConnection(conn);
+          return;
+        }
+        console.log(`Replacing connection to ${conn.peer} with the newer one.`);
+        this.retireConnection(existing);
+      }
+
       console.log('Connected to peer:', conn.peer);
       this.connections.push(conn);
+      delete this.retryAttempts[conn.peer];
 
       // Update peer status tracking
       this.peerStatus[conn.peer] = 'online';
       this.lastSeen[conn.peer] = Date.now();
       this.peerConnectionQuality[conn.peer] = 'good';
 
-      // Send initial handshake if we haven't already
-      if (!this.handshakeCompleted.has(conn.peer)) {
-        conn.send({
-          type: 'handshake',
-          username: this.userManager.username,
-          publicKey: this.userManager.publicKey,
-          encPublicKey: this.userManager.encPublicKey
-        });
-      }
+      // Handshake on every accepted connection: metadata (and the verified enc
+      // key) is per connection, so a replacement link needs its own.
+      this.sendHandshake(conn);
 
       // Update UI
       this.savePeers();
@@ -753,48 +927,36 @@ export class PeerManager {
 
     // Handle connection closure
     conn.on('close', () => {
-      console.log('Connection closed with peer:', conn.peer);
-      this.connections = this.connections.filter(c => c.peer !== conn.peer);
-      // Update peer status to offline but keep it in the list
-      this.peerStatus[conn.peer] = 'offline';
-      this.lastSeen[conn.peer] = Date.now();
-      // Remove from handshake tracking
-      this.handshakeCompleted.delete(conn.peer);
+      this.clearPending(conn);
+      const wasActive = this.connections.includes(conn);
+      this.connections = this.connections.filter(c => c !== conn);
+      // A link that never opened (or was already superseded) doesn't change the peer's state.
+      if (!wasActive) return;
 
-      // Update UI and saved state
-      this.savePeers();
-      this.updateStatus(`Connected to ${this.connections.length} peer(s)`);
+      console.log('Connection closed with peer:', conn.peer);
+      // Update peer status to offline but keep it in the list
+      this.markPeerOffline(conn.peer, 'offline');
 
       // Notify any disconnection callbacks
       this.notifyPeerDisconnectionCallbacks(conn.peer);
-
-      // Notify listeners
-      if (typeof this.onPeersUpdated === 'function') {
-        this.onPeersUpdated();
-      }
     });
 
     // Handle connection errors
     conn.on('error', (err) => {
       console.error(`Connection error with peer ${conn.peer}:`, err);
-      // Update peer status
-      this.peerStatus[conn.peer] = 'error';
-      this.lastSeen[conn.peer] = Date.now();
-      // Remove problematic connection
-      this.connections = this.connections.filter(c => c.peer !== conn.peer);
-      this.handshakeCompleted.delete(conn.peer);
+      // PeerJS also reports non-fatal errors on a live link (e.g. a message that
+      // is too large); only a link that is actually dead is torn down.
+      if (this.isConnectionOpen(conn)) return;
 
-      // Update UI and saved state
-      this.savePeers();
-      this.updateStatus(`Connected to ${this.connections.length} peer(s)`);
+      this.clearPending(conn);
+      const wasActive = this.connections.includes(conn);
+      this.connections = this.connections.filter(c => c !== conn);
+      if (!wasActive) return;
+
+      this.markPeerOffline(conn.peer, 'error');
 
       // Notify any error callbacks
       this.notifyPeerErrorCallbacks(conn.peer, err);
-
-      // Notify listeners
-      if (typeof this.onPeersUpdated === 'function') {
-        this.onPeersUpdated();
-      }
     });
   }
 
@@ -803,77 +965,61 @@ export class PeerManager {
    * @param {Object} conn - The connection to close
    */
   disconnectPeer(conn) {
-    // Close the connection
-    try {
-      conn.close();
-    } catch (e) {
-      console.error('Error closing connection:', e);
+    const wasActive = this.connections.includes(conn);
+    const label = this.peerLabel(conn.peer);
+    this.retireConnection(conn);
+
+    if (wasActive) {
+      this.markPeerOffline(conn.peer, 'offline', `Disconnected from ${label}`);
+
+      // Notify any disconnection callbacks
+      this.notifyPeerDisconnectionCallbacks(conn.peer);
     }
-
-    // Remove from connections array
-    this.connections = this.connections.filter(c => c.peer !== conn.peer);
-
-    // Update peer status
-    this.peerStatus[conn.peer] = 'offline';
-    this.lastSeen[conn.peer] = Date.now();
-
-    // Remove from handshake tracking
-    this.handshakeCompleted.delete(conn.peer);
-
-    // Update UI and saved state
-    this.savePeers();
-    this.updateStatus(`Disconnected from ${conn.peer}`);
-
-    // Notify any disconnection callbacks
-    this.notifyPeerDisconnectionCallbacks(conn.peer);
   }
 
   /**
-   * Reconnect to all known peers
+   * Reconnect to all known peers (after switching to a new peer object, whose
+   * predecessor's connections died with it).
    */
   reconnectToPeers() {
-    // Store the previous connections
-    const previousConnections = [...this.connections];
-    this.connections = [];
-
-    // Reconnect to each peer
-    previousConnections.forEach(prevConn => {
-      if (prevConn.peer !== this.userManager.peerId) {
-        console.log(`Attempting to reconnect with ${prevConn.peer}...`);
-
-        const newConn = this.peer.connect(prevConn.peer, {
-          reliable: true
-        });
-
-        // Transfer metadata if available
-        if (prevConn.metadata) {
-          newConn.metadata = prevConn.metadata;
-        }
-
-        this.handleConnection(newConn);
-      }
-    });
-
-    // Connect to saved peers
-    if (this.savedPeers && this.savedPeers.length > 0) {
-      this.connectToSavedPeers();
-    }
-
+    this.connectToSavedPeers();
     this.updateStatus('Attempting to reconnect to peers...');
   }
 
   /**
-   * Schedule a retry to connect to a specific peer
+   * Schedule an automatic retry for a peer that was unavailable, with
+   * exponential backoff and a bounded number of attempts (reset when a
+   * connection to the peer opens, or when the user connects deliberately).
    * @param {string} peerId - The ID of the peer to retry connecting to
+   * @returns {number} the delay in ms, or 0 if no retry was scheduled
    */
   schedulePeerRetry(peerId) {
-    this.pendingRetry = () => {
-      console.log(`Retrying connection to ${peerId}...`);
-      this.connectToPeer(peerId);
-      this.updateStatus(`Reconnecting to ${peerId}...`);
-    };
+    if (!peerId || this.isPeerRemoved(peerId)) return 0;
 
-    setTimeout(this.pendingRetry, 10000); // Retry after 10 seconds
+    const attempt = (this.retryAttempts[peerId] || 0) + 1;
+    if (attempt > this.MAX_PEER_RETRIES) return 0;
+    this.retryAttempts[peerId] = attempt;
+
+    const delayMs = 10000 * Math.pow(2, attempt - 1);
+    this.pendingRetry = () => this.autoConnect(peerId);
+    setTimeout(this.pendingRetry, delayMs);
+    return delayMs;
+  }
+
+  /**
+   * Automatic (not user-initiated) connection attempt, used by retries and the
+   * saved-peer reconnect. Unlike connectToPeer it never clears a removal and
+   * never spends the user's manual connect budget, and it skips peers we're
+   * already connected or connecting to.
+   * @param {string} peerId
+   * @param {Object} [metadata] - local-only metadata (e.g. the saved username)
+   */
+  autoConnect(peerId, metadata = null) {
+    if (!this.peer || this.peer.disconnected) return;
+    if (!peerId || peerId === this.userManager.peerId) return; // Don't connect to self
+    if (this.isPeerRemoved(peerId)) return; // Never auto-reconnect to a removed peer
+    if (this.hasOpenConnection(peerId) || this.hasPendingConnection(peerId)) return;
+    this.openConnection(peerId, metadata);
   }
 
   /**
@@ -924,19 +1070,17 @@ export class PeerManager {
 
     // Check individual peer connections
     if (this.connections.length > 0) {
-      console.log('Checking connection status of all peers...');
+      // Drop links whose data channel died without a 'close' event.
+      const stale = this.connections.filter(conn => !this.isConnectionOpen(conn));
+      stale.forEach(conn => {
+        console.log(`Detected stale connection to ${conn.peer}, removing...`);
+        this.retireConnection(conn);
+        this.markPeerOffline(conn.peer, 'offline');
+        this.notifyPeerDisconnectionCallbacks(conn.peer);
+      });
 
-      // Filter to keep only active connections
-      const previousLength = this.connections.length;
-      this.connections = this.connections.filter(conn => {
-        // Check if connection is still open
-        if (conn._dc && conn._dc.readyState !== 'open') {
-          console.log(`Detected stale connection to ${conn.peer}, removing...`);
-          try { conn.close(); } catch (e) { console.error('Error closing connection:', e); }
-          return false;
-        }
-
-        // Send ping to check connection
+      // Ping the live ones (drives connection quality + inactivity tracking)
+      this.connections.forEach(conn => {
         try {
           conn.send({
             type: 'ping',
@@ -944,21 +1088,8 @@ export class PeerManager {
           });
         } catch (e) {
           console.error(`Error pinging peer ${conn.peer}:`, e);
-          return false;
         }
-
-        return true;
       });
-
-      // If connections were removed, update state
-      if (previousLength !== this.connections.length) {
-        this.savePeers();
-        this.updateConnectionQualityIndicator();
-        // Notify listeners
-        if (typeof this.onPeersUpdated === 'function') {
-          this.onPeersUpdated();
-        }
-      }
     }
     // If no active connections but we have saved peers, try to connect
     else if (this.savedPeers && this.savedPeers.length > 0) {
@@ -981,45 +1112,18 @@ export class PeerManager {
     const now = Date.now();
     const INACTIVE_THRESHOLD = 30 * 60 * 1000; // 30 minutes of inactivity
 
-    // Check each connection
-    this.connections = this.connections.filter(conn => {
-      const lastSeenTime = this.lastSeen[conn.peer] || 0;
-      const timeSinceLastSeen = now - lastSeenTime;
+    // A peer we haven't heard from (not even a ping) for the threshold duration
+    const inactive = this.connections.filter(conn => now - (this.lastSeen[conn.peer] || 0) > INACTIVE_THRESHOLD);
 
-      // If peer hasn't been seen for the threshold duration
-      if (timeSinceLastSeen > INACTIVE_THRESHOLD) {
-        console.log(`Peer ${conn.peer} has been inactive for ${Math.floor(timeSinceLastSeen / 60000)} minutes. Disconnecting.`);
+    // Only touch storage / UI when something actually changed.
+    inactive.forEach(conn => {
+      console.log(`Peer ${conn.peer} has been inactive for ${Math.floor((now - (this.lastSeen[conn.peer] || 0)) / 60000)} minutes. Disconnecting.`);
+      this.retireConnection(conn);
+      this.markPeerOffline(conn.peer, 'timeout');
 
-        // Close connection
-        try {
-          conn.close();
-        } catch (e) {
-          console.error('Error closing inactive connection:', e);
-        }
-
-        // Update peer status
-        this.peerStatus[conn.peer] = 'timeout';
-        this.lastSeen[conn.peer] = now;
-
-        // Remove from handshake tracking
-        this.handshakeCompleted.delete(conn.peer);
-
-        // Notify any disconnection callbacks
-        this.notifyPeerDisconnectionCallbacks(conn.peer);
-
-        return false; // Remove from connections array
-      }
-
-      return true; // Keep in connections array
+      // Notify any disconnection callbacks
+      this.notifyPeerDisconnectionCallbacks(conn.peer);
     });
-
-    // If connections were modified, update UI
-    this.savePeers();
-
-    // Notify listeners
-    if (typeof this.onPeersUpdated === 'function') {
-      this.onPeersUpdated();
-    }
   }
 
   /**
@@ -1076,6 +1180,7 @@ export class PeerManager {
 	  // below can drop any removed peer that lingers in the saved list (e.g. from
 	  // a pre-removal state) and never restore it into the active maps.
 	  await this.loadRemovedPeers();
+	  await this.loadPeerKeyPins();
 
 	  const peers = await this.storageManager.loadFromStorage(StorageManager.KEYS.PEERS);
 
@@ -1098,6 +1203,9 @@ export class PeerManager {
    * Save peers to storage
    */
 	async savePeers() {
+	  // Nothing to persist without an account — and this stops late async events
+	  // (e.g. a connection 'close') from re-writing peers after credentials are deleted.
+	  if (!this.userManager.isLoggedIn()) return;
 	  try {
 		// Extract peer info including status. Removed peers are excluded so a
 		// transient status entry can never resurrect them in storage.
@@ -1109,10 +1217,11 @@ export class PeerManager {
 		  return {
 			peerId: peerId,
 			username: connection?.metadata?.username || saved?.username || 'Unknown user',
-			// Persist the peer's signing key (learned at handshake) so the UI can
-			// show the verifiable `name#fingerprint` handle even while they're
-			// offline, instead of leaking the raw peer ID / network address.
-			publicKey: connection?.metadata?.publicKey || saved?.publicKey || null,
+			// Persist the peer's signing key so the UI can show the verifiable
+			// `name#fingerprint` handle even while they're offline, instead of
+			// leaking the raw peer ID / network address. The TOFU pin wins over a
+			// (possibly impostor) key claimed in the current handshake.
+			publicKey: this.peerKeyPins[peerId] || connection?.metadata?.publicKey || saved?.publicKey || null,
 			status: this.peerStatus[peerId] || 'unknown',
 			lastSeen: this.lastSeen[peerId] || Date.now(),
 			connectionQuality: this.peerConnectionQuality[peerId] || 'unknown'
@@ -1138,26 +1247,9 @@ export class PeerManager {
 
     this.savedPeers.forEach(peerInfo => {
       try {
-        // Never auto-reconnect to a peer the user removed.
-        if (this.isPeerRemoved(peerInfo.peerId)) {
-          return;
-        }
-        if (peerInfo.peerId !== this.userManager.peerId) { // Don't connect to self
-          // Check if already connected
-          if (this.connections.some(conn => conn.peer === peerInfo.peerId)) {
-            console.log(`Already connected to saved peer: ${peerInfo.peerId}`);
-            return;
-          }
-
-          const conn = this.peer.connect(peerInfo.peerId, {
-            reliable: true
-          });
-
-          // Add metadata early
-          conn.metadata = { username: peerInfo.username };
-
-          this.handleConnection(conn);
-        }
+        // Skips removed peers, ourselves, and peers already connected or
+        // connecting (so the 15s health check can't stack attempts).
+        this.autoConnect(peerInfo.peerId, { username: peerInfo.username });
       } catch (e) {
         console.error(`Error connecting to saved peer ${peerInfo.peerId}:`, e);
       }
@@ -1205,15 +1297,19 @@ export class PeerManager {
 
     // Close any live connection to this peer (handles the case where the peer
     // came back online and reconnected before removal).
-    const conn = this.connections.find(c => c.peer === peerId);
-    if (conn) {
-      try { conn.close(); } catch (_) {}
+    this.connections.filter(c => c.peer === peerId).forEach(c => this.retireConnection(c));
+    this.abandonPendingConnection(peerId);
+    delete this.retryAttempts[peerId];
+
+    // Forget the pinned key too: deliberately re-adding the peer later re-pins
+    // whatever key they present (the escape hatch for a genuine identity reset).
+    if (this.peerKeyPins[peerId]) {
+      delete this.peerKeyPins[peerId];
+      this.savePeerKeyPins();
     }
-    this.connections = this.connections.filter(c => c.peer !== peerId);
 
     // Remove from saved peers and all in-memory tracking.
     this.savedPeers = this.savedPeers.filter(peer => peer.peerId !== peerId);
-    this.handshakeCompleted.delete(peerId);
     delete this.peerStatus[peerId];
     delete this.lastSeen[peerId];
     delete this.peerConnectionQuality[peerId];
@@ -1227,7 +1323,7 @@ export class PeerManager {
       this.onPeersUpdated();
     }
 
-    this.updateStatus(`Removed peer ${peerId}`);
+    this.updateStatus('Peer removed');
   }
 
   /**
@@ -1244,30 +1340,114 @@ export class PeerManager {
    * @param {Object} data - Message data
    * @param {Object} conn - Connection object
    */
-  handleHandshakeMessage(data, conn) {
-    // Update the username of this peer
-    const connectionIndex = this.connections.findIndex(c => c.peer === conn.peer);
-    if (connectionIndex !== -1) {
-      // Note: handshake username/publicKey are self-asserted and used only for
-      // display. Authorship is trusted only via per-message signatures.
-      this.connections[connectionIndex].metadata = {
-        username: data.username,
-        publicKey: data.publicKey || null,
-        encPublicKey: data.encPublicKey || null
-      };
-      this.savePeers();
+  async handleHandshakeMessage(data, conn) {
+    // Every accepted connection sends its own handshake on open; reply here only
+    // if this link somehow hasn't (sendHandshake marks it synchronously).
+    if (!this.handshakeSent.has(conn)) {
+      this.sendHandshake(conn);
     }
 
-    // Only send a handshake back if we haven't completed the handshake already
-    if (!this.handshakeCompleted.has(conn.peer)) {
-      conn.send({
-        type: 'handshake',
-        username: this.userManager.username,
-        publicKey: this.userManager.publicKey,
-        encPublicKey: this.userManager.encPublicKey
-      });
-      // Mark handshake as completed for this peer
-      this.handshakeCompleted.add(conn.peer);
+    const asKey = (v) => (typeof v === 'string' && v.length > 0 && v.length <= 256) ? v : null;
+    const username = (typeof data.username === 'string' && data.username.length <= 64) ? data.username : 'Unknown user';
+    const claimedKey = asKey(data.publicKey);
+    const claimedEncKey = asKey(data.encPublicKey);
+
+    // A different key at a pinned address means someone else holds this peer id
+    // (e.g. registered it while the owner was offline).
+    const pinnedKey = this.peerKeyPins[conn.peer] || null;
+    const keyMismatch = !!(pinnedKey && claimedKey !== pinnedKey);
+    if (!pinnedKey && claimedKey) {
+      this.peerKeyPins[conn.peer] = claimedKey;
+      this.savePeerKeyPins();
+    }
+
+    // Accept the encryption key only if the (pinned) signing key vouches for it,
+    // so circle posts are sealed to the identity — not to whoever has the peer id.
+    let encPublicKey = null;
+    if (!keyMismatch && claimedKey && claimedEncKey &&
+        await verifyEncKeyBinding(claimedKey, claimedEncKey, data.encKeySig)) {
+      encPublicKey = claimedEncKey;
+    }
+    if (keyMismatch) {
+      console.warn(`Peer ${conn.peer} presented a different signing key than the one pinned for it.`);
+    }
+
+    // Metadata belongs to THIS link only (never copied onto another connection
+    // to the same peer id), and only while it's still the accepted one.
+    if (this.connections.includes(conn)) {
+      // Note: handshake username/publicKey are self-asserted and used only for
+      // display. Authorship is trusted only via per-message signatures.
+      conn.metadata = {
+        username,
+        publicKey: claimedKey,
+        encPublicKey,
+        keyMismatch
+      };
+      this.savePeers();
+      if (typeof this.onPeersUpdated === 'function') {
+        this.onPeersUpdated();
+      }
+    }
+  }
+
+  /**
+   * Build our handshake: display name, signing key, and the encryption key plus
+   * a signature binding it to the signing key (cached per enc key).
+   * @returns {Promise<Object>}
+   */
+  async buildHandshake() {
+    const identity = this.userManager.identity;
+    const encPublicKey = this.userManager.encPublicKey;
+    if (this._encKeySigFor !== encPublicKey) {
+      this._encKeySig = (identity && encPublicKey) ? await identity.signEncKeyBinding() : null;
+      this._encKeySigFor = encPublicKey;
+    }
+    return {
+      type: 'handshake',
+      username: this.userManager.username,
+      publicKey: this.userManager.publicKey,
+      encPublicKey,
+      encKeySig: this._encKeySig || null
+    };
+  }
+
+  /**
+   * Send our handshake to a peer.
+   * @param {Object} conn - Connection object
+   */
+  async sendHandshake(conn) {
+    this.handshakeSent.add(conn);
+    try {
+      conn.send(await this.buildHandshake());
+    } catch (err) {
+      console.error(`Failed to send handshake to ${conn.peer}:`, err);
+    }
+  }
+
+  /**
+   * Tear down all networking and forget in-memory peer state (used when the
+   * user deletes their credentials). Listeners are detached before closing so
+   * late async close/error events cannot touch state after the wipe.
+   */
+  shutdown() {
+    [...this.connections].forEach(conn => this.retireConnection(conn));
+    this.destroyPeer(); // also drops pending outgoing attempts
+
+    this.connections = [];
+    this.savedPeers = [];
+    this.retryAttempts = {};
+    this.peerStatus = {};
+    this.lastSeen = {};
+    this.peerConnectionQuality = {};
+    this.blockedPeers = {};
+    this.removedPeers = new Set();
+    this.peerKeyPins = {};
+    this.rateLimiter = new RateLimiter();
+    this.usingFallbackServer = false;
+    this.reconnectAttempts = 0;
+
+    if (typeof this.onPeersUpdated === 'function') {
+      this.onPeersUpdated();
     }
   }
 
