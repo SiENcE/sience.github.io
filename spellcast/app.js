@@ -32,7 +32,32 @@ class SpellCastApp {
     );
   }
 
+  /**
+   * Hold a Web Lock for as long as this tab runs, so only one SpellCast tab per
+   * browser profile is active. Two tabs would share this IndexedDB (and
+   * overwrite each other's data) and fight over the same peer id at the broker.
+   * @returns {Promise<boolean>} false if another tab already holds it
+   */
+  acquireSessionLock() {
+    if (!navigator.locks || !navigator.locks.request) return Promise.resolve(true);
+    return new Promise((resolve) => {
+      navigator.locks.request('spellcast-session', { ifAvailable: true }, (lock) => {
+        if (!lock) {
+          resolve(false);
+          return undefined;
+        }
+        resolve(true);
+        return new Promise(() => {}); // never settles: held until the tab closes
+      }).catch(() => resolve(true));
+    });
+  }
+
   async initialize() {
+    if (!(await this.acquireSessionLock())) {
+      this.uiManager.showSessionBlocked();
+      return;
+    }
+
     // Migrate data from localStorage to IndexedDB
     await this.storageManager.migrateFromLegacyStorage();
     
@@ -62,32 +87,17 @@ class SpellCastApp {
     if (!hasCredentials) {
       this.uiManager.showIntroScreen();
     } else {
-      // Auto-login with saved credentials
-      try {
-        // Attempt to login to the peer network with saved credentials
-        await this.peerManager.loginToPeer();
+      // Auto-login with saved credentials.
+      // Claim our own name->key binding so impersonators of us get flagged.
+      await this.tweetManager.pinOwnIdentity();
 
-        // Claim our own name->key binding so impersonators of us get flagged.
-        await this.tweetManager.pinOwnIdentity();
-
-        // Show the app UI
-        this.uiManager.elements.appContainer.style.display = 'block';
-        this.uiManager.elements.currentUserElement.textContent = this.userManager.username;
-
-        // Update profile information and render the loaded history
-        this.uiManager.updateProfileInfo();
-        this.uiManager.renderTweets();
-        this.uiManager.updatePeersList();
-
-        // If we were opened via a scanned "?connect=" QR link, act on it now.
-        this.uiManager.consumePendingConnect();
-      } catch (error) {
-        console.error('Auto-login error:', error);
-        // If auto-login fails, show the intro screen
-        this.uiManager.showIntroScreen();
-        // Optionally, show an error message
-        alert('Failed to auto-login: ' + error.message);
-      }
+      // Show the app — and the locally stored history — right away: reaching
+      // the broker can take a while or need retries (e.g. it still holds our id
+      // from the page we just reloaded), and that shouldn't keep the user out of
+      // their own feed or bounce them to the intro screen.
+      const login = this.uiManager.connectInBackground();
+      this.uiManager.enterApp();
+      await login;
     }
 
     // Set up periodic media cleanup

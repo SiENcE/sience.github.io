@@ -35,6 +35,12 @@ export class PeerManager {
     this.connectionOpenedAt = new WeakMap(); // conn -> ms timestamp it opened (duplicate resolution)
     this.handshakeSent = new WeakSet();  // connections we've already sent our handshake on
     this.retryAttempts = {};             // peerId -> automatic retries since the last successful open
+    this.peerOpen = false;               // whether this.peer is registered with the broker
+    this.peerOpenWaiters = [];           // callbacks waiting for that (see whenPeerOpen)
+    // Peers the user clicked "Disconnect" on this session: not auto-reconnected,
+    // and their incoming connections are refused, until the user connects again.
+    // (Session-only — unlike a removal, this is a pause, not a blocklist.)
+    this.manuallyDisconnected = new Set();
     this.peerStatus = {};                // Status of all known peers
     this.lastSeen = {};                  // When peers were last seen
     this.peerConnectionQuality = {};     // Connection quality for each peer
@@ -56,6 +62,7 @@ export class PeerManager {
     this.PENDING_TIMEOUT_MS = 30000;  // An outgoing attempt not open by then is abandoned
     this.GLARE_WINDOW_MS = 5000;      // Two links to one peer opened this close together = simultaneous connect
     this.MAX_PEER_RETRIES = 3;        // Automatic retries for an unavailable peer (10s, 20s, 40s)
+    this.MAX_LOGIN_ATTEMPTS = 5;      // loginWithRetry: 2s, 4s, 8s, 16s between attempts
 
     // Inbound-message abuse resistance (P2 — mesh hardening)
     this.INBOUND_MAX = 400;            // Max messages per peer per window...
@@ -125,7 +132,12 @@ export class PeerManager {
     peer.on('open', (openedId) => {
       if (peer !== this.peer) return;
       opened = true;
+      this.peerOpen = true;
       onOpen(openedId);
+      const waiters = this.peerOpenWaiters.splice(0);
+      waiters.forEach(fn => {
+        try { fn(); } catch (e) { console.error('Error in peer-open callback:', e); }
+      });
     });
     peer.on('error', (err) => {
       if (peer !== this.peer) return;
@@ -153,6 +165,7 @@ export class PeerManager {
     if (!this.peer) return;
     const old = this.peer;
     this.peer = null;
+    this.peerOpen = false;
     try { old.removeAllListeners(); } catch (_) {}
     try { old.destroy(); } catch (_) {}
     this.pendingConnections.clear();
@@ -483,7 +496,9 @@ export class PeerManager {
         }, (err) => {
           console.error('Peer login error:', err);
           if (err.type === 'unavailable-id') {
-            reject(new Error('This Peer ID is unavailable. It might be in use or invalid.'));
+            const error = new Error('This Peer ID is unavailable. It might be in use or invalid.');
+            error.type = 'unavailable-id'; // keep the type so callers can decide to retry
+            reject(error);
           } else {
             reject(err);
           }
@@ -494,6 +509,47 @@ export class PeerManager {
         reject(error);
       }
     });
+  }
+
+  /**
+   * Log in, retrying with backoff on transient failures. Right after a reload
+   * the broker often still holds our id from the previous page for a few
+   * seconds ('unavailable-id'), and a flaky network fails the first attempt —
+   * neither should drop the user out of the app.
+   * @param {number} [maxAttempts]
+   * @returns {Promise<string>} our peer id once logged in
+   */
+  async loginWithRetry(maxAttempts = this.MAX_LOGIN_ATTEMPTS) {
+    const RETRIABLE = ['unavailable-id', 'network', 'server-error', 'socket-error', 'socket-closed'];
+    for (let attempt = 1; ; attempt++) {
+      try {
+        const id = await this.loginToPeer();
+        this.updateStatus('Connected to the network. Looking for your peers...');
+        return id;
+      } catch (err) {
+        if (attempt >= maxAttempts || !RETRIABLE.includes(err.type)) throw err;
+        const delayMs = 2000 * Math.pow(2, attempt - 1);
+        this.updateStatus(err.type === 'unavailable-id'
+          ? `Your peer ID is still registered from a previous session. Retrying in ${delayMs / 1000}s...`
+          : `Can't reach the signaling server. Retrying in ${delayMs / 1000}s...`);
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  /**
+   * Run `callback` once the current peer is registered with the broker (now,
+   * if it already is). Used for actions that need the network, e.g. acting on
+   * an invite link while auto-login is still connecting.
+   * @param {() => void} callback
+   */
+  whenPeerOpen(callback) {
+    // (PeerJS re-emits 'open' after a broker reconnect, which flushes waiters.)
+    if (this.peer && this.peerOpen && !this.peer.disconnected) {
+      callback();
+    } else {
+      this.peerOpenWaiters.push(callback);
+    }
   }
 
   /**
@@ -815,9 +871,10 @@ export class PeerManager {
     }
 
     // A deliberate attempt replaces any automatic one still in flight and
-    // restarts the automatic retry budget.
+    // restarts the automatic retry budget. It also ends a manual "Disconnect".
     this.abandonPendingConnection(peerId);
     delete this.retryAttempts[peerId];
+    this.manuallyDisconnected.delete(peerId);
 
     const conn = this.openConnection(peerId);
     if (!conn) {
@@ -839,6 +896,13 @@ export class PeerManager {
     // A peer blocklisted for abuse can't simply reconnect until the block expires.
     if (this.isPeerBlocked(conn.peer)) {
       console.log(`Refusing connection with blocklisted peer: ${conn.peer}`);
+      this.retireConnection(conn);
+      return;
+    }
+    // The user disconnected this peer: otherwise the peer's own reconnect logic
+    // would undo that within seconds. (A deliberate connect from us clears it.)
+    if (this.manuallyDisconnected.has(conn.peer)) {
+      console.log(`Refusing connection with manually disconnected peer: ${conn.peer}`);
       this.retireConnection(conn);
       return;
     }
@@ -964,6 +1028,17 @@ export class PeerManager {
    * Disconnect from a specific peer
    * @param {Object} conn - The connection to close
    */
+  /**
+   * The user's "Disconnect": close the link and keep it closed for this session
+   * (no auto-reconnect, incoming connections refused) until they connect again.
+   * @param {Object} conn
+   */
+  userDisconnect(conn) {
+    this.manuallyDisconnected.add(conn.peer);
+    this.abandonPendingConnection(conn.peer);
+    this.disconnectPeer(conn);
+  }
+
   disconnectPeer(conn) {
     const wasActive = this.connections.includes(conn);
     const label = this.peerLabel(conn.peer);
@@ -1015,23 +1090,24 @@ export class PeerManager {
    * @param {Object} [metadata] - local-only metadata (e.g. the saved username)
    */
   autoConnect(peerId, metadata = null) {
-    if (!this.peer || this.peer.disconnected) return;
-    if (!peerId || peerId === this.userManager.peerId) return; // Don't connect to self
-    if (this.isPeerRemoved(peerId)) return; // Never auto-reconnect to a removed peer
-    if (this.hasOpenConnection(peerId) || this.hasPendingConnection(peerId)) return;
-    this.openConnection(peerId, metadata);
+    if (!this.peer || this.peer.disconnected) return false;
+    if (!peerId || peerId === this.userManager.peerId) return false; // Don't connect to self
+    if (this.isPeerRemoved(peerId)) return false; // Never auto-reconnect to a removed peer
+    if (this.manuallyDisconnected.has(peerId)) return false; // ...or one the user disconnected
+    if (this.hasOpenConnection(peerId) || this.hasPendingConnection(peerId)) return false;
+    return !!this.openConnection(peerId, metadata);
   }
 
   /**
    * Update status with a retry button
    * @param {string} message - The status message
    */
-  updateStatusWithRetry(message) {
+  updateStatusWithRetry(message, retryFn = this.pendingRetry) {
     const event = new CustomEvent('status-update', {
       detail: {
         message,
         showRetry: true,
-        retryFn: this.pendingRetry
+        retryFn
       }
     });
 
@@ -1091,10 +1167,12 @@ export class PeerManager {
         }
       });
     }
-    // If no active connections but we have saved peers, try to connect
+    // If no active connections but we have saved peers, try to connect (and only
+    // say so if we actually dialled someone — removed / disconnected peers are skipped)
     else if (this.savedPeers && this.savedPeers.length > 0) {
-      this.updateStatus('No peers connected. Attempting to connect to saved peers...');
-      this.connectToSavedPeers();
+      if (this.connectToSavedPeers() > 0) {
+        this.updateStatus('No peers connected. Attempting to connect to saved peers...');
+      }
     }
 
     // Check for inactive peers
@@ -1228,8 +1306,11 @@ export class PeerManager {
 		  };
 		});
 		
-		await this.storageManager.saveToStorage(StorageManager.KEYS.PEERS, peersToSave);
+		// Update memory BEFORE the async write: assigning after it would let a save
+		// that was in flight during shutdown() (Delete Credentials) put the old
+		// account's peers back — and a new sign-up would then dial them.
 		this.savedPeers = peersToSave;
+		await this.storageManager.saveToStorage(StorageManager.KEYS.PEERS, peersToSave);
 	  } catch (e) {
 		console.error('Error saving peers to storage:', e);
 	  }
@@ -1240,20 +1321,22 @@ export class PeerManager {
    */
   connectToSavedPeers() {
     if (!this.peer || !this.savedPeers || this.savedPeers.length === 0) {
-      return;
+      return 0;
     }
 
     console.log('Attempting to connect to saved peers:', this.savedPeers);
 
+    let attempted = 0;
     this.savedPeers.forEach(peerInfo => {
       try {
-        // Skips removed peers, ourselves, and peers already connected or
-        // connecting (so the 15s health check can't stack attempts).
-        this.autoConnect(peerInfo.peerId, { username: peerInfo.username });
+        // Skips removed / disconnected peers, ourselves, and peers already
+        // connected or connecting (so the 15s health check can't stack attempts).
+        if (this.autoConnect(peerInfo.peerId, { username: peerInfo.username })) attempted++;
       } catch (e) {
         console.error(`Error connecting to saved peer ${peerInfo.peerId}:`, e);
       }
     });
+    return attempted;
   }
 
   /**
@@ -1436,6 +1519,8 @@ export class PeerManager {
     this.connections = [];
     this.savedPeers = [];
     this.retryAttempts = {};
+    this.manuallyDisconnected = new Set();
+    this.peerOpenWaiters = [];
     this.peerStatus = {};
     this.lastSeen = {};
     this.peerConnectionQuality = {};
@@ -1484,7 +1569,9 @@ export class PeerManager {
       if (!this.lastResponseTime) this.lastResponseTime = {};
       this.lastResponseTime[conn.peer] = Date.now();
 
-      // Update connection quality based on ping time
+      // Update connection quality based on ping time. (In memory only: it's
+      // persisted with the next real peer change — writing the peer list to
+      // storage on every ping reply, per peer, every 15s was pure churn.)
       if (pingTime < 300) {
         this.peerConnectionQuality[conn.peer] = 'good';
       } else if (pingTime < 1000) {
@@ -1492,9 +1579,6 @@ export class PeerManager {
       } else {
         this.peerConnectionQuality[conn.peer] = 'poor';
       }
-
-      // Save updated quality information
-      this.savePeers();
     }
   }
 
@@ -1574,18 +1658,39 @@ export class PeerManager {
     });
   }
 
+  /**
+   * Re-establish connectivity right away instead of waiting for the next
+   * 15-second health check: reconnect to the broker if we lost it, drop dead
+   * links, and dial saved peers we're not connected to. Used when the network
+   * comes back and when a backgrounded tab (often throttled or suspended,
+   * especially on mobile) becomes visible again.
+   */
+  wake() {
+    if (!this.peer || this.peer.destroyed) return;
+    if (this.peer.disconnected) {
+      this.peer.reconnect();
+      return;
+    }
+    this.checkConnectionHealth();
+    this.connectToSavedPeers();
+  }
+
   enhanceConnectivity() {
     // Set up network status monitoring
     window.addEventListener('online', () => {
-      this.updateStatus('Internet connection restored. Establishing connection...');
-      if (this.peer && this.peer.disconnected) {
-        this.peer.reconnect();
-      }
+      this.updateStatus('Internet connection restored. Reconnecting...');
+      this.wake();
     });
 
     window.addEventListener('offline', () => {
       this.updateStatus('Internet connection lost. Waiting for reconnection...');
     });
+
+    if (typeof document !== 'undefined') {
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') this.wake();
+      });
+    }
 
     // Set up periodic connection health checks (every 15 seconds)
     setInterval(() => this.checkConnectionHealth(), 15000);

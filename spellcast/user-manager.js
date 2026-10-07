@@ -3,6 +3,9 @@
 import { CryptoIdentity } from './crypto-identity.js';
 
 export class UserManager {
+  // Must not exceed TweetManager.MAX_USERNAME_LENGTH (what peers accept).
+  static MAX_USERNAME_LENGTH = 64;
+
   constructor(storageManager) {
     this.storageManager = storageManager;
 
@@ -12,6 +15,11 @@ export class UserManager {
 
     // Cryptographic signing identity (the real, unforgeable identity).
     this.identity = new CryptoIdentity(null, null);
+
+    // True when ensureIdentity() had to mint a brand-new keypair this session
+    // (no stored key on this device). Logging in to an existing account in that
+    // state starts a NEW identity under the old name — the UI warns about it.
+    this.identityIsNew = false;
 
     // Bind methods
     this.checkSavedCredentials = this.checkSavedCredentials.bind(this);
@@ -73,6 +81,7 @@ export class UserManager {
 
     const fresh = await CryptoIdentity.generate();
     this.identity = fresh;
+    this.identityIsNew = true;
     if (fresh.available) {
       await this.persistIdentity();
     } else {
@@ -123,12 +132,45 @@ export class UserManager {
 	}
 
   /**
+   * Adopt an identity restored from a backup (replacing any freshly minted one)
+   * and persist it.
+   * @param {CryptoIdentity} identity
+   */
+  async adoptIdentity(identity) {
+    this.identity = identity;
+    this.identityIsNew = false;
+    await this.persistIdentity();
+  }
+
+  /**
    * Reset user state
    */
   reset() {
     this.username = '';
     this.peerId = '';
     this.identity = new CryptoIdentity(null, null);
+    this.identityIsNew = false;
+  }
+
+  /**
+   * Check a username the user typed. Peers reject posts whose name is longer
+   * than 64 characters (so a longer name would silently never be delivered);
+   * '#' is reserved as the handle separator (`name#fingerprint`), so a name
+   * can't carry a fake fingerprint; control and bidi-override characters could
+   * disguise what the name looks like.
+   * @param {string} name - already trimmed
+   * @returns {string|null} a message describing the problem, or null if valid
+   */
+  static validateUsername(name) {
+    if (!name) return 'Please enter a username.';
+    if (name.length > UserManager.MAX_USERNAME_LENGTH) {
+      return `Please use at most ${UserManager.MAX_USERNAME_LENGTH} characters.`;
+    }
+    if (name.includes('#')) return 'The "#" character is reserved (it separates your name from your key fingerprint).';
+    if (/[\u0000-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/.test(name)) {
+      return 'The name contains invisible or text-direction control characters.';
+    }
+    return null;
   }
 
   /**

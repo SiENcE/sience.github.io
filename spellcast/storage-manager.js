@@ -14,7 +14,8 @@ export class StorageManager {
     NAME_REGISTRY: 'p2p_name_pins', // TOFU pins: username -> first verified public key
     REACTIONS: 'p2p_reactions',     // tweetId -> { reactorKey -> { name, active, ts, sig } }
     REMOVED_PEERS: 'p2p_removed_peers', // peerIds the user explicitly removed (persistent blocklist)
-    PEER_KEY_PINS: 'p2p_peer_key_pins'  // TOFU pins: peerId -> first signing key seen at that address
+    PEER_KEY_PINS: 'p2p_peer_key_pins', // TOFU pins: peerId -> first signing key seen at that address
+    BACKUP_INFO: 'p2p_backup_info'      // { at: ms } when the identity was last backed up (export / QR)
   };
 
   // Database configuration
@@ -30,10 +31,9 @@ export class StorageManager {
     // Initialize database
     this.dbPromise = this.initDatabase();
     
-    // Cookie operations (kept for transition compatibility)
-    this.setCookie = this.setCookie.bind(this);
+    // Cookie operations (legacy migration only — nothing is written to cookies)
     this.getCookie = this.getCookie.bind(this);
-    this.deleteCookie = this.deleteCookie.bind(this);
+    this.expireCookie = this.expireCookie.bind(this);
 
     // IndexedDB operations
     this.saveToStorage = this.saveToStorage.bind(this);
@@ -104,17 +104,10 @@ export class StorageManager {
     return { transaction, store };
   }
 
-  // Cookie operations (for legacy support and transition)
-  setCookie(name, value, days = 30) {
-    const date = new Date();
-    date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
-    const expires = "expires=" + date.toUTCString();
-    document.cookie = name + "=" + value + ";" + expires + ";path=/";
-    
-    // Also save to IndexedDB for syncing
-    this.saveToStorage(name, value);
-  }
-
+  // Cookie operations (legacy only). Older builds kept the username + peer id in
+  // cookies; cookies are sent to the web server with every request, which leaks
+  // the peer id (a login credential) to whoever hosts the page. They are now
+  // only read once for migration and then expired.
   getCookie(name) {
     const decodedCookie = decodeURIComponent(document.cookie);
     const cookies = decodedCookie.split(';');
@@ -127,9 +120,9 @@ export class StorageManager {
     return "";
   }
 
-  deleteCookie(name) {
-    this.setCookie(name, '', -1);
-    this.removeFromStorage(name);
+  /** Expire a cookie (touches nothing else). */
+  expireCookie(name) {
+    document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/`;
   }
 
   /**
@@ -257,16 +250,16 @@ export class StorageManager {
         }
       }
       
-      // Check cookies for credentials
-      const username = this.getCookie(StorageManager.KEYS.USERNAME);
-      const peerId = this.getCookie(StorageManager.KEYS.PEER_ID);
-      
-      if (username) {
-        await this.saveToStorage(StorageManager.KEYS.USERNAME, username);
-      }
-      
-      if (peerId) {
-        await this.saveToStorage(StorageManager.KEYS.PEER_ID, peerId);
+      // Move legacy cookie credentials into IndexedDB (without overwriting newer
+      // values there), then expire the cookies so they stop being sent.
+      for (const key of [StorageManager.KEYS.USERNAME, StorageManager.KEYS.PEER_ID]) {
+        const value = this.getCookie(key);
+        if (!value) continue;
+        const existing = await this.loadFromStorage(key);
+        if (!existing) {
+          await this.saveToStorage(key, value);
+        }
+        this.expireCookie(key);
       }
       
       console.log('Migration from legacy storage completed');
@@ -277,43 +270,57 @@ export class StorageManager {
 
   // User credentials with IndexedDB
   async saveUserCredentials(username, peerId) {
-    // Still set cookies for backward compatibility
-    this.setCookie(StorageManager.KEYS.USERNAME, username);
-    this.setCookie(StorageManager.KEYS.PEER_ID, peerId);
-    
-    // Save to IndexedDB
     await this.saveToStorage(StorageManager.KEYS.USERNAME, username);
     await this.saveToStorage(StorageManager.KEYS.PEER_ID, peerId);
   }
 
   async loadUserCredentials() {
+    // (Legacy cookie credentials were already moved here by migrateFromLegacyStorage.)
     try {
-      // First try to load from IndexedDB
-      const username = await this.loadFromStorage(StorageManager.KEYS.USERNAME);
-      const peerId = await this.loadFromStorage(StorageManager.KEYS.PEER_ID);
-      
-      // If not found in IndexedDB, try cookies as fallback
       return {
-        username: username || this.getCookie(StorageManager.KEYS.USERNAME),
-        peerId: peerId || this.getCookie(StorageManager.KEYS.PEER_ID)
+        username: (await this.loadFromStorage(StorageManager.KEYS.USERNAME)) || '',
+        peerId: (await this.loadFromStorage(StorageManager.KEYS.PEER_ID)) || ''
       };
     } catch (error) {
       console.error('Error loading user credentials:', error);
-      
-      // Fallback to cookies
-      return {
-        username: this.getCookie(StorageManager.KEYS.USERNAME),
-        peerId: this.getCookie(StorageManager.KEYS.PEER_ID)
-      };
+      return { username: '', peerId: '' };
     }
   }
 
   async deleteUserCredentials() {
-    this.deleteCookie(StorageManager.KEYS.USERNAME);
-    this.deleteCookie(StorageManager.KEYS.PEER_ID);
+    this.expireCookie(StorageManager.KEYS.USERNAME);
+    this.expireCookie(StorageManager.KEYS.PEER_ID);
 
     await this.removeFromStorage(StorageManager.KEYS.USERNAME);
     await this.removeFromStorage(StorageManager.KEYS.PEER_ID);
+  }
+
+  /**
+   * Ask the browser not to evict our data under storage pressure. Everything —
+   * including the identity keys, which have no other copy unless the user made
+   * a backup — lives in this origin's storage, which browsers may otherwise
+   * clear when the disk is full.
+   * @returns {Promise<boolean|null>} true if persistent, false if refused, null if unsupported
+   */
+  async requestPersistence() {
+    try {
+      if (!navigator.storage || !navigator.storage.persist) return null;
+      if (await navigator.storage.persisted()) return true;
+      return await navigator.storage.persist();
+    } catch (error) {
+      console.warn('Persistent storage request failed:', error);
+      return null;
+    }
+  }
+
+  /** Record that the identity was just backed up (export or backup QR). */
+  async markBackupDone() {
+    await this.saveToStorage(StorageManager.KEYS.BACKUP_INFO, { at: Date.now() });
+  }
+
+  /** @returns {Promise<{at: number}|null>} when the identity was last backed up */
+  async loadBackupInfo() {
+    return (await this.loadFromStorage(StorageManager.KEYS.BACKUP_INFO)) || null;
   }
 
   // ---- Signing identity (keypair) ----

@@ -7,8 +7,8 @@
       XSS-safe DOM rendering). The key protection is `script-src` WITHOUT
       'unsafe-inline'/'unsafe-eval' — PeerJS 1.5 no longer needs eval — so injected
       markup cannot execute script.
-        - img-src allows https: + data: because link previews legitimately load
-          remote favicons/thumbnails and message media is inline data: URIs.
+        - img-src allows https: + data: because click-to-load link previews
+          fetch remote images/thumbnails and message media is inline data: URIs.
         - connect-src allows https:/wss: for the PeerJS signalling broker (WebRTC
           ICE/STUN/TURN is not governed by CSP).
         - style-src keeps 'unsafe-inline' for the few static inline styles and the
@@ -21,6 +21,8 @@
     <meta name="referrer" content="no-referrer">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SpellCast</title>
+    <!-- Inline icon (data: is allowed by img-src): avoids a /favicon.ico request that 404s -->
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%E2%9C%A8%3C/text%3E%3C/svg%3E">
     <!-- Theme bootstrap: must run before paint to avoid a flash of the wrong theme -->
     <script src="theme.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.5/peerjs.min.js"
@@ -43,6 +45,13 @@
         </select>
     </header>
 
+    <div id="session-blocked" class="container" style="display: none;">
+        <h2>SpellCast is already open</h2>
+        <p>SpellCast is running in another tab or window of this browser. Only one can be active at a time — they would share (and overwrite) the same local data and compete for your peer ID.</p>
+        <p>Switch to the other tab, or close it and try again.</p>
+        <button id="session-reload-button" type="button">Try again</button>
+    </div>
+
     <div id="intro-container" class="container" style="display: none;">
         <h2>Welcome to SpellCast</h2>
         <p>A decentralized, peer-to-peer Twitter clone that works directly in your browser!</p>
@@ -55,36 +64,41 @@
         <h2>Create Your Credentials</h2>
         <div>
             <label for="username">Choose a username:</label>
-            <input type="text" id="username" placeholder="Enter username">
+            <input type="text" id="username" placeholder="Enter username" maxlength="64" autocomplete="nickname" autofocus>
+            <p class="hint">Shown to others as <em>name#fingerprint</em> — the fingerprint comes from your key, so nobody can copy it.</p>
         </div>
         <button id="generate-button">Generate Your Credentials</button>
         <div id="credentials" style="display: none;">
-            <p>Your peer ID (keep this private!):</p>
+            <p>Your peer ID — your address on the network:</p>
             <code id="peer-id"></code>
             <div id="qrcode"></div>
-            <p>Scan this QR code with another device to connect, or share your peer ID securely.</p>
+            <p>Friends can scan this QR code (or use the invite link on your Profile) to connect to you.</p>
+            <p class="hint">Next step: on the Profile tab, export a credential backup. Your identity key lives only in this browser — without a backup, clearing its data loses this identity for good.</p>
             <button id="continue-button">Continue to App</button>
         </div>
     </div>
 
     <div id="login-container" class="container">
         <h2>Login</h2>
-        <div>
-            <label for="login-username">Username:</label>
-            <input type="text" id="login-username" placeholder="Enter username">
-        </div>
-        <div>
-            <label for="login-peerid">Peer ID:</label>
-            <input type="text" id="login-peerid" placeholder="Enter your peer ID">
-        </div>
-        <button id="login-continue-button">Login</button>
-
         <div class="login-import">
-            <p class="hint">Have a credential backup file? Restore your credentials (key + username + peer ID):</p>
+            <h3>Restore from a backup (recommended)</h3>
+            <p class="hint">Restores your full identity — key, username and peer ID — so your peers recognise you.</p>
             <input type="file" id="import-identity-file" accept="application/json,.json">
             <button id="import-identity-button">Import Credential Backup</button>
             <button id="scan-backup-qr-button" type="button">Scan Backup QR</button>
         </div>
+
+        <h3>Or log in with username and peer ID</h3>
+        <p class="hint">Only keeps your identity on a device that already has your key. Elsewhere this starts a new identity (a different #fingerprint).</p>
+        <div>
+            <label for="login-username">Username:</label>
+            <input type="text" id="login-username" placeholder="Enter username" maxlength="64" autocomplete="nickname">
+        </div>
+        <div>
+            <label for="login-peerid">Peer ID:</label>
+            <input type="text" id="login-peerid" placeholder="Enter your peer ID (or paste your invite link)">
+        </div>
+        <button id="login-continue-button">Login</button>
     </div>
 
     <div id="app-container" class="container">
@@ -165,6 +179,8 @@
                         <button id="delete-credentials-button" class="danger-button">Delete Credentials</button>
                     </div>
                     <p class="hint">Export a passphrase-encrypted backup of your identity (signing key). Keep it safe — it is the only way to recover or move these credentials to another device.</p>
+                    <p id="backup-status" class="hint"></p>
+                    <p id="storage-status" class="hint"></p>
                 </div>
             </div>
         </div>

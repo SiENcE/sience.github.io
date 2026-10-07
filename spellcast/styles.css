@@ -759,9 +759,9 @@ h4,
 
 /* ---- Identity backup (import on login) ---- */
 .login-import {
-    margin-top: 18px;
-    padding-top: 14px;
-    border-top: 1px solid var(--muted-divider);
+    margin-bottom: 18px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--muted-divider);
 }
 
 .login-import input[type="file"] {
@@ -1149,6 +1149,11 @@ button:active {
 .hint {
     color: var(--text-muted);
     font-size: 0.85em;
+}
+
+.hint.backup-missing {
+    color: var(--danger);
+    font-weight: bold;
 }
 
 .circle-card {

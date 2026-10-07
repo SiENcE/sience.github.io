@@ -1,7 +1,8 @@
 // Manages UI components, event listeners and display logic
 
 import { linkify, extractUrls, buildLinkPreview } from './link-preview.js';
-import { fingerprint, handleFor, CryptoIdentity } from './crypto-identity.js';
+import { fingerprint, handleFor, CryptoIdentity, MIN_PASSPHRASE_LENGTH } from './crypto-identity.js';
+import { UserManager } from './user-manager.js';
 
 export class UIManager {
   constructor(userManager, peerManager, tweetManager, storageManager, mediaManager, circleManager) {
@@ -107,6 +108,10 @@ export class UIManager {
       currentUserElement: document.getElementById('current-user'),
       profileUsername: document.getElementById('profile-username'),
       profilePeerId: document.getElementById('profile-peerid'),
+      backupStatus: document.getElementById('backup-status'),
+      storageStatus: document.getElementById('storage-status'),
+      sessionBlockedContainer: document.getElementById('session-blocked'),
+      sessionReloadButton: document.getElementById('session-reload-button'),
 
       // Visual elements
       qrcode: document.getElementById('qrcode'),
@@ -166,14 +171,17 @@ export class UIManager {
 
     this.elements.generateButton.addEventListener('click', async () => {
       const username = this.elements.usernameInput.value.trim();
-      if (!username) {
-        alert('Please enter a username');
+      const problem = UserManager.validateUsername(username);
+      if (problem) {
+        alert(problem);
         return;
       }
 
       // Save username in user manager
       this.userManager.username = username;
 
+      const button = this.elements.generateButton;
+      button.disabled = true; // one peer id per sign-up (no double registration)
       try {
         // Initialize peer connection
         const peerId = await this.peerManager.initializePeer();
@@ -185,61 +193,78 @@ export class UIManager {
         // Display the peer ID and QR code
         this.elements.peerIdDisplay.textContent = peerId;
         this.elements.credentialsArea.style.display = 'block';
+        this.elements.usernameInput.disabled = true;
 
         // Generate QR code (encodes a connect deep link, not the raw id, so a
         // phone camera opens SpellCast instead of running a web search)
+        this.elements.qrcode.replaceChildren();
         new QRCode(this.elements.qrcode, {
           text: this.buildConnectUrl(peerId),
           width: 200,
           height: 200
         });
+        this.elements.continueButton.focus();
       } catch (error) {
         console.error('Error initializing peer:', error);
         alert(`Error creating peer connection: ${error.message}`);
+        button.disabled = false;
       }
     });
 
     this.elements.continueButton.addEventListener('click', () => {
-      this.elements.setupContainer.style.display = 'none';
-      this.elements.appContainer.style.display = 'block';
-      this.elements.currentUserElement.textContent = this.userManager.username;
-
       // Render the feed (and any already-stored history) for the new session
-      this.renderTweets();
-      this.updatePeersList();
-      this.consumePendingConnect();
+      this.enterApp();
     });
 
     this.elements.loginContinueButton.addEventListener('click', async () => {
       const username = this.elements.loginUsernameInput.value.trim();
-      const peerId = this.elements.loginPeerIdInput.value.trim();
+      const peerId = this.extractPeerId(this.elements.loginPeerIdInput.value);
 
-      if (!username || !peerId) {
-        alert('Please enter both username and peer ID');
+      const problem = UserManager.validateUsername(username);
+      if (problem || !peerId) {
+        alert(problem || 'Please enter your peer ID.');
         return;
       }
 
+      // Without this device's key, a name + peer-id login can't be "you": it
+      // starts a NEW identity (new #fingerprint) under the old name, and peers
+      // who know the old key will flag these posts as an impersonator.
+      if (this.userManager.identityIsNew && !confirm(
+        'This device has no key for that account, so logging in this way creates a NEW identity '
+        + '(a different #fingerprint). Your peers will see it as a different person and may flag '
+        + 'it as an impersonator.\n\nTo keep your identity, cancel and use "Import Credential Backup" '
+        + 'or "Scan Backup QR" instead.\n\nContinue with a new identity?')) {
+        return;
+      }
+
+      const button = this.elements.loginContinueButton;
+      button.disabled = true;
       try {
         // Save credentials and login
-        this.userManager.loginWithCredentials(username, peerId);
+        await this.userManager.loginWithCredentials(username, peerId);
         await this.userManager.ensureIdentity();
         await this.tweetManager.pinOwnIdentity();
         await this.peerManager.loginToPeer();
 
-        // Hide login screens, show app
-        this.elements.loginContainer.style.display = 'none';
-        this.elements.appContainer.style.display = 'block';
-        this.elements.currentUserElement.textContent = username;
-
-        // Make sure the stored message history is loaded and rendered
-        await this.tweetManager.loadTweets();
-        this.renderTweets();
-        this.updatePeersList();
-        this.updateProfileInfo();
-        this.consumePendingConnect();
+        this.enterApp();
       } catch (error) {
         console.error('Login error:', error);
         alert(`Error logging in: ${error.message}`);
+      } finally {
+        button.disabled = false;
+      }
+    });
+
+    // Enter submits the single-field forms; Ctrl/Cmd+Enter casts.
+    this.submitOnEnter(this.elements.usernameInput, this.elements.generateButton);
+    this.submitOnEnter(this.elements.loginUsernameInput, this.elements.loginContinueButton);
+    this.submitOnEnter(this.elements.loginPeerIdInput, this.elements.loginContinueButton);
+    this.submitOnEnter(this.elements.connectIdInput, this.elements.connectButton);
+    this.submitOnEnter(this.elements.newCircleName, this.elements.createCircleButton);
+    this.elements.tweetContentInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+        e.preventDefault();
+        this.createTweetWithMedia();
       }
     });
 
@@ -309,14 +334,16 @@ export class UIManager {
 
     // Browser refresh/close events
     window.addEventListener('beforeunload', () => {
-      // Ensure we're saving state appropriately (both are no-ops when logged out)
-      this.tweetManager.saveTweets();
+      // Write anything still pending in the save batch (both are no-ops when logged out)
+      this.tweetManager.flushSaves();
       this.peerManager.savePeers();
     });
 
-    // Register for tweet updates from the tweet manager
-    this.tweetManager.onTweetsUpdated = this.renderTweets;
-    this.peerManager.onPeersUpdated = this.updatePeersList;
+    // Register for updates. Re-renders are batched to one per frame: a sync
+    // can deliver hundreds of messages (and peer events) in a burst, and each
+    // used to rebuild the whole feed / peer list.
+    this.tweetManager.onTweetsUpdated = () => this.scheduleRender('tweets', () => this.renderTweets());
+    this.peerManager.onPeersUpdated = () => this.scheduleRender('peers', () => this.updatePeersList());
 
     // Add media upload UI elements to the tweet form
     this.setupMediaUploadUI();
@@ -330,6 +357,150 @@ export class UIManager {
     // Initialize circle UI (sidebar + cast-target indicator)
     this.renderCirclesSidebar();
     this.updateCastTarget();
+  }
+
+  /** Make Enter in `input` press `button` (ignoring IME composition). */
+  submitOnEnter(input, button) {
+    if (!input || !button) return;
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.isComposing) {
+        e.preventDefault();
+        button.click();
+      }
+    });
+  }
+
+  /**
+   * Run `render` once on the next animation frame, however often it is
+   * requested before then (one pending render per `key`).
+   * @param {string} key
+   * @param {() => void} render
+   */
+  scheduleRender(key, render) {
+    if (!this.pendingRenders) this.pendingRenders = new Set();
+    if (this.pendingRenders.has(key)) return;
+    this.pendingRenders.add(key);
+    const run = () => {
+      this.pendingRenders.delete(key);
+      render();
+    };
+    if (typeof requestAnimationFrame === 'function') {
+      requestAnimationFrame(run);
+    } else {
+      setTimeout(run, 16);
+    }
+  }
+
+  /**
+   * Show the main app for the logged-in user. Every way in — sign-up, login,
+   * backup restore, auto-login — goes through here so they behave the same.
+   */
+  enterApp() {
+    this.elements.introContainer.style.display = 'none';
+    this.elements.setupContainer.style.display = 'none';
+    this.elements.loginContainer.style.display = 'none';
+    this.elements.appContainer.style.display = 'block';
+    this.elements.currentUserElement.textContent = handleFor(this.userManager.username, this.userManager.publicKey);
+
+    this.renderTweets();
+    this.updatePeersList();
+    this.updateProfileInfo();
+
+    // Act on a scanned "?connect=" invite once we're actually on the network
+    // (auto-login may still be connecting).
+    this.peerManager.whenPeerOpen(() => this.consumePendingConnect());
+
+    // There's an account worth keeping now: ask the browser not to evict it.
+    this.ensurePersistentStorage();
+  }
+
+  /**
+   * Auto-login: connect to the network in the background (with retries) while
+   * the app is already usable. On final failure, offer a retry in the status bar.
+   */
+  async connectInBackground() {
+    try {
+      await this.peerManager.loginWithRetry();
+    } catch (error) {
+      console.error('Auto-login error:', error);
+      const reason = error.type === 'unavailable-id'
+        ? 'Your peer ID is in use elsewhere (another device or browser?).'
+        : `Could not connect: ${error.message}.`;
+      this.peerManager.updateStatusWithRetry(`${reason} You can still read your messages.`,
+        () => this.connectInBackground());
+    }
+  }
+
+  /** Another tab already runs SpellCast for this browser profile (see app.js). */
+  showSessionBlocked() {
+    this.elements.introContainer.style.display = 'none';
+    this.elements.setupContainer.style.display = 'none';
+    this.elements.loginContainer.style.display = 'none';
+    this.elements.appContainer.style.display = 'none';
+    if (this.elements.sessionBlockedContainer) {
+      this.elements.sessionBlockedContainer.style.display = 'block';
+    }
+    // Wired here, not in setupEventListeners(): that never runs in a blocked tab.
+    if (this.elements.sessionReloadButton) {
+      this.elements.sessionReloadButton.addEventListener('click', () => location.reload());
+    }
+  }
+
+  /** Request persistent storage (see StorageManager.requestPersistence) and show the result. */
+  async ensurePersistentStorage() {
+    this.storagePersistent = await this.storageManager.requestPersistence();
+    this.updateStorageStatus();
+  }
+
+  /** Profile: whether the browser may evict our data. */
+  updateStorageStatus() {
+    const el = this.elements.storageStatus;
+    if (!el) return;
+    if (this.storagePersistent === true) {
+      el.textContent = 'Storage: persistent — the browser won\'t clear it to free up space.';
+    } else if (this.storagePersistent === false) {
+      el.textContent = 'Storage: not persistent — the browser may clear it if the disk fills up. '
+        + 'A backup keeps your identity safe either way.';
+    } else {
+      el.textContent = '';
+    }
+  }
+
+  /** Profile: when the identity was last backed up — or a warning that it never was. */
+  async updateBackupStatus() {
+    const el = this.elements.backupStatus;
+    if (!el) return;
+    const info = await this.storageManager.loadBackupInfo();
+    if (info && info.at) {
+      el.textContent = `✓ Identity backed up on ${new Date(info.at).toLocaleDateString()}.`;
+      el.className = 'hint backup-ok';
+    } else {
+      el.textContent = '⚠ No backup yet. Your identity key exists only in this browser — if its data '
+        + 'is cleared, this identity is gone for good. Export a backup (file or QR) to keep it.';
+      el.className = 'hint backup-missing';
+    }
+  }
+
+  /**
+   * Ask for a backup passphrase (twice), enforcing the minimum length.
+   * @param {string} purpose - shown in the first prompt
+   * @returns {string|null} the passphrase, or null if cancelled / mismatched
+   */
+  promptNewPassphrase(purpose) {
+    const passphrase = prompt(`${purpose}\n\nUse at least ${MIN_PASSPHRASE_LENGTH} characters — `
+      + 'a few random words is easy to remember and hard to guess. There is no way to recover it.');
+    if (passphrase === null) return null;
+    if (passphrase.length < MIN_PASSPHRASE_LENGTH) {
+      alert(`Please use a passphrase of at least ${MIN_PASSPHRASE_LENGTH} characters.`);
+      return null;
+    }
+    const confirmPass = prompt('Re-enter the passphrase to confirm:');
+    if (confirmPass === null) return null;
+    if (confirmPass !== passphrase) {
+      alert('Passphrases did not match. Nothing was created.');
+      return null;
+    }
+    return passphrase;
   }
 
 	setupMediaUploadUI() {
@@ -506,6 +677,12 @@ export class UIManager {
       }
     }
 
+    // One cast at a time: image processing + sending can take a moment, and a
+    // second click (or Ctrl+Enter) meanwhile would post the message twice.
+    if (this.casting) return;
+    this.casting = true;
+    this.elements.tweetButton.disabled = true;
+
     try {
       // Create the tweet with optional media, targeting the selected circle
       await this.tweetManager.createTweet(content, this.pendingMediaFile, circle);
@@ -517,12 +694,17 @@ export class UIManager {
       // Jump the feed back to the top so the user sees their own new message.
       this.resetFeedPaging();
 
-      // Clear the inputs
+      // Clear the inputs (and refresh the character counter, which only
+      // listens for user input events)
       this.elements.tweetContentInput.value = '';
+      this.elements.tweetContentInput.dispatchEvent(new Event('input'));
       this.clearMediaPreview();
     } catch (error) {
       console.error('Error creating tweet with media:', error);
       alert(`Error creating tweet: ${error.message}`);
+    } finally {
+      this.casting = false;
+      this.elements.tweetButton.disabled = false;
     }
   }
 
@@ -593,6 +775,9 @@ export class UIManager {
         height: 200
       });
     }
+
+    this.updateBackupStatus();
+    this.updateStorageStatus();
   }
 
   /**
@@ -887,23 +1072,15 @@ export class UIManager {
       alert('No exportable credentials are available. (WebCrypto needs HTTPS or localhost.)');
       return;
     }
-    const passphrase = prompt('Choose a passphrase to encrypt this backup QR.\n'
+    const passphrase = this.promptNewPassphrase('Choose a passphrase to encrypt this backup QR. '
       + 'You will enter this same passphrase on the other device to restore.');
     if (passphrase === null) return;
-    if (passphrase.length < 6) {
-      alert('Please use a passphrase of at least 6 characters.');
-      return;
-    }
-    const confirmPass = prompt('Re-enter the passphrase to confirm:');
-    if (confirmPass === null) return;
-    if (confirmPass !== passphrase) {
-      alert('Passphrases did not match. Nothing was shown.');
-      return;
-    }
     try {
       const { username, peerId } = this.userManager.getUserInfo();
       const envelope = await this.userManager.identity.exportEncrypted(passphrase, { username, peerId });
       this.renderBackupQrOverlay(JSON.stringify(envelope));
+      await this.storageManager.markBackupDone();
+      this.updateBackupStatus();
     } catch (error) {
       console.error('Backup QR creation failed:', error);
       alert(`Could not create a backup QR: ${error.message}`);
@@ -993,19 +1170,9 @@ export class UIManager {
       return;
     }
 
-    const passphrase = prompt('Choose a passphrase to encrypt your credential backup.\n'
-      + 'You will need this exact passphrase to restore your credentials. There is no way to recover it.');
-    if (passphrase === null) return; // cancelled
-    if (passphrase.length < 6) {
-      alert('Please use a passphrase of at least 6 characters.');
-      return;
-    }
-    const confirmPass = prompt('Re-enter the passphrase to confirm:');
-    if (confirmPass === null) return;
-    if (confirmPass !== passphrase) {
-      alert('Passphrases did not match. Nothing was exported.');
-      return;
-    }
+    const passphrase = this.promptNewPassphrase('Choose a passphrase to encrypt your credential backup. '
+      + 'You will need this exact passphrase to restore your credentials.');
+    if (passphrase === null) return; // cancelled / mismatched
 
     try {
       const { username, peerId } = this.userManager.getUserInfo();
@@ -1021,6 +1188,8 @@ export class UIManager {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+      await this.storageManager.markBackupDone();
+      this.updateBackupStatus();
 
       alert('Credential backup downloaded. Store it somewhere safe — anyone with the file AND the passphrase can post as you.');
     } catch (error) {
@@ -1067,22 +1236,15 @@ export class UIManager {
       }
 
       // Adopt the restored credentials (both keypairs) and persist them.
-      this.userManager.identity = identity;
-      await this.userManager.persistIdentity();
+      await this.userManager.adoptIdentity(identity);
       await this.userManager.loginWithCredentials(username, peerId);
       await this.tweetManager.pinOwnIdentity();
+      // This identity evidently has a backup (we just restored from it).
+      await this.storageManager.markBackupDone();
 
       // Connect to the peer network and show the app (mirrors the login flow).
-      await this.peerManager.loginToPeer();
-      this.elements.loginContainer.style.display = 'none';
-      this.elements.appContainer.style.display = 'block';
-      this.elements.currentUserElement.textContent = username;
-
-      await this.tweetManager.loadTweets();
-      this.renderTweets();
-      this.updatePeersList();
-      this.updateProfileInfo();
-      this.consumePendingConnect();
+      await this.peerManager.loginWithRetry();
+      this.enterApp();
 
       alert(`Welcome back, ${handleFor(username, identity.publicKeyB64)}. Your credentials were restored.`);
     } catch (error) {
@@ -1096,18 +1258,32 @@ export class UIManager {
    * "All Peers" shows only public posts — narrow-cast (circle) messages are
    * hidden there to avoid confusion and only appear inside their circle. A
    * selected circle shows messages authored by its members (plus your own).
+   *
+   * `authorId` (the author's peer id) is NOT covered by the signature, so anyone
+   * can claim a member's — or your — peer id on a post. Members are therefore
+   * matched by the signing key pinned for their peer id; `authorId` is only used
+   * for a member we have no pinned key for (a legacy peer without signing).
    */
   tweetMatchesActiveCircle(tweet) {
+    const myKey = this.userManager.publicKey;
+
     if (this.activeCircleId === 'all' || !this.circleManager) {
-      // Global feed = public posts only; circle (narrow-cast) posts live in their circle.
-      return !tweet.circle;
+      // Global feed = public posts, plus circle posts OTHERS sent to us (shown
+      // with a 🔒 badge): circles are local, so we may have no circle containing
+      // the sender, and a private message we can never see is worse than one in
+      // the main feed. Our own circle posts stay in the circle we cast them to.
+      if (!tweet.circle) return true;
+      return !(myKey && tweet.verified && tweet.authorKey === myKey);
     }
 
-    const myPeerId = this.userManager.peerId;
-    if (tweet.authorId && tweet.authorId === myPeerId) return true;
+    if (myKey && tweet.verified && tweet.authorKey === myKey) return true;
 
-    const memberIds = this.circleManager.getMemberPeerIds(this.activeCircleId);
-    return !!(tweet.authorId && memberIds.includes(tweet.authorId));
+    const pins = this.peerManager.peerKeyPins || {};
+    return this.circleManager.getMemberPeerIds(this.activeCircleId).some(peerId => {
+      const pinnedKey = pins[peerId];
+      if (pinnedKey) return !!(tweet.verified && tweet.authorKey === pinnedKey);
+      return !!(tweet.authorId && tweet.authorId === peerId);
+    });
   }
 
   /**
@@ -1350,8 +1526,8 @@ export class UIManager {
     if (tweet.circle) {
       const badge = document.createElement('span');
       badge.className = 'tweet-circle-badge';
-      badge.textContent = tweet.circle;
-      badge.title = `Sent to circle: ${tweet.circle}`;
+      badge.textContent = `🔒 ${tweet.circle}`;
+      badge.title = `Private: sent end-to-end encrypted to the circle "${tweet.circle}" only.`;
       tweetHeader.appendChild(badge);
     }
 
@@ -1656,16 +1832,23 @@ export class UIManager {
     const el = this.elements.castTarget;
     if (!el) return;
 
-    let name = 'All Peers';
+    let text = 'Casting to: All Peers';
+    el.title = 'Public: sent to connected peers now, and shared with others when they connect.';
     if (this.activeCircleId !== 'all' && this.circleManager) {
       const circle = this.circleManager.getCircle(this.activeCircleId);
       if (circle) {
-        name = circle.name;
+        // Circle posts are live-only, so say up front how many members a cast
+        // would reach right now (connected + verified encryption key).
+        const total = circle.peerIds.length;
+        const reachable = circle.peerIds.filter(id => this.peerManager.getPeerEncKey(id)).length;
+        text = `Casting to: ${circle.name} · ${reachable}/${total} reachable`;
+        el.title = 'Circle posts are end-to-end encrypted and delivered live only: members who are '
+          + 'offline (or whose key isn\'t verified yet) won\'t receive them later.';
       } else {
         this.activeCircleId = 'all';
       }
     }
-    el.textContent = `Casting to: ${name}`;
+    el.textContent = text;
   }
 
   /**
@@ -1899,27 +2082,27 @@ export class UIManager {
     closeBtn.style.border = 'none';
     closeBtn.style.cursor = 'pointer';
     
-    // Close on button click, overlay click, or escape key
-    closeBtn.addEventListener('click', () => document.body.removeChild(modal));
+    // Close on button click, overlay click, or escape key. One close path, so
+    // the Escape listener is always removed (it used to leak — and throw on the
+    // next Escape — when the modal was closed by clicking).
+    const escHandler = (e) => {
+      if (e.key === 'Escape') close();
+    };
+    const close = () => {
+      modal.remove();
+      document.removeEventListener('keydown', escHandler);
+    };
+    closeBtn.addEventListener('click', close);
     modal.addEventListener('click', (e) => {
-      if (e.target === modal) document.body.removeChild(modal);
+      if (e.target === modal) close();
     });
-    
+
     // Add elements to modal
     modal.appendChild(img);
     modal.appendChild(closeBtn);
-    
+
     // Add modal to document
     document.body.appendChild(modal);
-    
-    // Setup escape key listener
-    const escHandler = (e) => {
-      if (e.key === 'Escape') {
-        document.body.removeChild(modal);
-        document.removeEventListener('keydown', escHandler);
-      }
-    };
-    
     document.addEventListener('keydown', escHandler);
   }
 
@@ -2092,8 +2275,9 @@ export class UIManager {
       peersList.appendChild(offlineSection);
     }
 
-    // Update connection status
+    // Update connection status, and the circle reachability shown at the composer
     this.updateConnectionStatus();
+    this.updateCastTarget();
 
     // Keep the circle management view in sync with peer changes (when visible)
     if (this.elements.circlesContainer && this.elements.circlesContainer.style.display !== 'none') {
@@ -2177,8 +2361,9 @@ export class UIManager {
       disconnectButton.className = 'danger-button';
       disconnectButton.style.marginRight = '5px';
       disconnectButton.addEventListener('click', () => {
-        if (confirm(`Are you sure you want to disconnect from ${peerInfo.username || 'this peer'}?`)) {
-          this.peerManager.disconnectPeer(connection);
+        if (confirm(`Disconnect from ${peerInfo.username || 'this peer'}? They won't be reconnected `
+          + 'automatically until you click Connect (or reload).')) {
+          this.peerManager.userDisconnect(connection);
         }
       });
       buttonContainer.appendChild(disconnectButton);

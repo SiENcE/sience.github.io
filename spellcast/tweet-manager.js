@@ -14,6 +14,9 @@ export class TweetManager {
 		// Constants for validation and limits
 		this.MAX_TWEET_LENGTH = 1000; // Maximum length of tweet content in characters
 		this.MAX_TWEETS_STORAGE = 1000; // Maximum number of tweets to store locally
+		this.MAX_TWEETS_PER_AUTHOR = 200; // Max stored tweets from any one author (flood bound)
+		this.MAX_ID_LENGTH = 128;        // Max length of a tweet id (ours are ~90 chars)
+		this.MAX_MEDIA_TYPE_LENGTH = 32; // Max length of a mediaType label
 		this.MAX_MEDIA_PER_TWEET = 1; // Start with just one attachment per message
 		this.MAX_USERNAME_LENGTH = 64;   // Max length of a (peer-supplied) username
 		this.MAX_CIRCLE_LENGTH = 64;     // Max length of a circle/audience name
@@ -23,6 +26,7 @@ export class TweetManager {
 		this.MAX_RELAY_HOPS = 6;         // Max times a tweet is forwarded across the mesh
 		this.MAX_RELAY_FANOUT = 32;      // Max peers we relay a single tweet to at once
 		this.MAX_KEY_B64 = 256;          // Generous bound for a base64 public key / signature
+		this.SAVE_DEBOUNCE_MS = 300;     // Coalescing window for storage writes (see scheduleSave)
 		this.VALID_TWEET_PROPS = [
 		  'id', 'username', 'content', 'timestamp', 'mediaId', 'mediaThumbnail', 'mediaType',
 		  'authorId', 'circle',
@@ -44,6 +48,12 @@ export class TweetManager {
 		this.tweets = [];
 		this.tweetRecipients = {}; // Maps tweet IDs to arrays of peer IDs who have received it
 		this.unsentTweets = {};    // Maps peer IDs to arrays of tweet IDs that need to be sent
+		this.tweetHops = {};       // tweetId -> hop count it arrived with (this session only; see hopsForResend)
+
+		// Coalesced storage writes (see scheduleSave)
+		this.saveTimer = null;
+		this.dirtyTweets = false;
+		this.dirtyDistribution = false;
 
 		// TOFU name registry: username -> the first public key we saw verified
 		// using that name. A later *different* key using the same name is flagged
@@ -110,14 +120,10 @@ export class TweetManager {
 	async loadTweets() {
 	  const savedTweets = await this.storageManager.loadFromStorage(StorageManager.KEYS.TWEETS);
 	  if (savedTweets) {
-		// Apply size limit if needed
-		if (savedTweets.length > this.MAX_TWEETS_STORAGE) {
-		  console.log(`Limiting loaded tweets to ${this.MAX_TWEETS_STORAGE} (had ${savedTweets.length})`);
-		  this.tweets = savedTweets.slice(0, this.MAX_TWEETS_STORAGE);
-		} else {
-		  this.tweets = savedTweets;
-		}
+		this.tweets = savedTweets;
 		this.sortTweets();
+		// Apply size limits (same flood-resistant policy as for new arrivals)
+		this.enforceStorageLimits();
 		// Call the callback if it exists
 		if (typeof this.onTweetsUpdated === 'function') {
 		  this.onTweetsUpdated();
@@ -146,13 +152,57 @@ export class TweetManager {
 	  if (!this.userManager.isLoggedIn()) return;
 
 	  // Apply limit before saving to prevent storage overflow
-	  if (this.tweets.length > this.MAX_TWEETS_STORAGE) {
-		console.log(`Limiting tweets to ${this.MAX_TWEETS_STORAGE} before saving`);
-		this.tweets = this.tweets.slice(0, this.MAX_TWEETS_STORAGE);
-	  }
-	  
+	  this.enforceStorageLimits();
+
 	  await this.storageManager.saveToStorage(StorageManager.KEYS.TWEETS, this.tweets);
 	  await this.saveMessageDistributionState();
+	}
+
+	/**
+	 * Coalesce saves. saveTweets() rewrites the whole tweet array (thumbnails
+	 * included) to IndexedDB, and distribution tracking changes on every send and
+	 * ack — so during a sync, saving per message meant hundreds of full rewrites.
+	 * Changes are written at most once per SAVE_DEBOUNCE_MS; flushSaves() writes
+	 * immediately (e.g. on page unload).
+	 * @param {boolean} [tweets=true] - whether the tweet list itself changed
+	 *        (false = only distribution tracking changed)
+	 */
+	scheduleSave(tweets = true) {
+		if (tweets) this.dirtyTweets = true;
+		this.dirtyDistribution = true;
+		if (this.saveTimer) return;
+		this.saveTimer = setTimeout(() => this.flushSaves(), this.SAVE_DEBOUNCE_MS);
+	}
+
+	/** Write any pending (coalesced) changes now. */
+	async flushSaves() {
+		if (this.saveTimer) {
+			clearTimeout(this.saveTimer);
+			this.saveTimer = null;
+		}
+		const tweets = this.dirtyTweets;
+		const distribution = this.dirtyDistribution;
+		this.dirtyTweets = false;
+		this.dirtyDistribution = false;
+		if (tweets) {
+			await this.saveTweets(); // also saves distribution state
+		} else if (distribution) {
+			await this.saveMessageDistributionState();
+		}
+	}
+
+	/**
+	 * The `hops` value to put on a tweet we send in a bulk sync: one more than
+	 * the hops it had when it reached us, or 0 for our own / pre-session tweets.
+	 * Without this, every bulk-synced tweet restarted the hop count at 0.
+	 */
+	hopsForResend(tweetId) {
+		return tweetId in this.tweetHops ? this.tweetHops[tweetId] + 1 : 0;
+	}
+
+	/** A peer-supplied hop count, as a bounded non-negative integer. */
+	parseHops(value) {
+		return Number.isInteger(value) && value >= 0 ? Math.min(value, this.MAX_RELAY_HOPS) : 0;
 	}
 
 	// In saveMessageDistributionState()
@@ -163,6 +213,69 @@ export class TweetManager {
 	}
 
 	/**
+	 * Whether a stored tweet is provably ours: signed by our key and verified.
+	 * (The username and authorId are self-asserted, so they never count.)
+	 * @param {Object} tweet
+	 * @returns {boolean}
+	 */
+	isOwnTweet(tweet) {
+		const myKey = this.userManager.publicKey;
+		return !!(myKey && tweet.verified && tweet.authorKey === myKey);
+	}
+
+	/**
+	 * Keep the store within MAX_TWEETS_STORAGE without letting a flood push out
+	 * what matters. Any peer can send a pile of valid, recent-looking tweets, and
+	 * plain "drop the oldest" would let it wipe everyone's history — including
+	 * our own posts. So:
+	 *  1. our own (verified) posts are never evicted;
+	 *  2. each author keeps at most MAX_TWEETS_PER_AUTHOR (their oldest go first),
+	 *     where the author is the verified key, or the username for unsigned posts;
+	 *  3. if still over the cap, the oldest UNVERIFIED tweets go first, then the
+	 *     oldest verified ones.
+	 * Assumes `this.tweets` is sorted newest-first.
+	 * @returns {Object[]} the evicted tweets
+	 */
+	enforceStorageLimits() {
+		const evicted = new Set();
+
+		const perAuthor = {};
+		for (const tweet of this.tweets) {
+			if (this.isOwnTweet(tweet)) continue;
+			const author = tweet.verified && tweet.authorKey ? `key:${tweet.authorKey}` : `name:${tweet.username}`;
+			perAuthor[author] = (perAuthor[author] || 0) + 1;
+			if (perAuthor[author] > this.MAX_TWEETS_PER_AUTHOR) evicted.add(tweet);
+		}
+
+		let excess = this.tweets.length - evicted.size - this.MAX_TWEETS_STORAGE;
+		if (excess > 0) {
+			const oldestFirst = this.tweets.filter(t => !evicted.has(t) && !this.isOwnTweet(t)).reverse();
+			const order = [...oldestFirst.filter(t => !t.verified), ...oldestFirst.filter(t => t.verified)];
+			for (const tweet of order) {
+				if (excess <= 0) break;
+				evicted.add(tweet);
+				excess--;
+			}
+		}
+
+		if (evicted.size === 0) return [];
+
+		console.log(`Evicting ${evicted.size} tweet(s) to stay within storage limits`);
+		this.tweets = this.tweets.filter(t => !evicted.has(t));
+
+		// Clean up references to removed tweets
+		const evictedIds = new Set([...evicted].map(t => t.id));
+		evictedIds.forEach(id => {
+			delete this.tweetRecipients[id];
+			delete this.tweetHops[id];
+		});
+		Object.keys(this.unsentTweets).forEach(peerId => {
+			this.unsentTweets[peerId] = this.unsentTweets[peerId].filter(id => !evictedIds.has(id));
+		});
+		return [...evicted];
+	}
+
+	/**
 	 * Forget all in-memory message state (used when credentials are deleted, so
 	 * nothing of the old account can be re-persisted or shown afterwards).
 	 */
@@ -170,9 +283,14 @@ export class TweetManager {
 		this.tweets = [];
 		this.tweetRecipients = {};
 		this.unsentTweets = {};
+		this.tweetHops = {};
 		this.nameRegistry = {};
 		this.reactions = {};
 		this.rateLimiter = new RateLimiter();
+		if (this.saveTimer) clearTimeout(this.saveTimer);
+		this.saveTimer = null;
+		this.dirtyTweets = false;
+		this.dirtyDistribution = false;
 
 		if (typeof this.onTweetsUpdated === 'function') {
 			this.onTweetsUpdated();
@@ -205,6 +323,21 @@ export class TweetManager {
 		  throw new Error(`Tweet content exceeds maximum length of ${this.MAX_TWEET_LENGTH} characters`);
 		}
 
+		// Rate limiting check — before processing any image, so a rejected post
+		// doesn't leave an orphaned image behind in storage.
+		const isAllowed = this.rateLimiter.isAllowed(
+		  'message',
+		  this.userManager.peerId,
+		  this.MESSAGE_MAX_COUNT,
+		  this.MESSAGE_TIME_WINDOW_MS
+		);
+
+		if (!isAllowed) {
+		  const timeUntil = this.rateLimiter.getTimeUntilAllowed('message', this.userManager.peerId);
+		  const secondsUntil = Math.ceil(timeUntil / 1000);
+		  throw new Error(`Message rate limit exceeded. Please wait ${secondsUntil} seconds before sending more messages.`);
+		}
+
 		// Process media if provided
 		let mediaId = null;
 		let mediaThumbnail = null;
@@ -220,20 +353,6 @@ export class TweetManager {
 			console.error('Error processing media:', error);
 			throw new Error(`Failed to process media: ${error.message}`);
 		  }
-		}
-
-		// Rate limiting check (existing code)
-		const isAllowed = this.rateLimiter.isAllowed(
-		  'message',
-		  this.userManager.peerId,
-		  this.MESSAGE_MAX_COUNT,
-		  this.MESSAGE_TIME_WINDOW_MS
-		);
-
-		if (!isAllowed) {
-		  const timeUntil = this.rateLimiter.getTimeUntilAllowed('message', this.userManager.peerId);
-		  const secondsUntil = Math.ceil(timeUntil / 1000);
-		  throw new Error(`Message rate limit exceeded. Please wait ${secondsUntil} seconds before sending more messages.`);
 		}
 
 		const { username, peerId } = this.userManager.getUserInfo();
@@ -265,12 +384,9 @@ export class TweetManager {
 			{ authorKey, signature, verified: !!signature });
 
 		// Send to peers (awaits loading the full image for transfer)
-		const { undeliverable } = await this.broadcastTweet(content, timestamp, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName, targetPeerIds,
+		const { delivered, undeliverable } = await this.broadcastTweet(content, timestamp, tweetId, mediaId, mediaThumbnail, mediaType, peerId, circleName, targetPeerIds,
 			{ authorKey, signature });
-		if (undeliverable > 0) {
-			this.peerManager.updateStatus(
-				`Circle post not delivered to ${undeliverable} connected member(s): no verified encryption key yet.`);
-		}
+		this.peerManager.updateStatus(this.describeDelivery(circle, delivered, undeliverable));
 
 		// Notify listeners
 		if (typeof this.onTweetsUpdated === 'function') {
@@ -279,6 +395,37 @@ export class TweetManager {
 
 		return tweetId;
 	  }
+
+	/**
+	 * Tell the user, in the status bar, who actually got the post. Public posts
+	 * also reach peers later through sync; circle posts are live-only (never
+	 * queued or synced), so for those it matters to say who missed out.
+	 * @param {Object|null} circle - target circle { name, peerIds }, or null for public
+	 * @param {number} delivered - peers the post was sent to
+	 * @param {number} undeliverable - connected circle members skipped (no verified enc key)
+	 * @returns {string}
+	 */
+	describeDelivery(circle, delivered, undeliverable) {
+		const peers = (n) => `${n} peer${n === 1 ? '' : 's'}`;
+		if (!circle) {
+			return delivered > 0
+				? `Cast to ${peers(delivered)}.`
+				: 'Saved. It will be shared with your peers when they connect.';
+		}
+
+		const members = circle.peerIds.length;
+		const offline = Math.max(0, members - delivered - undeliverable);
+		const parts = [delivered > 0
+			? `Cast to ${delivered} of ${members} member${members === 1 ? '' : 's'} of "${circle.name}".`
+			: `Saved, but no member of "${circle.name}" received it.`];
+		if (undeliverable > 0) {
+			parts.push(`Not delivered to ${undeliverable} connected member${undeliverable === 1 ? '' : 's'} (no verified encryption key yet).`);
+		}
+		if (offline > 0) {
+			parts.push(`Circle posts are only delivered live, so ${offline} offline member${offline === 1 ? '' : 's'} won't get it.`);
+		}
+		return parts.join(' ');
+	}
 
 	/**
 	 * Add a tweet to the database
@@ -360,24 +507,10 @@ export class TweetManager {
 		this.sortTweets();
 
 		// Ensure we're not exceeding the maximum number of tweets
-		if (this.tweets.length > this.MAX_TWEETS_STORAGE) {
-			// Remove oldest tweets that exceed the limit
-			const excess = this.tweets.length - this.MAX_TWEETS_STORAGE;
-			const removedTweets = this.tweets.splice(this.MAX_TWEETS_STORAGE, excess);
+		this.enforceStorageLimits();
 
-			// Clean up references to removed tweets
-			removedTweets.forEach(removedTweet => {
-				delete this.tweetRecipients[removedTweet.id];
-
-				// Remove from unsent tweets lists
-				Object.keys(this.unsentTweets).forEach(peerId => {
-					this.unsentTweets[peerId] = this.unsentTweets[peerId].filter(id => id !== removedTweet.id);
-				});
-			});
-		}
-
-		// Save to storage
-		this.saveTweets();
+		// Save to storage (coalesced: a sync can add hundreds of tweets in a burst)
+		this.scheduleSave();
 
 		// Notify listeners
 		if (typeof this.onTweetsUpdated === 'function') {
@@ -622,7 +755,7 @@ export class TweetManager {
 			}
 		});
 
-		this.saveMessageDistributionState();
+		this.scheduleSave(false);
 	}
 
 	/**
@@ -649,7 +782,7 @@ export class TweetManager {
 			pruned += before - this.unsentTweets[peerId].length;
 		});
 
-		this.saveMessageDistributionState();
+		this.scheduleSave(false);
 		return pruned;
 	}
 
@@ -757,6 +890,7 @@ export class TweetManager {
 		// key mismatch) are simply skipped.
 		let encByPeer = null; // Map<peerId, sealedEnvelope> when encrypting
 		let undeliverable = 0;
+		let delivered = 0;
 		if (circleName) {
 			encByPeer = new Map();
 			const recipients = connections
@@ -806,6 +940,7 @@ export class TweetManager {
 
 			try {
 				this.sendOrThrow(conn, payload);
+				delivered++;
 
 				// Mark as sent to this peer
 				if (this.tweetRecipients[tweetId] && !this.tweetRecipients[tweetId].includes(conn.peer)) {
@@ -833,9 +968,9 @@ export class TweetManager {
 		});
 
 		// Save the updated recipient and unsent tweet information
-		this.saveMessageDistributionState();
+		this.scheduleSave(false);
 
-		return { undeliverable };
+		return { delivered, undeliverable };
 	}
 
 	/**
@@ -878,8 +1013,15 @@ export class TweetManager {
 		  // bound its size to avoid storage/memory abuse.
 		  if (!tweet.mediaThumbnail.startsWith('data:image/')) return false;
 		  if (tweet.mediaThumbnail.length > this.MAX_THUMBNAIL_BYTES) return false;
-		  if (tweet.mediaId.length > 128) return false;
+		  if (tweet.mediaId.length > this.MAX_ID_LENGTH) return false;
+		  if (tweet.mediaType.length > this.MAX_MEDIA_TYPE_LENGTH) return false;
 		}
+
+		// The id is the de-dup key everywhere (storage, sync, acks, reactions): a
+		// non-string never compares equal (so it would be re-stored on every sync)
+		// and an unbounded one bloats storage. Absent is fine (we generate one).
+		if (tweet.id !== undefined && tweet.id !== null &&
+			(typeof tweet.id !== 'string' || tweet.id.length === 0 || tweet.id.length > this.MAX_ID_LENGTH)) return false;
 
 		// Optional author id / circle audience must be strings if present
 		if (tweet.authorId !== undefined && typeof tweet.authorId !== 'string') return false;
@@ -994,7 +1136,12 @@ export class TweetManager {
 		await this.saveReactions();
 		// Only propagate signed reactions (peers require a valid signature).
 		if (signature) {
-			this.broadcastReaction({ tweetId, reactorKey: myKey, reactorName: myName, active, timestamp, signature });
+			const reaction = { tweetId, reactorKey: myKey, reactorName: myName, active, timestamp, signature };
+			if (tweet.circle) {
+				this.sendReactionToAuthor(tweet, reaction);
+			} else {
+				this.broadcastReaction(reaction);
+			}
 		}
 
 		if (typeof this.onTweetsUpdated === 'function') this.onTweetsUpdated();
@@ -1004,7 +1151,13 @@ export class TweetManager {
 	recordReaction(r) {
 		if (!r || !r.tweetId || !r.reactorKey || typeof r.timestamp !== 'number') return false;
 		const isNewTweet = !this.reactions[r.tweetId];
-		if (isNewTweet && Object.keys(this.reactions).length >= this.MAX_REACTION_TWEETS) return false;
+		if (isNewTweet && Object.keys(this.reactions).length >= this.MAX_REACTION_TWEETS) {
+			// Full: reclaim room from reactions to tweets we don't hold. Anyone can
+			// sign reactions to made-up tweet ids, so without this one peer could
+			// fill the table and disable reactions for good.
+			this.pruneReactions();
+			if (Object.keys(this.reactions).length >= this.MAX_REACTION_TWEETS) return false;
+		}
 		if (!this.reactions[r.tweetId]) this.reactions[r.tweetId] = {};
 		const byKey = this.reactions[r.tweetId];
 		const prev = byKey[r.reactorKey];
@@ -1012,6 +1165,23 @@ export class TweetManager {
 		if (!prev && Object.keys(byKey).length >= this.MAX_REACTORS_PER_TWEET) return false; // cap
 		byKey[r.reactorKey] = { name: r.reactorName || '', active: !!r.active, ts: r.timestamp, sig: r.signature || null };
 		return true;
+	}
+
+	/**
+	 * Drop reaction records for tweets we don't hold (made-up ids, or tweets
+	 * since evicted/deleted).
+	 * @returns {number} number of tweet entries removed
+	 */
+	pruneReactions() {
+		const held = new Set(this.tweets.map(t => t.id));
+		let removed = 0;
+		for (const tweetId of Object.keys(this.reactions)) {
+			if (!held.has(tweetId)) {
+				delete this.reactions[tweetId];
+				removed++;
+			}
+		}
+		return removed;
 	}
 
 	/** Broadcast a reaction to all connected peers. */
@@ -1022,19 +1192,43 @@ export class TweetManager {
 		});
 	}
 
+	/**
+	 * Send a reaction to a circle post only to its author. Circle tweet ids embed
+	 * the author's name and posting time, so broadcasting/relaying the reaction
+	 * would reveal circle activity to the whole mesh.
+	 * @param {Object} tweet - the stored circle tweet
+	 * @param {Object} r - the signed reaction
+	 */
+	sendReactionToAuthor(tweet, r) {
+		const msg = { type: 'reaction', tweetId: r.tweetId, reactorKey: r.reactorKey, reactorName: r.reactorName, active: r.active, timestamp: r.timestamp, signature: r.signature };
+		const pins = this.peerManager.peerKeyPins || {};
+		this.peerManager.getAllConnections().forEach(conn => {
+			// Identify the author by their verified key where we can, so whoever
+			// holds the author's peer id can't collect reactions meant for them.
+			const isAuthor = tweet.verified && tweet.authorKey
+				? pins[conn.peer] === tweet.authorKey
+				: (tweet.authorId && conn.peer === tweet.authorId);
+			if (!isAuthor) return;
+			try { conn.send(msg); } catch (_) {}
+		});
+	}
+
 	/** Handle an incoming reaction: verify, apply, relay onward. */
 	async handleReactionMessage(data, conn) {
 		if (!(await this.verifyReactionMsg(data))) { this.peerManager.recordPeerStrike(conn.peer); return; }
 		const changed = this.recordReaction(data);
 		if (!changed) return; // stale / duplicate — do not relay
 		await this.saveReactions();
+		if (typeof this.onTweetsUpdated === 'function') this.onTweetsUpdated();
+		// Reactions to circle posts are never relayed (see sendReactionToAuthor).
+		const tweet = this.tweets.find(t => t.id === data.tweetId);
+		if (tweet && tweet.circle) return;
 		// Relay the verified reaction to our other peers (skip the sender).
 		const fwd = { type: 'reaction', tweetId: data.tweetId, reactorKey: data.reactorKey, reactorName: data.reactorName, active: data.active, timestamp: data.timestamp, signature: data.signature };
 		this.peerManager.getAllConnections().forEach(c => {
 			if (c.peer === conn.peer) return;
 			try { c.send(fwd); } catch (_) {}
 		});
-		if (typeof this.onTweetsUpdated === 'function') this.onTweetsUpdated();
 	}
 
 	/** Bulk reactions received during sync. */
@@ -1055,16 +1249,21 @@ export class TweetManager {
 	/** Validate + verify a reaction message signature. */
 	async verifyReactionMsg(r) {
 		if (!r || typeof r.tweetId !== 'string' || typeof r.reactorKey !== 'string' || typeof r.timestamp !== 'number') return false;
-		if (r.tweetId.length > 128 || r.reactorKey.length > this.MAX_KEY_B64) return false;
+		if (r.tweetId.length > this.MAX_ID_LENGTH || r.reactorKey.length > this.MAX_KEY_B64) return false;
 		if (typeof r.signature !== 'string' || r.signature.length > this.MAX_KEY_B64) return false;
 		if (r.timestamp > Date.now() + 60000) return false;
 		return verifyReaction(r.reactorKey, r.signature, { reactorKey: r.reactorKey, tweetId: r.tweetId, active: !!r.active, timestamp: r.timestamp });
 	}
 
-	/** All reaction records we hold, as signed wire items (for sync). */
+	/**
+	 * All reaction records we hold, as signed wire items (for sync). Reactions to
+	 * circle posts are excluded: like the posts themselves, they're never bulk-synced.
+	 */
 	collectReactionItems(limit = 2000) {
 		const items = [];
+		const circleIds = new Set(this.tweets.filter(t => t.circle).map(t => t.id));
 		for (const tweetId of Object.keys(this.reactions)) {
+			if (circleIds.has(tweetId)) continue;
 			for (const reactorKey of Object.keys(this.reactions[tweetId])) {
 				const rec = this.reactions[tweetId][reactorKey];
 				if (!rec || !rec.sig) continue;
@@ -1210,14 +1409,14 @@ export class TweetManager {
 
 		if (tweetsToSend.length === 0) {
 			console.log(`Peer ${conn.peer} is already up to date (${knownIds.size} tweets)`);
-			this.saveMessageDistributionState();
+			this.scheduleSave(false);
 			this.sendReactionsTo(conn);
 			return;
 		}
 
 		console.log(`Peer ${conn.peer} is missing ${tweetsToSend.length} tweets — sending them`);
 		this.sendTweetsToPeer(conn, tweetsToSend);
-		this.saveMessageDistributionState();
+		this.scheduleSave(false);
 		this.sendReactionsTo(conn);
 	}
 
@@ -1289,7 +1488,10 @@ export class TweetManager {
 				try {
 					// Build sanitized wire payloads (carries the signature + full
 					// image; omits local-only trust flags like `verified`).
-					const enrichedTweets = await Promise.all(batch.map(tweet => this.buildTweetPayload(tweet)));
+					const enrichedTweets = await Promise.all(batch.map(async tweet => ({
+						...(await this.buildTweetPayload(tweet)),
+						hops: this.hopsForResend(tweet.id)
+					})));
 
 					this.sendOrThrow(conn, {
 						type: 'all_tweets',
@@ -1309,7 +1511,7 @@ export class TweetManager {
 						}
 					});
 
-					this.saveMessageDistributionState();
+					this.scheduleSave(false);
 					console.log(`Sent batch ${index + 1}/${batches.length} (${batch.length} tweets) to peer ${peerId}`);
 				} catch (error) {
 					console.error(`Failed to send tweets batch to peer ${peerId}:`, error);
@@ -1324,7 +1526,7 @@ export class TweetManager {
 						}
 					});
 
-					this.saveMessageDistributionState();
+					this.scheduleSave(false);
 				}
 			}, index * 500); // 500ms delay between batches
 		});
@@ -1443,7 +1645,7 @@ export class TweetManager {
 				id: tweetId
 			});
 
-			this.saveMessageDistributionState();
+			this.scheduleSave(false);
 
 			// Notify listeners
 			if (typeof this.onTweetsUpdated === 'function') {
@@ -1452,9 +1654,11 @@ export class TweetManager {
 
 			// Multi-hop relay: forward newly seen tweets to our other peers
 			if (isNew) {
+				const hops = this.parseHops(data.hops);
+				this.tweetHops[tweetId] = hops;
 				const storedTweet = this.tweets.find(t => t.id === tweetId);
 				if (storedTweet) {
-					await this.relayTweet(storedTweet, conn.peer, typeof data.hops === 'number' ? data.hops : 0);
+					await this.relayTweet(storedTweet, conn.peer, hops);
 				}
 			}
 		} catch (error) {
@@ -1477,7 +1681,7 @@ export class TweetManager {
 				this.unsentTweets[conn.peer] = this.unsentTweets[conn.peer].filter(id => id !== data.id);
 			}
 
-			this.saveMessageDistributionState();
+			this.scheduleSave(false);
 		}
 	}
 
@@ -1591,6 +1795,7 @@ export class TweetManager {
 					validTweetIds.push(tweetId);
 					if (isNew) {
 						newlyAddedIds.push(tweetId);
+						this.tweetHops[tweetId] = this.parseHops(tweet.hops);
 					}
 				} catch (error) {
 					console.error('Error processing individual tweet in bulk message:', error);
@@ -1610,7 +1815,7 @@ export class TweetManager {
 				});
 			}
 
-			this.saveMessageDistributionState();
+			this.scheduleSave(false);
 
 			// Notify listeners
 			if (typeof this.onTweetsUpdated === 'function') {
@@ -1621,7 +1826,7 @@ export class TweetManager {
 			for (const tweetId of newlyAddedIds) {
 				const storedTweet = this.tweets.find(t => t.id === tweetId);
 				if (storedTweet) {
-					await this.relayTweet(storedTweet, conn.peer);
+					await this.relayTweet(storedTweet, conn.peer, this.tweetHops[tweetId] || 0);
 				}
 			}
 		} catch (error) {
@@ -1648,7 +1853,7 @@ export class TweetManager {
 				}
 			});
 
-			this.saveMessageDistributionState();
+			this.scheduleSave(false);
 		}
 	}
 }

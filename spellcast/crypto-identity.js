@@ -20,6 +20,17 @@ const SIGN_ALGO = { name: 'ECDSA', hash: 'SHA-256' };
 const ECDH_ALGO = { name: 'ECDH', namedCurve: 'P-256' };
 const SIGNED_PREFIX = 'spellcast-tweet-v1';
 const PBKDF2_ITERATIONS = 250000;
+// Accepted range for a backup's (attacker-controllable) iteration count: too low
+// makes the passphrase cheap to brute-force, too high can hang the tab.
+const PBKDF2_MIN_ITERATIONS = 100000;
+const PBKDF2_MAX_ITERATIONS = 5000000;
+
+/**
+ * Minimum backup passphrase length. The encrypted backup may be shown as a QR
+ * code on screen (photographable), so its passphrase must resist an offline
+ * guessing attack; a few random words is the easy way to get there.
+ */
+export const MIN_PASSPHRASE_LENGTH = 10;
 
 /** Derive an AES-GCM key from a passphrase via PBKDF2-SHA-256. */
 async function deriveAesKey(passphrase, salt, iterations = PBKDF2_ITERATIONS) {
@@ -130,20 +141,81 @@ function canonicalBytes(fields) {
   return new TextEncoder().encode(canonical);
 }
 
+// ---- Synchronous SHA-256 (FIPS 180-4) ----
+// fingerprint() runs while rendering, and WebCrypto's digest is async-only, so
+// this small synchronous implementation backs it. Round constants are derived
+// (fractional parts of cube / square roots of the first primes) rather than
+// typed out; tests check the output against Node's crypto.
+const SHA256_K = new Uint32Array(64);
+const SHA256_H0 = new Uint32Array(8);
+(() => {
+  const primes = [];
+  for (let n = 2; primes.length < 64; n++) {
+    if (primes.every(p => n % p !== 0)) primes.push(n);
+  }
+  const frac32 = (x) => ((x - Math.floor(x)) * 0x100000000) >>> 0;
+  primes.forEach((p, i) => {
+    SHA256_K[i] = frac32(Math.cbrt(p));
+    if (i < 8) SHA256_H0[i] = frac32(Math.sqrt(p));
+  });
+})();
+
+const ror = (x, n) => (x >>> n) | (x << (32 - n));
+
+/** Hex SHA-256 of a UTF-8 string, computed synchronously. */
+export function sha256Hex(text) {
+  const bytes = new TextEncoder().encode(text);
+  const paddedLength = ((bytes.length + 9 + 63) >> 6) << 6;
+  const buf = new Uint8Array(paddedLength);
+  buf.set(bytes);
+  buf[bytes.length] = 0x80;
+  const view = new DataView(buf.buffer);
+  const bitLength = bytes.length * 8;
+  view.setUint32(paddedLength - 8, Math.floor(bitLength / 0x100000000));
+  view.setUint32(paddedLength - 4, bitLength >>> 0);
+
+  const H = new Uint32Array(SHA256_H0);
+  const W = new Uint32Array(64);
+  for (let offset = 0; offset < paddedLength; offset += 64) {
+    for (let i = 0; i < 16; i++) W[i] = view.getUint32(offset + i * 4);
+    for (let i = 16; i < 64; i++) {
+      const s0 = ror(W[i - 15], 7) ^ ror(W[i - 15], 18) ^ (W[i - 15] >>> 3);
+      const s1 = ror(W[i - 2], 17) ^ ror(W[i - 2], 19) ^ (W[i - 2] >>> 10);
+      W[i] = (W[i - 16] + s0 + W[i - 7] + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, h] = H;
+    for (let i = 0; i < 64; i++) {
+      const t1 = (h + (ror(e, 6) ^ ror(e, 11) ^ ror(e, 25)) + ((e & f) ^ (~e & g)) + SHA256_K[i] + W[i]) >>> 0;
+      const t2 = ((ror(a, 2) ^ ror(a, 13) ^ ror(a, 22)) + ((a & b) ^ (a & c) ^ (b & c))) >>> 0;
+      h = g; g = f; f = e; e = (d + t1) >>> 0;
+      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    H[0] += a; H[1] += b; H[2] += c; H[3] += d;
+    H[4] += e; H[5] += f; H[6] += g; H[7] += h;
+  }
+  return Array.from(H, x => x.toString(16).padStart(8, '0')).join('');
+}
+
+const FINGERPRINT_CACHE = new Map();
+const FINGERPRINT_CACHE_MAX = 1000;
+
 /**
- * Short, key-derived fingerprint (4 hex chars) used to build the human handle
- * `username#fingerprint`. It visually disambiguates two users sharing a name;
- * it is NOT the security boundary (that is the signature + full-key TOFU pin),
- * so a fast synchronous string hash of the public key is sufficient and keeps
- * rendering synchronous.
+ * Short, key-derived fingerprint (8 hex chars = 32 bits of SHA-256) used to
+ * build the human handle `username#fingerprint`. It visually disambiguates two
+ * users sharing a name. It is NOT the security boundary (that is the signature
+ * + full-key TOFU pin), but it should still be costly to forge a look-alike:
+ * matching 32 bits means ~4 billion key generations, versus ~65 thousand for
+ * the old 16-bit string hash.
  */
 export function fingerprint(publicKeyB64) {
-  if (!publicKeyB64) return '----';
-  let hash = 0;
-  for (let i = 0; i < publicKeyB64.length; i++) {
-    hash = ((hash << 5) - hash + publicKeyB64.charCodeAt(i)) >>> 0;
+  if (!publicKeyB64) return '--------';
+  let fp = FINGERPRINT_CACHE.get(publicKeyB64);
+  if (!fp) {
+    fp = sha256Hex(`spellcast-fp-v1|${publicKeyB64}`).slice(0, 8);
+    if (FINGERPRINT_CACHE.size >= FINGERPRINT_CACHE_MAX) FINGERPRINT_CACHE.clear();
+    FINGERPRINT_CACHE.set(publicKeyB64, fp);
   }
-  return hash.toString(16).padStart(8, '0').slice(0, 4);
+  return fp;
 }
 
 /** Build the display handle `username#fingerprint`. */
@@ -347,7 +419,9 @@ export class CryptoIdentity {
     const s = subtle();
     if (!s) throw new Error('WebCrypto unavailable (need HTTPS or localhost).');
     if (!this.privateKey) throw new Error('No credentials to export.');
-    if (!passphrase) throw new Error('A passphrase is required.');
+    if (!passphrase || passphrase.length < MIN_PASSPHRASE_LENGTH) {
+      throw new Error(`The passphrase must be at least ${MIN_PASSPHRASE_LENGTH} characters.`);
+    }
 
     let jwk, encJwk = null;
     try {
@@ -404,9 +478,19 @@ export class CryptoIdentity {
     }
     if (!passphrase) throw new Error('A passphrase is required.');
 
+    // The envelope is untrusted input (a file or scanned QR): bound the KDF cost
+    // before running it, and fail clearly on malformed fields.
+    const iterations = envelope.iterations ?? PBKDF2_ITERATIONS;
+    if (!Number.isInteger(iterations) || iterations < PBKDF2_MIN_ITERATIONS || iterations > PBKDF2_MAX_ITERATIONS) {
+      throw new Error('Unsupported backup: its key-derivation settings are out of range.');
+    }
+    if (typeof envelope.salt !== 'string' || typeof envelope.iv !== 'string' || typeof envelope.data !== 'string') {
+      throw new Error('Corrupted backup file.');
+    }
+
     const salt = new Uint8Array(b64ToBuf(envelope.salt));
     const iv = new Uint8Array(b64ToBuf(envelope.iv));
-    const aesKey = await deriveAesKey(passphrase, salt, envelope.iterations || PBKDF2_ITERATIONS);
+    const aesKey = await deriveAesKey(passphrase, salt, iterations);
 
     let plainBuf;
     try {
