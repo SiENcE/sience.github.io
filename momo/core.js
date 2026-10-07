@@ -92,6 +92,12 @@
     { id: "count", icon: "✋", title: "Wie viele?", color: "peach" },
     { id: "more", icon: "🍎", title: "Mehr oder weniger?", color: "rose" },
     { id: "venn", icon: "⭕", title: "Mengen-Kreise", color: "lavender" },
+    { id: "cross", icon: "🌉", title: "Über den Zehner", color: "sky" },
+    { id: "times", icon: "🔵", title: "Malfelder", color: "lavender" },
+    { id: "money", icon: "🪙", title: "Geld zählen", color: "yellow" },
+    { id: "clock", icon: "🕒", title: "Uhr lesen", color: "mint" },
+    { id: "syllables", icon: "🥁", title: "Silben klatschen", color: "peach" },
+    { id: "extend", icon: "🐍", title: "Wörter verlängern", color: "mint" },
   ];
   // Menu: subject → category → game. "report" names the category for adults.
   const SUBJECTS = [
@@ -120,11 +126,11 @@
     {
       id: "spelling",
       subject: "deutsch",
-      icon: "🧠",
-      title: "Merkwörter",
-      report: "Merkwörter",
+      icon: "✏️",
+      title: "Richtig schreiben",
+      report: "Rechtschreiben",
       color: "yellow",
-      games: ["merk"],
+      games: ["syllables", "extend", "merk"],
     },
     {
       id: "memory",
@@ -176,9 +182,27 @@
       subject: "mathe",
       icon: "➕",
       title: "Rechnen",
-      report: "Rechnen mit Zehnern",
+      report: "Rechnen bis 100",
       color: "rose",
-      games: ["calc"],
+      games: ["calc", "cross"],
+    },
+    {
+      id: "times",
+      subject: "mathe",
+      icon: "✖️",
+      title: "Einmaleins",
+      report: "Einmaleins",
+      color: "lavender",
+      games: ["times"],
+    },
+    {
+      id: "sizes",
+      subject: "mathe",
+      icon: "👛",
+      title: "Geld und Uhr",
+      report: "Größen: Geld & Uhrzeit",
+      color: "yellow",
+      games: ["money", "clock"],
     },
     {
       id: "charts",
@@ -523,6 +547,86 @@
       { max: 20, gap: 1, ask: ["diff"], trap: true, choices: 4, label: "Wie viele mehr? bis 20" },
     ],
     // Sorting into rings by two properties (set diagram with an intersection).
+    // Adding and subtracting across a ten, best in steps via the full ten.
+    cross: [
+      { ops: ["E+E"], choices: 3, label: "über die 10: 7 + 5" },
+      { ops: ["E-E"], choices: 3, label: "zurück über die 10: 13 − 5" },
+      { ops: ["N+E"], choices: 3, label: "über den Zehner: 38 + 5" },
+      { ops: ["N-E"], choices: 3, label: "zurück über den Zehner: 52 − 7" },
+      { ops: ["step+", "step-"], choices: 4, label: "in Schritten: 38 + 2 + 3" },
+      { ops: ["N+N"], carry: false, choices: 4, label: "zweistellig: 34 + 25" },
+      { ops: ["N+N", "N-N"], carry: true, choices: 4, label: "mit Übergang: 38 + 25, 62 − 27" },
+      {
+        ops: ["E+E", "E-E", "N+E", "N-E", "N+N", "N-N"],
+        carry: true,
+        choices: 4,
+        label: "alles gemischt",
+      },
+    ],
+    // Times tables from dot arrays: core tasks (2, 5, 10), neighbours, swaps.
+    times: [
+      { ask: "count", rows: [2, 5, 10], max: 5, choices: 3, label: "Punktefeld: 2er, 5er, 10er" },
+      { ask: "task", rows: [2, 5, 10], max: 5, choices: 3, label: "Welche Malaufgabe passt?" },
+      { ask: "result", rows: [2, 5, 10], max: 10, choices: 3, label: "Kernaufgaben: 2er, 5er, 10er" },
+      { ask: "result", rows: [2, 3, 4, 5, 10], max: 10, choices: 4, label: "2er bis 5er und 10er" },
+      { ask: "neighbor", rows: [2, 3, 4, 5, 10], max: 10, choices: 4, label: "Nachbaraufgaben: 6 · 5 = 5 · 5 + 5" },
+      { ask: "swap", rows: [3, 4, 6, 7, 8, 9], max: 10, choices: 4, label: "Tauschaufgaben: 4 · 7 = 7 · 4" },
+      { ask: "result", rows: [2, 3, 4, 5, 6, 7, 8, 9, 10], max: 10, choices: 4, label: "alle Reihen" },
+    ],
+    // Coins and notes: count, pay exactly, change.
+    money: [
+      { coins: [1, 2, 5, 10], max: 20, unit: "ct", ask: "count", choices: 3, label: "Cent bis 20" },
+      { coins: [1, 2, 5, 10, 20, 50], max: 100, unit: "ct", ask: "count", choices: 3, label: "Cent bis 100" },
+      { coins: [1, 2, 5, 10], max: 30, unit: "€", ask: "count", choices: 3, label: "Euro bis 30" },
+      { coins: [1, 2, 5, 10, 20, 50], max: 100, unit: "€", ask: "count", choices: 4, label: "Euro bis 100" },
+      { coins: [1, 2, 5, 10, 20, 50], max: 100, unit: "ct", ask: "pay", choices: 3, label: "passend bezahlen" },
+      { unit: "ct", ask: "change", choices: 4, label: "Rückgeld" },
+      { coins: [1, 2, 5, 10, 20, 50], max: 100, unit: "€", ask: "pay", choices: 3, label: "passend bezahlen in Euro" },
+    ],
+    // Reading an analog clock: full, half, quarter hours, five-minute steps.
+    clock: [
+      { kinds: ["full"], choices: 3, label: "volle Stunden" },
+      { kinds: ["full", "half"], choices: 3, label: "volle und halbe Stunden" },
+      { kinds: ["half"], choices: 4, label: "halbe Stunden: halb 4" },
+      { kinds: ["quarterPast", "quarterTo"], choices: 4, label: "Viertel nach, Viertel vor" },
+      {
+        kinds: ["full", "half", "quarterPast", "quarterTo"],
+        digital: true,
+        choices: 4,
+        label: "auch als Digitalzeit: 3:30",
+      },
+      { kinds: ["five"], choices: 4, label: "5-Minuten-Schritte: 10 nach 3" },
+      {
+        kinds: ["full", "half", "quarterPast", "quarterTo", "five"],
+        digital: true,
+        choices: 4,
+        label: "alles gemischt",
+      },
+    ],
+    // Syllables: count them (clapping), then find a missing one.
+    syllables: [
+      { ask: "count", sizes: [1, 2], choices: 3, label: "1 oder 2 Silben" },
+      { ask: "count", sizes: [1, 2, 3], choices: 3, label: "bis 3 Silben" },
+      { ask: "count", sizes: [2, 3, 4], choices: 4, label: "bis 4 Silben" },
+      { ask: "count", sizes: [1, 2, 3, 4, 5], picture: false, choices: 4, label: "nur hören, bis 5 Silben" },
+      { ask: "gap", sizes: [2, 3], choices: 3, label: "Welche Silbe fehlt?" },
+      { ask: "gap", sizes: [3, 4, 5], choices: 4, label: "Silbe fehlt, lange Wörter" },
+    ],
+    // Final d/t, g/k, b/p: lengthen the word and the ending can be heard.
+    extend: [
+      { ends: ["d", "t"], kinds: ["noun"], choices: 2, label: "d oder t: Hund, Brot" },
+      { ends: ["g", "k", "b"], kinds: ["noun"], choices: 2, label: "g oder k, b oder p" },
+      { ends: ["d", "t", "g", "k", "b"], kinds: ["noun"], choices: 2, label: "alle gemischt" },
+      { ends: ["d", "t", "g", "k", "b"], kinds: ["noun"], picture: false, choices: 2, label: "ohne Bild" },
+      { ends: ["d", "t", "g", "k", "b"], kinds: ["adjective"], choices: 2, label: "Eigenschaftswörter: gelb, rund" },
+      {
+        ends: ["d", "t", "g", "k", "b"],
+        kinds: ["noun", "adjective"],
+        picture: false,
+        choices: 2,
+        label: "alles, ohne Bild",
+      },
+    ],
     venn: [
       { rings: 1, sets: [0], choices: 2, label: "ein Kreis: drin oder draußen" },
       { rings: 2, sets: [0], noBoth: true, choices: 4, label: "zwei Kreise" },
@@ -1033,6 +1137,52 @@
       speech: `${capitalize(numberWord(from))} ${signWord(delta)} ${numberWord(Math.abs(delta))} ist ${numberWord(result)}.`,
     };
   }
+  // Syllables are separated by "-"; every syllable has at least two letters,
+  // so the voice never has to say a single letter.
+  const SYLLABLE_WORDS = [
+    ["🐶", "Hund"], ["🐭", "Maus"], ["⚽", "Ball"], ["🐑", "Schaf"], ["🌳", "Baum"], ["🏠", "Haus"],
+    ["🌙", "Mond"], ["🐟", "Fisch"], ["🐮", "Kuh"], ["🍞", "Brot"], ["⭐", "Stern"], ["🚆", "Zug"],
+    ["🚌", "Bus"], ["🎩", "Hut"],
+    ["🐱", "Kat-ze"], ["☀️", "Son-ne"], ["☁️", "Wol-ke"], ["🌼", "Blu-me"], ["🍰", "Ku-chen"],
+    ["🍐", "Bir-ne"], ["🦁", "Lö-we"], ["🐯", "Ti-ger"], ["🦓", "Ze-bra"], ["🌹", "Ro-se"],
+    ["👃", "Na-se"], ["🛋️", "So-fa"], ["🍎", "Ap-fel"], ["🚲", "Fahr-rad"], ["🐰", "Ha-se"],
+    ["☕", "Tas-se"], ["🎻", "Gei-ge"], ["🖌️", "Pin-sel"], ["⛄", "Schnee-mann"], ["🐪", "Ka-mel"],
+    ["🍌", "Ba-na-ne"], ["🍅", "To-ma-te"], ["🚀", "Ra-ke-te"], ["🍉", "Me-lo-ne"], ["🦒", "Gi-raf-fe"],
+    ["🐧", "Pin-gu-in"], ["🐊", "Kro-ko-dil"], ["☎️", "Te-le-fon"], ["🦜", "Pa-pa-gei"],
+    ["🦋", "Schmet-ter-ling"], ["🥕", "Ka-rot-te"], ["🚁", "Hub-schrau-ber"], ["🍔", "Ham-bur-ger"],
+    ["🍫", "Scho-ko-la-de"], ["🛁", "Ba-de-wan-ne"], ["🌈", "Re-gen-bo-gen"], ["🌻", "Son-nen-blu-me"],
+    ["🐞", "Ma-ri-en-kä-fer"], ["🚂", "Lo-ko-mo-ti-ve"], ["🚒", "Feu-er-wehr-au-to"],
+  ];
+  /*
+   * Words with a hard-sounding ending: [icon, word, lengthened form, kind].
+   * The written ending is the last letter; lengthening makes it audible.
+   */
+  const EXTEND_WORDS = [
+    ["🐶", "Hund", "Hunde", "noun"], ["🌙", "Mond", "Monde", "noun"], ["🧒", "Kind", "Kinder", "noun"],
+    ["✋", "Hand", "Hände", "noun"], ["🌲", "Wald", "Wälder", "noun"], ["🖼️", "Bild", "Bilder", "noun"],
+    ["🐴", "Pferd", "Pferde", "noun"], ["👕", "Hemd", "Hemden", "noun"], ["🚲", "Fahrrad", "Fahrräder", "noun"],
+    ["🍞", "Brot", "Brote", "noun"], ["🎩", "Hut", "Hüte", "noun"], ["⛺", "Zelt", "Zelte", "noun"],
+    ["⛵", "Boot", "Boote", "noun"], ["📦", "Paket", "Pakete", "noun"], ["🥗", "Salat", "Salate", "noun"],
+    ["🐘", "Elefant", "Elefanten", "noun"],
+    ["⛰️", "Berg", "Berge", "noun"], ["🚆", "Zug", "Züge", "noun"], ["✈️", "Flugzeug", "Flugzeuge", "noun"],
+    ["🏰", "Burg", "Burgen", "noun"], ["🤴", "König", "Könige", "noun"], ["🛤️", "Weg", "Wege", "noun"],
+    ["🎁", "Geschenk", "Geschenke", "noun"], ["🥤", "Getränk", "Getränke", "noun"],
+    ["🧺", "Korb", "Körbe", "noun"], ["🦹", "Dieb", "Diebe", "noun"], ["🪄", "Zauberstab", "Zauberstäbe", "noun"],
+    ["🟡", "gelb", "gelbe", "adjective"], ["🔵", "rund", "runde", "adjective"], ["🐗", "wild", "wilde", "adjective"],
+    ["🧊", "kalt", "kalte", "adjective"], ["📢", "laut", "laute", "adjective"], ["🎨", "bunt", "bunte", "adjective"],
+    ["💖", "lieb", "liebe", "adjective"], ["🦉", "klug", "kluge", "adjective"], ["💪", "stark", "starke", "adjective"],
+    ["🤒", "krank", "kranke", "adjective"],
+  ];
+  // Endings that sound alike at the end of a word.
+  const SOUND_TWINS = { d: "t", t: "d", g: "k", k: "g", b: "p", p: "b" };
+  const SHOP_ITEMS = [
+    { icon: "🍦", word: "Das Eis" },
+    { icon: "🥨", word: "Die Brezel" },
+    { icon: "🍎", word: "Der Apfel" },
+    { icon: "🍬", word: "Das Bonbon" },
+    { icon: "✏️", word: "Der Stift" },
+    { icon: "🎈", word: "Der Luftballon" },
+  ];
   const SET_ICONS = ["🍎", "⭐", "🐞", "🌸", "🍓", "⚽", "🐟", "🦋", "🍄", "🐥"];
   /*
    * Set diagrams: two properties ("rings") and things with [icon, article,
@@ -2005,6 +2155,435 @@
       } while (question.answer === previous?.answer);
       return question;
     }
+    if (mode === "cross") {
+      let question;
+      do {
+        const op = pick(config.ops, random);
+        const digit = () => between(2, 9, random);
+        let a;
+        let b;
+        let forced;
+        let steps;
+        if (op === "E+E") {
+          do [a, b] = [digit(), digit()];
+          while (a + b <= 10);
+          forced = [(a + b) % 10];
+          steps = [10 - a, b - (10 - a)];
+        } else if (op === "E-E") {
+          do [a, b] = [between(11, 18, random), digit()];
+          while (a % 10 >= b || a - b >= 10);
+          forced = [b - (a % 10)];
+          steps = [-(a % 10), -(b - (a % 10))];
+        } else if (op === "N+E" || op === "step+") {
+          do [a, b] = [between(11, 89, random), digit()];
+          while (a % 10 === 0 || (a % 10) + b <= 10);
+          forced = [a - (a % 10) + (((a % 10) + b) % 10)];
+          steps = [10 - (a % 10), b - (10 - (a % 10))];
+        } else if (op === "N-E" || op === "step-") {
+          do [a, b] = [between(21, 99, random), digit()];
+          while (a % 10 === 0 || a % 10 >= b);
+          forced = [a - (a % 10) + (b - (a % 10))];
+          steps = [-(a % 10), -(b - (a % 10))];
+        } else {
+          // Two two-digit numbers: first the tens, then the ones.
+          const minus = op === "N-N";
+          do {
+            [a, b] = [between(21, 89, random), between(11, 69, random)];
+            if (minus && a < b) [a, b] = [b, a];
+          } while (
+            (minus
+              ? config.carry
+                ? a % 10 >= b % 10 || b % 10 === 0
+                : a % 10 < b % 10
+              : config.carry
+                ? (a % 10) + (b % 10) <= 10 || a + b > 100
+                : (a % 10) + (b % 10) >= 10 || a + b > 99) || a === b
+          );
+          const tens = b - (b % 10);
+          forced = minus
+            ? [Math.floor(a / 10) * 10 - tens + Math.abs((a % 10) - (b % 10))]
+            : [a + b - 10];
+          steps = minus ? [-tens, -(b % 10)] : [tens, b % 10];
+        }
+        const minus = op.includes("-");
+        const result = minus ? a - b : a + b;
+        const step = op.startsWith("step");
+        const answer = step ? Math.abs(steps[1]) : result;
+        const sign = minus ? "−" : "+";
+        const word = minus ? "minus" : "plus";
+        // [numbers and signs]; null is the gap.
+        const parts = step
+          ? [a, sign, b, "=", a, sign, Math.abs(steps[0]), sign, null]
+          : [a, sign, b, "=", null];
+        question = {
+          op,
+          a,
+          b,
+          minus,
+          result,
+          steps,
+          parts,
+          number: answer,
+          answer: String(answer),
+          choices: numberOptions(
+            answer,
+            step ? [b] : forced,
+            [answer + 1, answer - 1, answer + 10, answer - 10, answer + 2],
+            config.choices,
+            random,
+          ),
+          speech: step
+            ? `${numberWord(a)} ${word} ${numberWord(b)} ist ${numberWord(a)} ${word} ${numberWord(Math.abs(steps[0]))} ${word} wie viel?`
+            : `${numberWord(a)} ${word} ${numberWord(b)}`,
+          explain: {
+            text: `${a} ${sign} ${Math.abs(steps[0])} ${sign} ${Math.abs(steps[1])} = ${result}.`,
+            speech: `${capitalize(numberWord(a))} ${word} ${numberWord(Math.abs(steps[0]))} ist ${numberWord(a + steps[0])}, ${word} ${numberWord(Math.abs(steps[1]))} ist ${numberWord(result)}.`,
+          },
+          cue: `Vorlesen: ${parts.map((x) => (x === null ? "?" : x)).join(" ")}`,
+        };
+      } while (question.answer === previous?.answer);
+      return question;
+    }
+    if (mode === "times") {
+      let question;
+      do {
+        const k = pick(config.rows, random);
+        const field = ["count", "task"].includes(config.ask);
+        let n = between(field ? 2 : 1, config.max, random);
+        let core = null;
+        if (config.ask === "neighbor") {
+          // Next to a core task (2, 5 or 10 times): one row more or less.
+          core = pick([2, 5, 10], random);
+          n = core === 10 ? 9 : core + pick([-1, 1], random);
+        }
+        if (config.ask === "swap") while (n === k || n < 2) n = between(2, config.max, random);
+        const product = n * k;
+        const times = (x, y) => `${x} · ${y}`;
+        const timesWord = (x, y) => `${numberWord(x)} mal ${numberWord(y)}`;
+        let answer = String(product);
+        let choices;
+        let say = null;
+        if (config.ask === "task") {
+          // The swapped task (k · n) would also be right, so it is never offered.
+          const wrong = [
+            [n + 1, k],
+            [n - 1, k],
+            [n, k + 1],
+            [n, k - 1],
+          ].filter(([x, y]) => x >= 1 && y >= 1 && !(x === k && y === n));
+          answer = times(n, k);
+          const options = [answer, `${n} + ${k}`, ...shuffle(wrong, random).map(([x, y]) => times(x, y))];
+          choices = shuffle([...new Set(options)].slice(0, config.choices), random);
+          say = Object.fromEntries(
+            choices.map((choice) => {
+              const [x, sign, y] = choice.split(" ");
+              return [choice, `${numberWord(Number(x))} ${sign === "+" ? "plus" : "mal"} ${numberWord(Number(y))}`];
+            }),
+          );
+        } else
+          choices = numberOptions(
+            product,
+            core ? [core * k + (n > core ? 1 : -1)] : [n + k],
+            [product + k, product - k, product + 1, product - 1, product + n],
+            config.choices,
+            random,
+          );
+        const known =
+          config.ask === "neighbor"
+            ? { text: `${times(core, k)} = ${core * k}`, speech: `${timesWord(core, k)} ist ${numberWord(core * k)}.` }
+            : config.ask === "swap"
+              ? { text: `${times(k, n)} = ${product}`, speech: `${timesWord(k, n)} ist ${numberWord(product)}.` }
+              : null;
+        const explain = {
+          count: {
+            text: `${n} Reihen mit je ${k}: ${times(n, k)} = ${product}.`,
+            speech: `${capitalize(numberWord(n))} Reihen mit je ${numberWord(k)}: ${timesWord(n, k)} ist ${numberWord(product)}.`,
+          },
+          task: {
+            text: `${n} Reihen mit je ${k}: ${times(n, k)} = ${product}.`,
+            speech: `${capitalize(numberWord(n))} Reihen mit je ${numberWord(k)}: ${timesWord(n, k)}.`,
+          },
+          neighbor: core && {
+            text: `${times(core, k)} = ${core * k}, ${n > core ? "plus" : "minus"} ${k}: ${times(n, k)} = ${product}.`,
+            speech: `${capitalize(timesWord(core, k))} ist ${numberWord(core * k)}, ${n > core ? "plus" : "minus"} ${numberWord(k)} ist ${numberWord(product)}.`,
+          },
+          swap: {
+            text: `${times(k, n)} = ${times(n, k)} = ${product}. Tauschaufgaben haben das gleiche Ergebnis.`,
+            speech: `${capitalize(timesWord(n, k))} ist auch ${numberWord(product)}. Tauschaufgaben haben das gleiche Ergebnis.`,
+          },
+        }[config.ask] || {
+          text: `${times(n, k)} = ${product}.`,
+          speech: `${capitalize(timesWord(n, k))} ist ${numberWord(product)}.`,
+        };
+        question = {
+          ask: config.ask,
+          rows: n,
+          cols: k,
+          core,
+          known,
+          number: product,
+          key: `${n}x${k}|${config.ask}`,
+          answer,
+          choices,
+          say,
+          speech: field ? undefined : `${known ? `${known.speech} ` : ""}${timesWord(n, k)}?`,
+          explain,
+        };
+      } while (question.key === previous?.key);
+      return question;
+    }
+    if (mode === "money") {
+      const euro = config.unit === "€";
+      const unit = euro ? "€" : "ct";
+      const unitWord = euro ? "Euro" : "Cent";
+      const item = pick(SHOP_ITEMS, random);
+      if (config.ask === "change") {
+        const paid = pick([50, 100], random);
+        const back = 5 * between(1, paid / 5 - 1, random);
+        const price = paid - back;
+        const paidText = paid === 100 ? "1 €" : "50 ct";
+        const paidWord = paid === 100 ? "einem Euro" : "fünfzig Cent";
+        return {
+          ask: "change",
+          paid,
+          price,
+          unit: "ct",
+          item,
+          key: `${paid}|${price}`,
+          answer: String(back),
+          number: back,
+          choices: numberOptions(back, [price], [back + 5, back - 5, back + 10, back - 10, back + 1], config.choices, random),
+          question: `${item.word} kostet ${price} ct. Du zahlst mit ${paidText}. Wie viel bekommst du zurück?`,
+          questionSpeech: `${item.word} kostet ${numberWord(price)} Cent. Du zahlst mit ${paidWord}. Wie viel bekommst du zurück?`,
+          explain: {
+            text: `${paid} ct − ${price} ct = ${back} ct.`,
+            speech: `${capitalize(numberWord(paid))} minus ${numberWord(price)} ist ${numberWord(back)}. Du bekommst ${numberWord(back)} Cent zurück.`,
+          },
+        };
+      }
+      // Random coins and notes that add up to a total (at most six pieces).
+      const split = (total) => {
+        for (let attempt = 0; attempt < 30; attempt++) {
+          const coins = [];
+          let rest = total;
+          while (rest > 0 && coins.length < 6) {
+            const fit = config.coins.filter((coin) => coin <= rest);
+            coins.push(random() < 0.6 ? Math.max(...fit) : pick(fit, random));
+            rest -= coins.at(-1);
+          }
+          if (rest === 0) return coins.sort((x, y) => y - x);
+        }
+        const coins = [];
+        let rest = total;
+        for (const coin of [...config.coins].sort((x, y) => y - x))
+          while (rest >= coin) {
+            coins.push(coin);
+            rest -= coin;
+          }
+        return coins;
+      };
+      if (config.ask === "pay") {
+        const price = between(5, config.max - 10, random);
+        const sums = shuffle(
+          [price + 1, price - 1, price + 2, price - 2, price + 5, price - 5, price + 10, price - 10].filter(
+            (x) => x >= 1 && x <= config.max,
+          ),
+          random,
+        ).slice(0, config.choices - 1);
+        const sets = shuffle(
+          [{ total: price, coins: split(price) }, ...sums.map((total) => ({ total, coins: split(total) }))],
+          random,
+        ).map((set, i) => ({ ...set, id: "abc"[i] }));
+        return {
+          ask: "pay",
+          unit,
+          item,
+          price,
+          sets,
+          key: `${price}|${unit}`,
+          answer: sets.find((set) => set.total === price).id,
+          choices: sets.map((set) => set.id),
+          question: `${item.word} kostet ${price} ${unit}. Womit kannst du genau bezahlen?`,
+          questionSpeech: `${item.word} kostet ${numberWord(price)} ${unitWord}. Womit kannst du genau bezahlen?`,
+          explain: {
+            text: `${sets.find((set) => set.total === price).coins.join(" + ")} = ${price} ${unit}.`,
+            speech: `Das sind genau ${numberWord(price)} ${unitWord}.`,
+          },
+        };
+      }
+      let total;
+      do total = between(Math.ceil(config.max / 4), config.max, random);
+      while (String(total) === previous?.answer);
+      const coins = split(total);
+      return {
+        ask: "count",
+        unit,
+        coins: shuffle(coins, random),
+        number: total,
+        answer: String(total),
+        // Typical slip: counting the pieces instead of their value.
+        choices: numberOptions(total, [coins.length], [total + 1, total - 1, total + 2, total + 5, total - 5, total + 10, total - 10], config.choices, random),
+        say: null,
+        explain: {
+          text: `${coins.join(" + ")} = ${total} ${unit}.`,
+          speech: `Zusammen sind es ${numberWord(total)} ${unitWord}.`,
+        },
+      };
+    }
+    if (mode === "clock") {
+      const norm = (h) => ((h - 1 + 120) % 12) + 1;
+      const hourWord = (h) => (h === 1 ? "ein" : numberWord(h));
+      // German clock words: "halb 4" is 3:30, "Viertel vor 4" is 3:45.
+      const words = (h, m) => {
+        const next = norm(h + 1);
+        const say = (text, speech) => ({ text, speech });
+        if (m === 0) return say(`${h} Uhr`, `${hourWord(h)} Uhr`);
+        if (m === 30) return say(`halb ${next}`, `halb ${numberWord(next)}`);
+        if (m === 15) return say(`Viertel nach ${h}`, `Viertel nach ${numberWord(h)}`);
+        if (m === 45) return say(`Viertel vor ${next}`, `Viertel vor ${numberWord(next)}`);
+        if (m === 25) return say(`5 vor halb ${next}`, `fünf vor halb ${numberWord(next)}`);
+        if (m === 35) return say(`5 nach halb ${next}`, `fünf nach halb ${numberWord(next)}`);
+        if (m < 30) return say(`${m} nach ${h}`, `${numberWord(m)} nach ${numberWord(h)}`);
+        return say(`${60 - m} vor ${next}`, `${numberWord(60 - m)} vor ${numberWord(next)}`);
+      };
+      const digits = (h, m) => ({
+        text: `${h}:${String(m).padStart(2, "0")}`,
+        speech: `${hourWord(h)} Uhr${m ? ` ${numberWord(m)}` : ""}`,
+      });
+      let question;
+      do {
+        const kind = pick(config.kinds, random);
+        const h = between(1, 12, random);
+        const m = { full: 0, half: 30, quarterPast: 15, quarterTo: 45 }[kind] ?? pick([5, 10, 20, 25, 35, 40, 50, 55], random);
+        const format = config.digital && random() < 0.5 ? digits : words;
+        // Typical slips first: "halb 3" for 3:30, hands mixed up, an hour off.
+        const forced = {
+          full: [12, (h * 5) % 60],
+          half: [norm(h - 1), 30],
+          quarterPast: [norm(h - 1), 45],
+          quarterTo: [norm(h + 1), 15],
+          five: [h, 60 - m],
+        }[kind];
+        const others = shuffle(
+          [
+            [norm(h + 1), m],
+            [norm(h - 1), m],
+            [norm(h + 2), m],
+            [h, (m + 30) % 60],
+            [h, (m + 15) % 60],
+            [norm(h + 1), (m + 30) % 60],
+          ],
+          random,
+        );
+        // Wrong answers only use times already learned on this level.
+        const minutes = { full: [0], half: [30], quarterPast: [15], quarterTo: [45] };
+        const known = (y) =>
+          config.kinds.includes("five") || config.kinds.some((x) => minutes[x].includes(y));
+        const answer = format(h, m);
+        const labels = [answer];
+        for (const [x, y] of [forced, ...others].filter(([, y]) => known(y))) {
+          const label = format(x, y);
+          if (labels.length < config.choices && !labels.some((other) => other.text === label.text))
+            labels.push(label);
+        }
+        question = {
+          kind,
+          hour: h,
+          minute: m,
+          digital: format === digits,
+          answer: answer.text,
+          choices: shuffle(labels.map((label) => label.text), random),
+          say: Object.fromEntries(labels.map((label) => [label.text, label.speech])),
+          question: "Wie spät ist es?",
+          explain: {
+            text: `Es ist ${answer.text}.`,
+            speech: `Es ist ${answer.speech}.`,
+          },
+        };
+      } while (question.answer === previous?.answer);
+      return question;
+    }
+    if (mode === "syllables") {
+      const words = SYLLABLE_WORDS.map(([icon, spelled]) => ({
+        icon,
+        syllables: spelled.split("-"),
+        word: spelled.replace(/-/g, ""),
+      }));
+      const item = pick(
+        words.filter(
+          (x) => config.sizes.includes(x.syllables.length) && x.word !== previous?.word,
+        ),
+        random,
+      );
+      const count = item.syllables.length;
+      const base = {
+        ...item,
+        // Only a few possible answers: the word must not repeat, the answer may.
+        key: item.word,
+        picture: config.picture !== false,
+        speech: item.word,
+        cue: `Wort: „${item.word}“`,
+      };
+      if (config.ask === "count")
+        return {
+          ...base,
+          ask: "count",
+          answer: String(count),
+          choices: numberOptions(count, [], [count + 1, count - 1, count + 2], config.choices, random),
+          explain: {
+            text: `${item.syllables.join(" – ")}: ${count} ${count === 1 ? "Silbe" : "Silben"}.`,
+            speech: `${item.word} hat ${count === 1 ? "eine Silbe" : `${numberWord(count)} Silben`}.`,
+          },
+        };
+      const gap = between(0, count - 1, random);
+      const answer = item.syllables[gap];
+      // Other syllables of the same word and of other words as distractors.
+      const fit = (syllable) =>
+        gap === 0 ? capitalize(syllable.toLowerCase()) : syllable.toLowerCase();
+      const pool = shuffle(
+        [
+          ...item.syllables.filter((_, i) => i !== gap),
+          ...shuffle(words.flatMap((x) => x.syllables), random).slice(0, 12),
+        ].map(fit),
+        random,
+      );
+      const choices = [answer];
+      for (const syllable of pool)
+        if (choices.length < config.choices && !choices.includes(syllable)) choices.push(syllable);
+      return {
+        ...base,
+        ask: "gap",
+        gap,
+        answer,
+        choices: shuffle(choices, random),
+        explain: {
+          text: `${item.syllables.join(" – ")}.`,
+          speech: `${item.syllables.join(", ")}. ${item.word}.`,
+        },
+      };
+    }
+    if (mode === "extend") {
+      const item = pick(
+        EXTEND_WORDS.map(([icon, word, long, kind]) => ({ icon, word, long, kind, end: word.at(-1) })).filter(
+          (x) => config.kinds.includes(x.kind) && config.ends.includes(x.end) && x.word !== previous?.word,
+        ),
+        random,
+      );
+      return {
+        ...item,
+        stem: item.word.slice(0, -1),
+        key: item.word,
+        picture: config.picture !== false,
+        answer: item.end,
+        choices: shuffle([item.end, SOUND_TWINS[item.end]], random),
+        speech: item.word,
+        explain: {
+          text: `${item.word} – ${item.long}: Beim Verlängern hört man das ${item.end}.`,
+          speech: [`${item.word}. Verlängert: ${item.long}. Da hört man es:`, { laut: item.end.toUpperCase() }],
+        },
+        cue: `Wort: „${item.word}“ – verlängert: „${item.long}“`,
+      };
+    }
     if (mode === "count") {
       let question;
       do {
@@ -2325,7 +2904,7 @@
       pet: { full: 40, joy: 60, updatedAt: 0 },
       food: {},
       plots: BEDS.map(() => ({ crop: null })),
-      settings: { voice: "", rate: 0.8, autoSpeak: true, lowercase: false },
+      settings: { voice: "", rate: 0.8, speech: true, autoSpeak: true, lowercase: false },
       stats: defaultStats(),
     };
   }
@@ -2372,7 +2951,7 @@
         state.settings.voice = raw.settings.voice.slice(0, 500);
       if ([0.65, 0.8, 0.95].includes(raw.settings.rate))
         state.settings.rate = raw.settings.rate;
-      for (const key of ["autoSpeak", "lowercase"])
+      for (const key of ["speech", "autoSpeak", "lowercase"])
         if (typeof raw.settings[key] === "boolean")
           state.settings[key] = raw.settings[key];
     }
@@ -2550,7 +3129,9 @@
       "Laute gemeinsam dehnen und hören: „Mmmaus – was hörst du am Anfang?“ Wörter langsam in Laute zerlegen und wieder zusammenziehen.",
     abc: "Das ABC-Lied singen, eine Buchstabenleiste aufhängen und Nachbarn zeigen lassen: „Wer kommt nach F?“",
     spelling:
-      "Merkwörter auf Kärtchen schreiben, den besonderen Buchstaben farbig markieren und jeden Tag einmal gemeinsam lesen.",
+      "Wörter in Silben klatschen, am Wortende verlängern (Hund – Hunde) und Merkwörter auf Kärtchen schreiben, den besonderen Buchstaben farbig markieren und täglich einmal gemeinsam lesen.",
+    times: "Einmaleins im Alltag: Eierkartons (2 · 5), Hände (5er) und Socken (2er) zählen. Erst die Kernaufgaben 2 ·, 5 ·, 10 · sicher können, dann von dort aus weiterrechnen.",
+    sizes: "Mit echtem Geld einkaufen spielen und gemeinsam auf die Uhr schauen: „Es ist halb vier – in einer halben Stunde ist es vier Uhr.“",
     memory:
       "Merkspiele im Alltag: Einkaufsliste mit 3–4 Dingen merken, „Ich packe meinen Koffer“ spielen.",
     tens: "Zehner bündeln mit Alltagsdingen: je 10 Nudeln in einen Becher, die übrigen einzeln daneben. Dann gemeinsam sagen: „4 Zehner und 7 Einer sind 47.“",
@@ -2882,6 +3463,8 @@
     shuffle,
     GRAPH_TOPICS,
     VENN_SETS,
+    SYLLABLE_WORDS,
+    EXTEND_WORDS,
     categoryOf,
     numberWord,
     maxLevel,

@@ -39,8 +39,41 @@
     const cubes = `<span class="cubes">${loose}</span>`;
     return `<div class="blocks" role="img" aria-label="Zehnerstangen und Einerwürfel">${onesFirst ? cubes + rods : rods + cubes}</div>`;
   }
-  function numberButtons(choices, labels = {}) {
-    return `<div class="answer-choices">${choices.map((value) => `<button class="letter-button number-button" data-answer="${value}" aria-label="${labels[value] || value}">${value}</button>`).join("")}</div>`;
+  function numberButtons(choices, labels = {}, shown = {}, cls = "") {
+    return `<div class="answer-choices">${choices.map((value) => `<button class="letter-button number-button${cls ? ` ${cls}` : ""}" data-answer="${value}" aria-label="${labels[value] || value}">${shown[value] || value}</button>`).join("")}</div>`;
+  }
+  // Coins (cent and euro) and notes (from 5 €), not real images of money.
+  function coin(value, unit) {
+    if (unit === "€" && value >= 5) return `<span class="note n${value}">${value} €</span>`;
+    return `<span class="coin ${unit === "€" ? "euro" : `c${value}`}">${value}<small>${unit}</small></span>`;
+  }
+  // A dot field: rows of equal length, a small gap after five; row sums as help.
+  function dotField(rows, cols) {
+    return `<div class="dot-field" role="img" aria-label="Punktefeld">${Array.from({ length: rows }, (_, r) => `<span class="dot-row">${'<span class="dot"></span>'.repeat(cols)}<span class="row-sum" hidden>${(r + 1) * cols}</span></span>`).join("")}</div>`;
+  }
+  // Analog clock: short hand hours, long hand minutes; minute marks as help.
+  function clockFace(hour, minute) {
+    const at = (angle, radius) => [
+      (Math.sin((angle * Math.PI) / 180) * radius).toFixed(1),
+      (-Math.cos((angle * Math.PI) / 180) * radius).toFixed(1),
+    ];
+    let marks = "";
+    for (let i = 0; i < 60; i++) {
+      const [x1, y1] = at(i * 6, i % 5 ? 92 : 86);
+      const [x2, y2] = at(i * 6, 98);
+      marks += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" class="${i % 5 ? "minute-mark" : "hour-mark"}"/>`;
+    }
+    const numbers = Array.from({ length: 12 }, (_, i) => {
+      const [x, y] = at((i + 1) * 30, 72);
+      return `<text x="${x}" y="${y}" class="clock-number">${i + 1}</text>`;
+    }).join("");
+    const minutes = Array.from({ length: 12 }, (_, i) => {
+      const [x, y] = at(i * 30, 114);
+      return `<text x="${x}" y="${y}" class="clock-minute">${i * 5}</text>`;
+    }).join("");
+    const [hx, hy] = at((hour % 12) * 30 + minute / 2, 48);
+    const [mx, my] = at(minute * 6, 80);
+    return `<svg class="clock" viewBox="-128 -128 256 256" role="img" aria-label="Uhr"><circle r="100" class="clock-face"/>${marks}${numbers}${minutes}<line x1="0" y1="0" x2="${hx}" y2="${hy}" class="hand hour-hand"/><line x1="0" y1="0" x2="${mx}" y2="${my}" class="hand minute-hand"/><circle r="6" class="clock-pin"/></svg><p class="clock-legend" hidden><span class="hour-key">kurzer Zeiger: Stunde</span> <span class="minute-key">langer Zeiger: Minuten</span></p>`;
   }
   // Picture cards with a visible caption (the chart shows the same words).
   function pictureButtons(items) {
@@ -191,8 +224,18 @@
               ? "Wie viel musst du wegnehmen bis zum vollen Zehner?"
               : "Rechne aus.",
         );
+      case "cross":
+        return same(q.op.startsWith("step") ? "Rechne in Schritten. Was fehlt?" : "Rechne aus.");
+      case "times":
+        return same(
+          { count: "Wie viele Punkte sind es?", task: "Welche Malaufgabe passt zum Punktefeld?" }[q.ask] ||
+            "Rechne aus.",
+        );
+      case "money":
+        if (q.ask === "count") return same("Wie viel Geld ist das?");
+        return { text: q.question, speech: q.questionSpeech };
       default:
-        return same(q.question);
+        return { text: q.question, speech: q.questionSpeech || q.question };
     }
   }
 
@@ -275,6 +318,57 @@
           : `${blocks(Math.floor(q.a / 10), q.a % 10)}<p>${op} ${q.b / 10} Zehner</p>`;
         return `<div class="equation">${task}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${help}</div>`;
       }
+      case "cross": {
+        const task = q.parts.map((part) => (part === null ? gap : part)).join(" ");
+        const [first] = q.steps;
+        const sign = q.minus ? "−" : "+";
+        const low = Math.min(q.a, q.result);
+        const high = Math.max(q.a, q.result);
+        const from = Math.floor(low / 10) * 10;
+        const to = Math.min(100, Math.max(from + 20, Math.ceil(high / 10) * 10));
+        const tens = [];
+        for (let n = from; n <= to; n += 10) tens.push(n);
+        // Two-digit numbers: the first step (tens) as help; else the number line.
+        const help = q.op.startsWith("N") && q.op.endsWith("N")
+          ? `<p>${q.a} ${sign} ${Math.abs(first)} = ${q.a + first}</p>`
+          : numberLine({ from, to, ticks: to - from > 50 ? 5 : 1, labels: tens, marker: q.a });
+        return `<div class="equation">${task}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${help}</div>`;
+      }
+      case "times": {
+        if (q.ask === "count" || q.ask === "task")
+          return `${dotField(q.rows, q.cols)}${numberButtons(q.choices, q.say || {}, {}, q.ask === "task" ? "expression" : "")}`;
+        const known = q.known ? `<p class="equation known">${q.known.text}</p>` : "";
+        return `${known}<div class="equation">${q.rows} · ${q.cols} = ${gap}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${dotField(q.rows, q.cols)}</div>`;
+      }
+      case "money": {
+        const unitWord = q.unit === "€" ? "Euro" : "Cent";
+        const labelled = (choices) =>
+          numberButtons(
+            choices,
+            Object.fromEntries(choices.map((value) => [value, `${value} ${unitWord}`])),
+            Object.fromEntries(choices.map((value) => [value, `${value} ${q.unit}`])),
+            "money-answer",
+          );
+        const item = (price) =>
+          `<div class="shop-item"><span class="shop-icon" aria-hidden="true">${q.item.icon}</span><span class="price-tag">${price} ${q.unit}</span></div>`;
+        if (q.ask === "count") {
+          // Help: the same money sorted from big to small, with running totals.
+          let sum = 0;
+          const sorted = [...q.coins]
+            .sort((x, y) => y - x)
+            .map((value) => `<span class="money-step">${coin(value, q.unit)}<span>${(sum += value)}</span></span>`)
+            .join("");
+          return `<div class="purse" role="img" aria-label="Geld">${q.coins.map((value) => coin(value, q.unit)).join("")}</div><div class="math-help money-help" id="math-help" hidden>${sorted}</div>${labelled(q.choices)}`;
+        }
+        if (q.ask === "pay")
+          return `${item(q.price)}<div class="coin-sets">${q.sets.map((set, i) => `<button class="coin-set" data-answer="${set.id}" aria-label="Möglichkeit ${i + 1}: ${set.coins.join(" + ")} ${unitWord}">${set.coins.map((value) => coin(value, q.unit)).join("")}<span class="set-total" hidden>= ${set.total} ${q.unit}</span></button>`).join("")}</div>`;
+        const tens = [];
+        const from = Math.floor(q.price / 10) * 10;
+        for (let n = from; n <= q.paid; n += 10) tens.push(n);
+        return `${item(q.price)}<div class="purse paid" role="img" aria-label="Bezahlt">${q.paid === 100 ? coin(1, "€") : coin(50, "ct")}</div>${listen("Aufgabe anhören")}${labelled(q.choices)}<div class="math-help" id="math-help" hidden>${numberLine({ from, to: q.paid, ticks: q.paid - from > 50 ? 5 : 1, labels: tens, marker: q.price })}</div>`;
+      }
+      case "clock":
+        return `${clockFace(q.hour, q.minute)}${numberButtons(q.choices, q.say, {}, "word-answer")}`;
       case "count": {
         const shown =
           q.show === "dice"
@@ -383,6 +477,13 @@
       return { text: `${picked} passt nicht.`, speech: "Dieses Zeichen passt nicht." };
     if (q.mode === "venn" && q.ask === "place") return same("Da passt es nicht hin.");
     if (SIDES[picked]) return same(`${SIDES[picked][1]} stimmt nicht.`);
+    if (q.mode === "money" && q.ask === "pay") return same("Das passt nicht genau.");
+    if (q.mode === "money")
+      return {
+        text: `${picked} ${q.unit} passt nicht.`,
+        speech: `${capitalize(W(Number(picked)))} ${q.unit === "€" ? "Euro" : "Cent"} passt nicht.`,
+      };
+    if (q.say?.[picked]) return { text: `${picked} passt nicht.`, speech: `${capitalize(q.say[picked])} passt nicht.` };
     if (/^\d+$/.test(picked))
       return { text: `${picked} passt nicht.`, speech: `${capitalize(W(Number(picked)))} passt nicht.` };
     return same(`${picked} passt nicht.`);
@@ -515,6 +616,14 @@
         return moreTip(q, n, { find, showAll });
       case "venn":
         return vennTip(q, n, { find, showAll });
+      case "cross":
+        return crossTip(q, n, { help });
+      case "times":
+        return timesTip(q, n, { showAll, help });
+      case "money":
+        return moneyTip(q, n, { showAll, help });
+      case "clock":
+        return clockTip(q, n, { find, showAll });
       default:
         return same("Versuch es noch einmal.");
     }
@@ -621,6 +730,84 @@
     );
   }
 
+  function crossTip(q, n, { help }) {
+    const twoDigit = q.op === "N+N" || q.op === "N-N";
+    if (n === 1)
+      return same(
+        twoDigit
+          ? "Rechne erst mit den Zehnern, dann mit den Einern."
+          : q.minus
+            ? "Rechne erst zurück bis zum vollen Zehner, dann weiter."
+            : "Rechne erst bis zum vollen Zehner, dann weiter.",
+      );
+    help();
+    const [first, second] = q.steps.map(Math.abs);
+    const sign = q.minus ? "−" : "+";
+    const word = q.minus ? "minus" : "plus";
+    const middle = q.a + q.steps[0];
+    return {
+      text: `Erst ${q.a} ${sign} ${first} = ${middle}. Dann noch ${second} ${q.minus ? "weg" : "dazu"}.`,
+      speech: `Erst ${W(q.a)} ${word} ${W(first)} ist ${W(middle)}. Dann noch ${W(second)} ${q.minus ? "weg" : "dazu"}.`,
+    };
+  }
+  function timesTip(q, n, { showAll, help }) {
+    const k = q.cols;
+    if (n === 1) {
+      if (q.ask === "count") return same(`Zähle in Reihen: Jede Reihe hat ${k}.`);
+      if (q.ask === "task") return same("Wie viele Reihen sind es? Wie viele Punkte hat eine Reihe?");
+      if (q.ask === "neighbor")
+        return {
+          text: `${q.rows} · ${k} ist eine Reihe ${q.rows > q.core ? "mehr" : "weniger"} als ${q.core} · ${k}.`,
+          speech: `${capitalize(W(q.rows))} mal ${W(k)} ist eine Reihe ${q.rows > q.core ? "mehr" : "weniger"} als ${W(q.core)} mal ${W(k)}.`,
+        };
+      if (q.ask === "swap") return same("Tauschaufgaben haben das gleiche Ergebnis.");
+      return same(`Zähle in ${k}er-Schritten: ${k}, ${2 * k}, ${3 * k} …`);
+    }
+    if (q.ask !== "count" && q.ask !== "task") help();
+    showAll(".row-sum");
+    return same(
+      q.ask === "task"
+        ? `Zähle die Reihen. Jede Reihe hat ${k} Punkte.`
+        : "Die Zahlen am Rand zählen die Reihen zusammen.",
+    );
+  }
+  function moneyTip(q, n, { showAll, help }) {
+    if (q.ask === "count") {
+      if (n === 1) return same("Fang beim größten Geld an und zähle weiter.");
+      help();
+      return same("Hier ist das Geld sortiert. Zähle vom größten aus weiter.");
+    }
+    if (q.ask === "pay") {
+      if (n === 1) return same("Rechne bei jeder Reihe das Geld zusammen.");
+      showAll(".set-total");
+      return same("Welche Reihe ergibt genau den Preis?");
+    }
+    if (n === 1)
+      return {
+        text: `Wie viel fehlt von ${q.price} bis ${q.paid}?`,
+        speech: `Wie viel fehlt von ${W(q.price)} bis ${W(q.paid)}?`,
+      };
+    help();
+    return same("Zähle auf dem Zahlenstrahl weiter.");
+  }
+  function clockTip(q, n, { find, showAll }) {
+    if (n === 1)
+      return same(
+        q.kind === "half"
+          ? "Halb heißt: noch eine halbe Stunde bis zur nächsten vollen Stunde."
+          : "Der kurze Zeiger zeigt die Stunde. Der lange Zeiger zeigt die Minuten.",
+      );
+    find(".clock").classList.add("helping");
+    showAll(".clock-legend");
+    if (n === 2) return same("Die kleinen Zahlen außen zeigen die Minuten.");
+    const next = (q.hour % 12) + 1;
+    return q.minute === 0
+      ? { text: `Der kurze Zeiger zeigt genau auf die ${q.hour}.`, speech: `Der kurze Zeiger zeigt genau auf die ${W(q.hour)}.` }
+      : {
+          text: `Der kurze Zeiger steht zwischen ${q.hour} und ${next}.`,
+          speech: `Der kurze Zeiger steht zwischen ${W(q.hour)} und ${W(next)}.`,
+        };
+  }
   function countTip(q, n, { find, showAll }) {
     if (n === 1)
       return same(

@@ -3,6 +3,10 @@
   const C = window.Wiese;
   const G = window.WieseGarden;
   const M = window.WieseMath;
+  const D = window.WieseDeutsch;
+  // Games whose view lives in math.js or deutsch.js (same interface).
+  const viewFor = (mode) =>
+    C.MATH_GAMES.includes(mode) ? M : D.MODES.includes(mode) ? D : null;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const STORAGE_KEY = "woerterwiese.v1";
@@ -61,6 +65,7 @@
   }
   function refresh() {
     $("#total-stars").textContent = state.stars;
+    document.body.classList.toggle("speech-off", !state.settings.speech);
     const now = Date.now();
     const plots = state.plots
       .slice(0, C.bedCount(state.totalStars))
@@ -136,6 +141,11 @@
    */
   function speak(text, button = null) {
     stopSpeech();
+    // Switched off by an adult: everything stays silent, the reading aid shows.
+    if (!state.settings.speech) {
+      revealSpeechFallback(SPEECH_OFF);
+      return Promise.resolve();
+    }
     let parts = [text].flat(2).filter(Boolean);
     if (parts.some((part) => typeof part === "string") && !speechAvailable()) {
       revealSpeechFallback(
@@ -252,6 +262,21 @@
       readNext();
     });
   }
+  const SPEECH_OFF =
+    "Die Sprachausgabe ist ausgeschaltet. Bitte einen Erwachsenen, dir vorzulesen.";
+  // In a running task: reading aid while speech is off or no voice exists.
+  function showSpeechState() {
+    if (currentView !== "game" || !game || game.answered) return;
+    if (!state.settings.speech) revealSpeechFallback(SPEECH_OFF);
+    else if (!speechAvailable())
+      revealSpeechFallback(
+        "Hier gibt es gerade keine deutsche Stimme. Bitte einen Erwachsenen, dir vorzulesen.",
+      );
+    else {
+      $("#speech-notice").hidden = true;
+      $("#adult-cue").hidden = true;
+    }
+  }
   function autoSpeak(text, button) {
     return state.settings.autoSpeak ? speak(text, button) : Promise.resolve();
   }
@@ -282,15 +307,9 @@
       ? `${voices.length} deutsche ${voices.length === 1 ? "Stimme" : "Stimmen"} verfügbar. Bitte einmal probehören.`
       : "Keine deutsche Stimme gefunden. Ihr könnt trotzdem spielen: Bei jeder Aufgabe gibt es dann einen Vorlesetext für Erwachsene.";
     if (currentView === "game" && game && !game.answered) {
-      if (!speechAvailable())
-        revealSpeechFallback(
-          "Hier gibt es gerade keine deutsche Stimme. Bitte einen Erwachsenen, dir vorzulesen.",
-        );
-      else {
-        $("#speech-notice").hidden = true;
-        $("#adult-cue").hidden = true;
-        if (!wasAvailable && !$("#settings-dialog").open) speakTask();
-      }
+      showSpeechState();
+      if (speechAvailable() && state.settings.speech && !wasAvailable && !$("#settings-dialog").open)
+        speakTask();
     }
   }
 
@@ -408,7 +427,7 @@
   }
   function instruction() {
     const q = game.question;
-    if (C.MATH_GAMES.includes(game.mode)) return M.instruction(q);
+    if (viewFor(game.mode)) return viewFor(game.mode).instruction(q);
     const same = (text) => ({ text, speech: text });
     switch (game.mode) {
       case "type":
@@ -502,7 +521,7 @@
     renderTask();
     // Sound files still play without a voice; speak() then shows the reading aid.
     if (state.settings.autoSpeak) speakTask();
-    else if (!speechAvailable())
+    else if (!speechAvailable() || !state.settings.speech)
       revealSpeechFallback(
         "Hier gibt es gerade keine deutsche Stimme. Bitte einen Erwachsenen, dir vorzulesen.",
       );
@@ -548,8 +567,8 @@
       task.innerHTML = `<div class="neighbor-question">${row}</div><div class="answer-choices">${q.choices.map((letter) => letterButton(letter)).join("")}</div>${abcHelp(q.help)}`;
     } else if (mode === "order") {
       task.innerHTML = `<div class="order-slots" aria-label="Deine Reihe">${[...q.answer].map((_, i) => `<div class="order-slot" aria-label="Platz ${i + 1}, noch leer"><span>${i + 1}</span></div>`).join("")}</div><div class="order-cards">${q.cards.map((letter) => letterButton(letter)).join("")}</div>${abcHelp(q.help)}`;
-    } else if (C.MATH_GAMES.includes(mode)) {
-      task.innerHTML = M.markup(q, listenButton);
+    } else if (viewFor(mode)) {
+      task.innerHTML = viewFor(mode).markup(q, listenButton);
       if (mode === "build") {
         M.renderBuilt(task, game.built, false);
         $$("#task-area [data-build]").forEach((button) =>
@@ -658,7 +677,7 @@
     }
     button?.classList.add("chosen");
     if (alternative) game.alternative = letter;
-    if (C.MATH_GAMES.includes(game.mode)) M.reveal(q, $("#task-area"), letter);
+    viewFor(game.mode)?.reveal(q, $("#task-area"), letter);
     if (game.mode === "neighbor") {
       const hole = $(".neighbor-question .hole");
       hole.innerHTML = letterMarkup(letter);
@@ -754,8 +773,8 @@
         autoSpeak([`Tipp: ${rule.speech}`, q.speech]);
         return;
       }
-    } else if (C.MATH_GAMES.includes(game.mode)) {
-      const hint = M.hint(q, n, picked, $("#task-area"), game.built);
+    } else if (viewFor(game.mode)) {
+      const hint = viewFor(game.mode).hint(q, n, picked, $("#task-area"), game.built);
       setFeedback(hint.text, "try-again");
       autoSpeak([hint.speech, q.speech]);
       return;
@@ -906,6 +925,7 @@
     // like "Jetzt wird es kniffliger" is never cut off. Without narration the
     // child gets a moment to read the message.
     const tap = game.tapLaut ? [{ laut: game.tapLaut }] : [];
+    const narrated = state.settings.autoSpeak && state.settings.speech;
     const speaking = state.settings.autoSpeak
       ? speak([...tap, ...spoken])
       : tap.length
@@ -913,7 +933,7 @@
         : Promise.resolve();
     const readingTime =
       SUCCESS_DELAY +
-      (state.settings.autoSpeak ? 0 : message.length > 30 ? 1200 : 0);
+      (narrated ? 0 : message.length > 30 ? 1200 : 0);
     await Promise.race([
       Promise.all([
         speaking,
@@ -993,6 +1013,8 @@
     updateVoices();
     $("#speech-rate").value = String(state.settings.rate);
     $("#auto-speak").checked = state.settings.autoSpeak;
+    $("#speech-on").checked = state.settings.speech;
+    $("#speech-options").disabled = !state.settings.speech;
     $("#lowercase").checked = state.settings.lowercase;
     $("#reset-confirm").hidden = true;
     renderLevelSettings();
@@ -1093,6 +1115,18 @@
     stopSpeech();
     G.setActive(currentView === "garden");
     refresh();
+    showSpeechState();
+  });
+  $("#speech-on").addEventListener("change", (event) => {
+    const value = event.target.checked;
+    if (!value) stopSpeech();
+    $("#speech-options").disabled = !value;
+    $("#voice-status").textContent = value
+      ? "Die Sprachausgabe ist wieder an."
+      : "Die Sprachausgabe ist aus. Im Spiel erscheint ein Vorlesetext.";
+    save((latest) => {
+      latest.settings.speech = value;
+    });
   });
   $("#voice-select").addEventListener("change", (event) => {
     const voice = event.target.value;

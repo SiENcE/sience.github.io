@@ -14,6 +14,7 @@
     <script src="core.js" defer></script>
     <script src="garden.js" defer></script>
     <script src="math.js" defer></script>
+    <script src="deutsch.js" defer></script>
     <script src="report.js" defer></script>
     <script src="app.js" defer></script>
   </head>
@@ -235,6 +236,16 @@
       </div>
       <div class="settings-section">
         <h3>Vorlesen</h3>
+        <label class="switch-row"
+          ><input type="checkbox" id="speech-on" role="switch" />
+          <span>Sprachausgabe (Stimme und Laute)</span></label
+        >
+        <p class="field-note">
+          Ausgeschaltet bleibt das Spiel ganz still. Dann erscheint bei jeder
+          Aufgabe ein Vorlesetext für Erwachsene.
+        </p>
+        <fieldset id="speech-options" class="speech-options">
+        <legend class="sr-only">Einstellungen der Sprachausgabe</legend>
         <label for="voice-select">Deutsche Stimme</label
         ><select id="voice-select">
           <option value="">Automatisch auswählen</option>
@@ -258,7 +269,9 @@
         ><label class="check-row"
           ><input type="checkbox" id="auto-speak" /> Aufgaben automatisch
           vorlesen</label
-        ><label class="check-row"
+        >
+        </fieldset>
+        <label class="check-row"
           ><input type="checkbox" id="lowercase" /> Kleine Buchstaben anzeigen
           (a statt A)</label
         >

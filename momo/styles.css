@@ -1854,6 +1854,273 @@ button.venn-zone:hover:not(:disabled) {
   font-weight: 800;
   color: var(--muted);
 }
+/* Times tables: dot fields with a gap after five */
+.dot-field {
+  display: grid;
+  justify-content: center;
+  gap: 6px;
+  margin: 10px 0 6px;
+}
+.dot-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dot {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #4f84b2;
+}
+.dot:nth-child(5) {
+  margin-right: 8px;
+}
+.row-sum {
+  margin-left: 8px;
+  font-weight: 800;
+  color: #b5560f;
+}
+.equation.known {
+  font-size: 1.6rem;
+  color: var(--muted);
+  margin-bottom: 0;
+}
+/* Answers with units or signs stay on one line. */
+.answer-choices .number-button.expression,
+.answer-choices .number-button.money-answer {
+  width: auto;
+  min-width: 92px;
+  padding: 0 12px;
+  font-size: 1.7rem;
+  white-space: nowrap;
+}
+.answer-choices .letter-button.word-answer {
+  width: auto;
+  min-width: 120px;
+  height: 64px;
+  padding: 0 14px;
+  font-size: 1.25rem;
+  white-space: nowrap;
+}
+/* Money: coins and notes */
+.purse,
+.coin-set,
+.money-help {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.purse {
+  margin: 10px 0 6px;
+}
+.coin {
+  display: inline-grid;
+  place-items: center;
+  align-content: center;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  font-weight: 800;
+  font-size: 1.25rem;
+  line-height: 1;
+  background: #e2b04a;
+  border: 3px solid #b8862a;
+  color: #4a3510;
+}
+.coin small {
+  font-size: 0.7rem;
+}
+.coin.c1,
+.coin.c2,
+.coin.c5 {
+  background: #d08a5a;
+  border-color: #9c5f35;
+  width: 46px;
+  height: 46px;
+}
+.coin.euro {
+  background: radial-gradient(circle, #e2b04a 52%, #c9cbc4 54%);
+  border-color: #8f938a;
+  width: 58px;
+  height: 58px;
+}
+.note {
+  display: inline-grid;
+  place-items: center;
+  width: 84px;
+  height: 46px;
+  border-radius: 6px;
+  font-weight: 800;
+  border: 2px solid #6f8a63;
+  background: #dcedc6;
+}
+.note.n10 {
+  background: #f8dfe4;
+  border-color: #b5687a;
+}
+.note.n20 {
+  background: #dcecf7;
+  border-color: #4f84b2;
+}
+.note.n50 {
+  background: #fde6d6;
+  border-color: #c97a35;
+}
+.money-step {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-weight: 800;
+  color: #b5560f;
+}
+.shop-item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0;
+}
+.shop-icon {
+  font-size: 3rem;
+}
+.price-tag {
+  padding: 4px 12px;
+  border-radius: 10px;
+  background: var(--warm);
+  border: 2px dashed #e0a92e;
+  font-weight: 800;
+  font-size: 1.4rem;
+}
+.purse.paid {
+  margin-top: 0;
+}
+.coin-sets {
+  display: grid;
+  gap: 10px;
+  max-width: 460px;
+  margin: 10px auto;
+}
+.coin-set {
+  min-height: 64px;
+  padding: 8px;
+  border-radius: 18px;
+  border: 2px solid #dce3d1;
+  box-shadow: 0 4px 0 #dce3d1;
+  background: #f8faef;
+}
+.coin-set:hover:not(:disabled) {
+  background: #e9f0dd;
+}
+.coin-set.wrong {
+  opacity: 0.35;
+}
+.coin-set.chosen {
+  background: #dcedc6;
+  border-color: #8fb575;
+}
+.set-total {
+  font-weight: 800;
+  font-size: 1.2rem;
+}
+/* Clock */
+.clock {
+  display: block;
+  width: min(100%, 250px);
+  margin: 4px auto;
+}
+.clock-face {
+  fill: #fffef9;
+  stroke: #6f8a63;
+  stroke-width: 5;
+}
+.hour-mark,
+.minute-mark {
+  stroke: #6f8a63;
+  stroke-width: 3;
+}
+.minute-mark {
+  stroke-width: 1.5;
+}
+.clock text {
+  text-anchor: middle;
+  dominant-baseline: central;
+  font-weight: 800;
+}
+.clock-number {
+  font-size: 19px;
+  fill: var(--ink);
+}
+.clock-minute {
+  display: none;
+  font-size: 12px;
+  fill: #b5560f;
+}
+.clock.helping .clock-minute {
+  display: inline;
+}
+.hand {
+  stroke-linecap: round;
+}
+.hour-hand {
+  stroke: #3f6f99;
+  stroke-width: 9;
+}
+.minute-hand {
+  stroke: #c97a35;
+  stroke-width: 5;
+}
+.clock-pin {
+  fill: var(--ink);
+}
+.clock-legend {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  font-weight: 800;
+  font-size: 0.95rem;
+}
+.hour-key {
+  color: #3f6f99;
+}
+.minute-key {
+  color: #a35f22;
+}
+/* Syllables with arcs underneath */
+.syllable-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #45603e;
+}
+.syllable.arc {
+  padding: 0 6px 8px;
+  border-bottom: 4px solid #e0a92e;
+  border-radius: 0 0 50% 50%;
+}
+.syllable.gap {
+  min-width: 64px;
+  text-align: center;
+  color: #9caf87;
+  border-bottom-style: dashed;
+}
+.syllable.found {
+  color: #45603e;
+  background: #dcedc6;
+  border-radius: 10px 10px 50% 50%;
+}
+.answer-choices .letter-button.syllable-button {
+  width: auto;
+  min-width: 92px;
+  padding: 0 12px;
+  font-size: 2rem;
+}
 .level-group {
   margin: 10px 0 2px;
   font-size: 0.95rem;
@@ -2096,6 +2363,58 @@ body:has(dialog[open]) {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
+}
+.switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-weight: 800;
+}
+/* A real switch look for the on/off checkbox. */
+.switch-row input {
+  appearance: none;
+  flex: none;
+  width: 52px;
+  height: 30px;
+  margin: 0;
+  border-radius: 99px;
+  background: #c9cfbf;
+  position: relative;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.switch-row input::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px #0003;
+  transition: transform 0.2s;
+}
+.switch-row input:checked {
+  background: var(--green);
+}
+.switch-row input:checked::after {
+  transform: translateX(22px);
+}
+.speech-options {
+  border: 0;
+  margin: 10px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+.speech-options:disabled {
+  opacity: 0.45;
+}
+/* Speech switched off: no listen buttons that would do nothing. */
+.speech-off #listen-button,
+.speech-off .big-listen {
+  display: none;
 }
 .check-row {
   display: flex;
