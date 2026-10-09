@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>RLE – fan editor for Raiden (Atari Lynx)</title>
+<meta name="description" content="RLE: browser-based map, enemy wave, graphics and music fan editor for Raiden (Atari Lynx). Unofficial, bring your own ROM.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23272a3d'/%3E%3Ctext x='32' y='43' font-family='Arial' font-weight='bold' font-size='30' text-anchor='middle' fill='%237cf'%3ERLE%3C/text%3E%3C/svg%3E">
+<style>
+  body { margin:0; font:13px system-ui, sans-serif; background:#1b1d2a; color:#dde; display:flex; flex-direction:column; height:100vh; }
+  header { padding:6px 10px; background:#272a3d; display:flex; gap:8px 14px; align-items:center; flex-wrap:wrap; }
+  header label { display:flex; gap:4px; align-items:center; }
+  .grp { display:flex; gap:6px; align-items:center; }
+  .sep { width:1px; align-self:stretch; background:#4a4e70; }
+  .spacer { flex:1; }
+  .ver { color:#8d93c4; font-size:12px; font-weight:400; }
+  @media (max-width:1560px) { header .sub { display:none; } }
+  #copyright a, #helpcontent a { color:#9db4ff; text-decoration:none; } #copyright a:hover, #helpcontent a:hover { text-decoration:underline; }
+  #copyright.rle-seen a { color:#6fe08c; }
+  button, select, input[type=number], input[type=text] { background:#3a3f5c; color:#eef; border:1px solid #555a7a; padding:3px 8px; border-radius:3px; }
+  button:hover { background:#4a5078; cursor:pointer; }
+  button:disabled { opacity:.45; cursor:default; }
+  button.on { background:#6a73c8; }
+  main { flex:1; display:flex; min-height:0; }
+  #mapcol { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .tools { padding:4px 10px; background:#222538; display:flex; gap:8px 12px; align-items:center; flex-wrap:wrap; justify-content:center; border-bottom:1px solid #333a58; }
+  #mapwrap { flex:1; overflow:auto; background:#10111a; display:flex; padding:12px; position:relative; }
+  #stack { position:relative; flex:none; margin:auto; box-shadow:0 0 0 1px #3a3f5c, 0 4px 24px rgba(0,0,0,.5); }
+  #ov { position:absolute; left:0; top:0; }
+  #side { width:420px; display:flex; flex-direction:column; border-left:1px solid #444; background:#20233a; }
+  #pickwrap, #evwrap { flex:1; overflow:auto; }
+  canvas { image-rendering: pixelated; display:block; }
+  #footer { display:flex; align-items:center; background:#272a3d; padding:0 10px; }
+  #copyright { color:#99a; font-size:12px; white-space:nowrap; padding-right:12px; margin-right:12px; border-right:1px solid #4a4e70; }
+  #status { flex:1; padding:4px 0; font-family:monospace; min-height:1.3em; }
+  #brush { padding:6px 10px; display:flex; gap:10px; align-items:center; }
+  .hint { color:#99a; font-size:12px; padding:2px 10px; }
+  table { border-collapse:collapse; width:100%; font-size:12px; }
+  th, td { padding:1px 3px; border-bottom:1px solid #333a58; }
+  tr.sel { background:#3d4580; }
+  td input, td select { width:100%; box-sizing:border-box; padding:1px 3px; }
+  #sizebar { padding:4px 10px; font-family:monospace; }
+  .bad { color:#f66; }
+  #inspector { padding:4px 10px; font-size:12px; border-top:1px solid #333a58; }
+  #inspector h4 { margin:2px 0; font-size:13px; }
+  #inspector .prm { display:flex; align-items:center; gap:6px; margin:2px 0; }
+  #inspector .prm label { width:150px; flex:none; }
+  #inspector .prm input[type=number] { width:70px; }
+  #inspector .prm input[type=range] { flex:1; }
+  #inspector .ev { color:#99a; font-size:11px; }
+  button.primary { background:#3f7a4a; border-color:#5aa468; } button.primary:hover { background:#4f9a5c; }
+  .langsw button { padding:3px 7px; font-weight:600; }
+  #welcome { position:fixed; inset:0; background:rgba(16,17,26,.96); z-index:10; display:flex; align-items:center; justify-content:center; }
+  #welcome .box { max-width:560px; padding:24px 32px; background:#272a3d; border:1px solid #555a7a; border-radius:8px; text-align:center; position:relative; }
+  #welcome .langsw { position:absolute; right:10px; top:10px; }
+  #welcome.drag .box { border-color:#7cf; background:#2c3350; }
+  #welcome h2 { margin:0 0 8px; } #welcome p { color:#aab; line-height:1.5; }
+  #gfxview { flex:1; overflow:auto; background:#10111a; padding:4px; }
+  #gfxui { flex:1; overflow:auto; padding:6px 10px; }
+  #gfxedit { border:1px solid #666; cursor:crosshair; background:repeating-conic-gradient(#222 0 25%, #2c2c2c 0 50%) 0 0/16px 16px; }
+  .sw { display:inline-block; width:22px; height:22px; border:2px solid #000; vertical-align:middle; cursor:pointer; box-sizing:border-box; }
+  .sw.on { border-color:#fff; outline:1px solid #000; }
+  .penrow { display:flex; align-items:center; gap:6px; margin:2px 0; }
+  #musview { flex:1; min-width:0; flex-direction:column; background:#10111a; }
+  #trkwrap { flex:1; min-height:0; }
+  #trkscroll { position:relative; overflow:auto; height:100%; }
+  #trk { position:sticky; top:0; left:0; display:block; outline:none; image-rendering:auto; }
+  #rollwrap { flex:1; overflow:auto; }
+  button.mute { padding:3px 6px; border-width:2px; } button.mute.on { opacity:.45; text-decoration:line-through; }
+  #mussidebody details { margin:2px 0; } #mussidebody summary { cursor:pointer; padding:2px 0; }
+  #mussidebody details details { margin-left:8px; }
+  #helpmodal { position:fixed; inset:0; z-index:30; background:rgba(8,9,16,.78); display:flex; align-items:center; justify-content:center; }
+  #helpmodal .hbox { width:min(1020px, 94vw); height:min(720px, 90vh); background:#232640; border:1px solid #5a5f86; border-radius:10px; display:flex; overflow:hidden; box-shadow:0 12px 48px rgba(0,0,0,.6); }
+  #helpnav { width:210px; flex:none; background:#1c1e33; padding:10px 8px; display:flex; flex-direction:column; gap:3px; overflow:auto; }
+  #helpnav button { text-align:left; background:transparent; border:0; border-radius:6px; padding:8px 10px; font-size:13px; }
+  #helpnav button:hover { background:#2d3152; } #helpnav button.on { background:#4b55a8; }
+  #helpnav .ico { display:inline-block; width:1.5em; }
+  #helpmain { flex:1; display:flex; flex-direction:column; min-width:0; position:relative; }
+  #helpcontent { flex:1; overflow:auto; padding:18px 28px 12px; line-height:1.55; font-size:14px; color:#d6d9f5; }
+  #helpcontent h3 { margin:0 0 10px; font-size:21px; color:#fff; border-bottom:1px solid #444a78; padding-bottom:8px; }
+  #helpcontent h4 { margin:18px 0 6px; font-size:14px; color:#9db4ff; text-transform:uppercase; letter-spacing:.05em; }
+  #helpcontent p { margin:8px 0; } #helpcontent ul, #helpcontent ol { margin:6px 0; padding-left:22px; } #helpcontent li { margin:4px 0; }
+  #helpcontent code { background:#171a2e; padding:1px 5px; border-radius:3px; color:#ffd98a; }
+  #helpcontent .callout { margin:12px 0; padding:9px 14px; border-radius:6px; border-left:4px solid; }
+  #helpcontent .callout.tip { background:#1f3a2e; border-color:#4fbf7f; } #helpcontent .callout.warn { background:#3d2f1b; border-color:#e6a23c; }
+  #helpcontent table.keys { width:100%; font-size:13px; } #helpcontent table.keys td { padding:5px 8px; border-bottom:1px solid #353a63; vertical-align:top; } #helpcontent table.keys td:first-child { width:46%; white-space:nowrap; }
+  #helpcontent ul.tips li { padding:2px 0; }
+  #helpbar { display:flex; align-items:center; gap:10px; padding:9px 18px; background:#1c1e33; border-top:1px solid #3a3f68; font-size:13px; color:#cfd3ff; }
+  #helptip { flex:1; }
+  #helpclose { position:absolute; right:10px; top:8px; width:30px; height:30px; padding:0; font-size:18px; border-radius:15px; }
+  kbd { background:#3a3f5c; border:1px solid #555a7a; border-radius:3px; padding:0 4px; font-size:11px; }
+</style>
+</head>
+<body>
+<header>
+  <b>RLE</b> <span class="ver rle-ver"></span> <span class="ver sub" data-i18n>fan editor for Raiden (Atari Lynx)</span>
+  <span class="grp">
+    <button id="loadrom" class="primary" data-i18n>Load ROM…</button><input type="file" id="romfile" accept=".lnx,.bin,.rom" style="display:none">
+    <span id="romname" class="hint" style="padding:0"></span>
+  </span>
+  <span class="sep"></span>
+  <span class="grp">
+    <button id="mmap" class="on" data-i18n>Map</button><button id="mene" data-i18n>Enemies</button><button id="mgfx" data-i18n>Graphics</button><button id="mmus" data-i18n>Music</button>
+  </span>
+  <label id="stagelabel"><span data-i18n>Stage</span> <select id="stage"></select></label>
+  <span class="grp">
+    <button id="undo" data-i18n-title="Undo (Ctrl+Z)" title="Undo (Ctrl+Z)">↶</button><button id="redo" data-i18n-title="Redo (Ctrl+Y)" title="Redo (Ctrl+Y)">↷</button>
+  </span>
+  <label data-i18n-title="NOP on the life counter in the main program ($BD1B)" title="NOP on the life counter in the main program ($BD1B)"><input type="checkbox" id="inflives"> <span data-i18n>infinite lives</span></label>
+  <span class="spacer"></span>
+  <span class="grp">
+    <button id="saverom" class="primary" data-i18n data-i18n-title="download the patched, re-signed ROM" title="download the patched, re-signed ROM">Save ROM</button>
+    <button id="saveproj" data-i18n data-i18n-title="only the changes as JSON (contains no game data)" title="only the changes as JSON (contains no game data)">Save project</button>
+    <button id="loadproj" data-i18n>Load project…</button><input type="file" id="projfile" accept=".json" style="display:none">
+    <button id="exportgfx" data-i18n data-i18n-title="all tiles, sprites, load screen and maps as PNG in native resolution" title="all tiles, sprites, load screen and maps as PNG in native resolution">Graphics → ZIP</button>
+    <button id="exportsnd" data-i18n data-i18n-title="songs and sound effects as WAV, plus the raw modules" title="songs and sound effects as WAV, plus the raw modules">Sound → ZIP</button>
+  </span>
+  <span class="sep"></span>
+  <button id="helpbtn" class="primary" data-i18n data-i18n-title="Help, shortcuts and tips (?)" title="Help, shortcuts and tips (?)">? Help</button>
+  <span class="grp langsw" data-i18n-title="Language" title="Language"><button data-lang="en">EN</button><button data-lang="de">DE</button></span>
+</header>
+<noscript><div style="padding:40px;text-align:center;color:#fff;background:#1b1d2a;position:fixed;inset:0;z-index:50">RLE needs JavaScript. Please enable it in your browser.</div></noscript>
+<div id="welcome"><div class="box">
+  <span class="grp langsw"><button data-lang="en">EN</button><button data-lang="de">DE</button></span>
+  <h2>RLE <span class="ver rle-ver"></span></h2>
+  <p class="hint" style="margin-top:-6px" data-i18n>fan editor for Raiden (Atari Lynx)</p>
+  <p data-i18n-html>Choose your <b>Raiden ROM</b> (<code>.lnx</code>, USA v3.0 or the 1997 re-release). It is only processed locally in this browser and never uploaded –
+  the editor contains no game data.<br>Afterwards you can edit maps, enemy waves, graphics and sound and save the finished ROM or just the changes (project JSON).</p>
+  <p><button id="welcomerom" class="primary" style="padding:8px 18px;font-size:15px" data-i18n>Choose ROM…</button>
+  <button id="welcomeproj" style="padding:8px 18px;font-size:15px" data-i18n>Load project JSON…</button></p>
+  <p class="hint" data-i18n style="max-width:480px;margin:6px auto">RLE is an unofficial fan tool and is not affiliated with Telegames or the rights holders of Raiden. It contains no game data – you need your own ROM.</p>
+  <p><button id="welcomehelp" data-i18n>? Help</button></p>
+  <p class="hint" id="welcomemsg" data-i18n>or drag a file here</p>
+  <p class="hint" id="welcometip" style="max-width:480px;margin:6px auto 0"></p>
+</div></div>
+<main>
+  <div id="mapcol">
+    <div class="tools" id="maptools">
+      <span class="grp" id="tooltools">
+        <button id="toolpencil" class="on" data-i18n data-i18n-title="Pencil: paint tiles (P)" title="Pencil: paint tiles (P)">Pencil</button>
+        <button id="toolfill" data-i18n data-i18n-title="Fill: replace a connected area of identical tiles (F)" title="Fill: replace a connected area of identical tiles (F)">Fill</button>
+        <button id="toolpick" data-i18n data-i18n-title="Pick a tile from the map (I or right click)" title="Pick a tile from the map (I or right click)">Pick</button>
+      </span>
+      <label><span data-i18n>Zoom</span> <select id="zoom"><option>1</option><option>2</option><option selected>3</option><option>4</option></select></label>
+      <button id="gridbtn" data-i18n data-i18n-title="Show / hide the tile grid (G)" title="Show / hide the tile grid (G)">Grid</button>
+      <label data-i18n-title="Scroll the map to a row" title="Scroll the map to a row"><span data-i18n>Go to row</span> <input type="number" id="gotorow" min="0" value="0" style="width:62px"></label>
+    </div>
+    <div id="mapwrap"><div id="stack"><canvas id="map"></canvas><canvas id="ov"></canvas></div></div>
+  </div>
+  <div id="musview" style="display:none">
+    <div class="tools" id="mustools">
+      <select id="musmod"></select>
+      <span class="grp"><button id="vtrk" class="on" data-i18n>Tracker</button><button id="vroll" data-i18n>Piano roll</button></span>
+      <span class="grp">
+        <button id="musplay" data-i18n data-i18n-title="Play from the cursor row (Space)" title="Play from the cursor row (Space)">▶ From cursor</button>
+        <button id="musplayall" data-i18n data-i18n-title="Play from the start (Enter)" title="Play from the start (Enter)">▶▶ From start</button>
+        <button id="musstop" data-i18n data-i18n-title="Stop (Esc)" title="Stop (Esc)">■ Stop</button>
+      </span>
+      <span class="grp" id="musmutes"></span>
+      <label class="trkonly"><span data-i18n>Octave</span> <select id="trkoct"></select></label>
+      <label class="trkonly"><input type="checkbox" id="trkfollow" checked> <span data-i18n>follow</span></label>
+      <select id="musvoice" class="rollonly"></select>
+      <label class="rollonly"><span data-i18n>Zoom</span> <input type="range" id="muszoom" min="3" max="60" value="12" style="width:70px"></label>
+      <span class="grp">
+        <button id="musexport" data-i18n>Save edits.json</button><button id="musimport" data-i18n>Load edits.json…</button><input type="file" id="musfile" accept=".json" style="display:none">
+      </span>
+    </div>
+    <div class="hint trkonly" data-i18n-html>Keys: <kbd>↑↓←→</kbd> move · <kbd>Z S X D C V G B H N J M</kbd> / <kbd>Q 2 W 3 E R…</kbd> piano keys (octave <kbd>F1</kbd>–<kbd>F7</kbd>) · field 2/3: hex digit or <kbd>+</kbd>/<kbd>-</kbd> · <kbd>Del</kbd> rest · <kbd>Shift+↑↓</kbd> select · <kbd>Ctrl+↑↓</kbd> transpose (<kbd>+Shift</kbd> octave) · <kbd>Ctrl+C/V</kbd> copy/paste · <kbd>Space</kbd> play/stop · notes can be changed in place, not inserted or deleted (cart format)</div>
+    <div id="trkwrap"><div id="trkscroll"><canvas id="trk" tabindex="0"></canvas><div id="trkspacer"></div></div></div>
+    <div id="rollwrap" style="display:none"><canvas id="roll" width="800" height="400"></canvas></div>
+  </div>
+  <div id="gfxview" style="display:none"><canvas id="gfxgrid"></canvas></div>
+  <div id="side">
+    <div id="mapui">
+      <div id="brush">
+        <canvas id="preview" width="48" height="48" style="width:48px;height:48px;border:1px solid #666"></canvas>
+        <div>
+          <span data-i18n>Tile</span> <input type="number" id="tileno" value="0" min="0" max="639" style="width:70px"><br>
+          <label><input type="checkbox" id="hf"> <span data-i18n>H-flip</span></label>
+          <label><input type="checkbox" id="vf"> <span data-i18n>V-flip</span></label>
+        </div>
+      </div>
+      <div class="hint" data-i18n>Left click: paint · right click: pick tile · H/V: toggle flip · G: grid</div>
+    </div>
+    <div id="eneui" style="display:none">
+      <div class="hint" data-i18n>Drag a marker: vertical = time (up = later), horizontal = X position. Select a row to highlight its marker.</div>
+      <div style="padding:4px 10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="evnew" data-i18n-title="Enemy type for new events" title="Enemy type for new events"></select><button id="evadd" data-i18n>+ Event</button><button id="evdup" data-i18n>Duplicate</button><button id="evdel" data-i18n>Delete</button>
+        <label data-i18n-title="Draw the motion path of all enemies (measured in the game)" title="Draw the motion path of all enemies (measured in the game)"><input type="checkbox" id="allpaths"> <span data-i18n>all paths</span></label>
+        <label><span data-i18n>Time offset (px)</span> <input type="number" id="toff" value="160" style="width:60px"></label>
+        <label><span data-i18n>Side offset (px)</span> <input type="number" id="loff" value="29" style="width:60px"></label>
+      </div>
+      <div id="sizebar"></div>
+      <div id="inspector"></div>
+    </div>
+    <div id="musui" style="display:none;flex:1;overflow:auto;padding:4px 8px">
+      <div id="musstat" class="hint"></div>
+      <div id="mussidebody"></div>
+    </div>
+    <div id="gfxui" style="display:none">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <select id="gfxtab"></select>
+        <button id="gfxexp" data-i18n>Export PNG</button><button id="gfxrep" data-i18n>Replace PNG…</button><button id="gfxreset" data-i18n>Reset</button>
+        <button id="gfxmany" data-i18n data-i18n-title="load several edited PNGs at once; the file name selects the target (tile_NNN.png, setPP_sprite_NNN.png)" title="load several edited PNGs at once; the file name selects the target (tile_NNN.png, setPP_sprite_NNN.png)">Load several PNGs…</button>
+        <input type="file" id="gfxpng" accept=".png" style="display:none"><input type="file" id="gfxpngs" accept=".png" multiple style="display:none">
+      </div>
+      <div class="hint" data-i18n>View as stored on the cart (the game is rotated by 90°). Select an image on the left · in the image: left click paints, right click picks the pen.</div>
+      <div id="gfxinfo" style="padding:4px 0"></div>
+      <canvas id="gfxedit"></canvas>
+      <div id="gfxpens" style="padding:6px 0"></div>
+    </div>
+    <div id="pickwrap"><canvas id="pick"></canvas></div>
+    <div id="evwrap" style="display:none"><table id="evtab"></table></div>
+  </div>
+</main>
+<div id="helpmodal" style="display:none"><div class="hbox" role="dialog" aria-modal="true">
+  <div id="helpnav"></div>
+  <div id="helpmain"><button id="helpclose" data-i18n-title="Close (Esc)" title="Close (Esc)">×</button><div id="helpcontent"></div>
+    <div id="helpbar"><span id="helptip"></span><button id="helpnext" data-i18n>Next tip</button></div></div>
+</div></div>
+<div id="footer"><span id="copyright">© by <a href="https://sience.github.io/" target="_blank" rel="noopener">SiENcE</a></span><span id="status"></span></div>
+<script src="version.js"></script>
+<script src="i18n.js"></script>
+<script src="rom.js"></script>
+<script src="lynx.js"></script>
+<script src="pack.js"></script>
+<script src="export.js"></script>
+<script src="project.js"></script>
+<script src="static.js"></script>
+<script src="hsfx.js"></script>
+<script src="music.js"></script>
+<script src="tracker.js"></script>
+<script src="help.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
