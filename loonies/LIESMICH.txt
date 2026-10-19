@@ -1,0 +1,11 @@
+The Loonies 0.1.0: Erster Akt (Demo)
+© 2026 OneBitKid (Florian Fischer). A free fan project, not affiliated with Warner Bros. or Amblin.
+
+Ein freies Fanprojekt, inspiriert von einem Abenteuerfilm aus dem Jahr 1985. Eigene Figuren, eigene
+Geschichte, eigene Bilder und Musik. Alle Rechte an Spiel, Bildern, Texten und Musik vorbehalten.
+
+Spielen: index.html im Browser öffnen. Maus: Linksklick handelt, Doppelklick rennt, Rechtsklick schaut
+an. Touch: tippen handelt, doppelt tippen rennt, lange drücken schaut an. Esc: Menü. Tab: alle Stellen
+zeigen. H: Tipp. 1-4: Kind wechseln. F11: Vollbild.
+
+Engine: Cutaway.js (MIT-Lizenz, siehe licenses/cutaway.txt).
