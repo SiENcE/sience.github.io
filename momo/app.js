@@ -4,9 +4,16 @@
   const G = window.WieseGarden;
   const M = window.WieseMath;
   const D = window.WieseDeutsch;
-  // Games whose view lives in math.js or deutsch.js (same interface).
+  const E = window.WieseEnglish;
+  // Games whose view lives in math.js, deutsch.js or english.js (same interface).
   const viewFor = (mode) =>
-    C.MATH_GAMES.includes(mode) ? M : D.MODES.includes(mode) ? D : null;
+    C.MATH_GAMES.includes(mode)
+      ? M
+      : D.MODES.includes(mode)
+        ? D
+        : E.MODES.includes(mode)
+          ? E
+          : null;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
   const STORAGE_KEY = "woerterwiese.v1";
@@ -26,6 +33,7 @@
   let lastTick = Date.now();
   let pauseSuggested = false;
   let voices = [];
+  let englishVoices = [];
   let speechGeneration = 0;
   let speechDelay;
   let speechWatchdog;
@@ -106,24 +114,32 @@
     endSpeech?.();
     $$(".speaking").forEach((button) => button.classList.remove("speaking"));
   }
-  function chosenVoice() {
+  // German voice for Momo; an English one only for { en: … } parts.
+  function chosenVoice(english = false) {
+    const list = english ? englishVoices : voices;
+    const wanted = english ? state.settings.voiceEn : state.settings.voice;
     return (
-      voices.find((voice) => voice.voiceURI === state.settings.voice) ||
-      voices.find((voice) => voice.localService) ||
-      voices[0]
+      list.find((voice) => voice.voiceURI === wanted) ||
+      (english && list.find((voice) => voice.localService && /^en[-_]GB/i.test(voice.lang))) ||
+      list.find((voice) => voice.localService) ||
+      list[0]
     );
   }
-  function speechAvailable() {
+  function speechAvailable(english = false) {
     return (
       "speechSynthesis" in window &&
       "SpeechSynthesisUtterance" in window &&
-      voices.length > 0
+      (english ? englishVoices : voices).length > 0
     );
   }
+  const NO_GERMAN =
+    "Hier gibt es gerade keine deutsche Stimme. Bitte einen Erwachsenen, dir vorzulesen.";
+  const NO_ENGLISH =
+    "Hier gibt es gerade keine englische Stimme. Bitte einen Erwachsenen, dir das Englische vorzulesen.";
   // Without a working voice an adult can read the task aloud instead.
   function revealSpeechFallback(message) {
     if ($("#settings-dialog").open) {
-      $("#voice-status").textContent = message;
+      $(message === NO_ENGLISH ? "#voice-en-status" : "#voice-status").textContent = message;
       return;
     }
     if (currentView !== "game") return;
@@ -137,7 +153,8 @@
    * recorded German sound audio/laute/m.wav, because browser voices can only
    * spell letters ("Emm"), not sound them ("mmm"). A laut part may carry
    * "gap" (pause before it, after another laut) and "highlight" (a selector
-   * in the task that lights up while it plays).
+   * in the task that lights up while it plays). { en: "cat" } is spoken by
+   * an English voice and may carry "gap" and "highlight" too.
    */
   function speak(text, button = null) {
     stopSpeech();
@@ -147,13 +164,17 @@
       return Promise.resolve();
     }
     let parts = [text].flat(2).filter(Boolean);
-    if (parts.some((part) => typeof part === "string") && !speechAvailable()) {
-      revealSpeechFallback(
-        "Hier gibt es gerade keine deutsche Stimme. Bitte einen Erwachsenen, dir vorzulesen.",
-      );
-      parts = parts.filter((part) => typeof part !== "string");
-      if (!parts.length) return Promise.resolve();
+    const german = (part) => typeof part === "string";
+    const english = (part) => typeof part === "object" && part.en != null;
+    if (parts.some(german) && !speechAvailable()) {
+      revealSpeechFallback(NO_GERMAN);
+      parts = parts.filter((part) => !german(part));
     }
+    if (parts.some(english) && !speechAvailable(true)) {
+      if (speechAvailable()) revealSpeechFallback(NO_ENGLISH);
+      parts = parts.filter((part) => !english(part));
+    }
+    if (!parts.length) return Promise.resolve();
     const generation = speechGeneration;
     button?.classList.add("speaking");
     return new Promise((resolve) => {
@@ -212,10 +233,15 @@
         if (generation !== speechGeneration) return;
         const part = parts.shift();
         previous = part;
-        if (typeof part === "object") return playLaut(part);
-        const utterance = new SpeechSynthesisUtterance(part);
-        utterance.lang = "de-DE";
-        utterance.voice = chosenVoice();
+        if (part.laut) return playLaut(part);
+        const inEnglish = english(part);
+        const utterance = new SpeechSynthesisUtterance(inEnglish ? part.en : part);
+        utterance.voice = chosenVoice(inEnglish);
+        utterance.lang = inEnglish ? utterance.voice?.lang || "en-GB" : "de-DE";
+        if (inEnglish && part.highlight)
+          $$(`#task-area ${part.highlight}`).forEach((element) =>
+            element.classList.add("sounding"),
+          );
         utterance.rate = state.settings.rate;
         utterance.pitch = 1.05;
         utterance.onstart = () => {
@@ -265,13 +291,18 @@
   const SPEECH_OFF =
     "Die Sprachausgabe ist ausgeschaltet. Bitte einen Erwachsenen, dir vorzulesen.";
   // In a running task: reading aid while speech is off or no voice exists.
+  // Why the current task cannot be read out, or null if it can.
+  function voiceNotice() {
+    if (!state.settings.speech) return SPEECH_OFF;
+    if (!speechAvailable()) return NO_GERMAN;
+    const english = [game?.question?.speech].flat().some((part) => part?.en);
+    if (english && !speechAvailable(true)) return NO_ENGLISH;
+    return null;
+  }
   function showSpeechState() {
     if (currentView !== "game" || !game || game.answered) return;
-    if (!state.settings.speech) revealSpeechFallback(SPEECH_OFF);
-    else if (!speechAvailable())
-      revealSpeechFallback(
-        "Hier gibt es gerade keine deutsche Stimme. Bitte einen Erwachsenen, dir vorzulesen.",
-      );
+    const notice = voiceNotice();
+    if (notice) revealSpeechFallback(notice);
     else {
       $("#speech-notice").hidden = true;
       $("#adult-cue").hidden = true;
@@ -280,17 +311,9 @@
   function autoSpeak(text, button) {
     return state.settings.autoSpeak ? speak(text, button) : Promise.resolve();
   }
-  function updateVoices() {
-    const wasAvailable = speechAvailable();
-    voices =
-      "speechSynthesis" in window
-        ? window.speechSynthesis
-            .getVoices()
-            .filter((voice) => /^de(?:[-_]|$)/i.test(voice.lang))
-        : [];
-    const select = $("#voice-select");
+  function fillVoiceSelect(select, list, wanted) {
     select.replaceChildren(new Option("Automatisch auswählen", ""));
-    voices.forEach((voice) =>
+    list.forEach((voice) =>
       select.add(
         new Option(
           `${voice.name}${voice.localService ? " · lokal" : " · eventuell online"}`,
@@ -298,18 +321,24 @@
         ),
       ),
     );
-    select.value = voices.some(
-      (voice) => voice.voiceURI === state.settings.voice,
-    )
-      ? state.settings.voice
-      : "";
+    select.value = list.some((voice) => voice.voiceURI === wanted) ? wanted : "";
+  }
+  function updateVoices() {
+    const wasMissing = game && state.settings.speech ? voiceNotice() : null;
+    const all = "speechSynthesis" in window ? window.speechSynthesis.getVoices() : [];
+    voices = all.filter((voice) => /^de(?:[-_]|$)/i.test(voice.lang));
+    englishVoices = all.filter((voice) => /^en(?:[-_]|$)/i.test(voice.lang));
+    fillVoiceSelect($("#voice-select"), voices, state.settings.voice);
+    fillVoiceSelect($("#voice-en-select"), englishVoices, state.settings.voiceEn);
     $("#voice-status").textContent = voices.length
       ? `${voices.length} deutsche ${voices.length === 1 ? "Stimme" : "Stimmen"} verfügbar. Bitte einmal probehören.`
       : "Keine deutsche Stimme gefunden. Ihr könnt trotzdem spielen: Bei jeder Aufgabe gibt es dann einen Vorlesetext für Erwachsene.";
+    $("#voice-en-status").textContent = englishVoices.length
+      ? `${englishVoices.length} englische ${englishVoices.length === 1 ? "Stimme" : "Stimmen"} verfügbar (für die Englisch-Spiele).`
+      : "Keine englische Stimme gefunden. Die Englisch-Spiele zeigen dann einen Vorlesetext für Erwachsene. Englische Stimmen lassen sich meist in den Spracheinstellungen des Geräts nachinstallieren.";
     if (currentView === "game" && game && !game.answered) {
       showSpeechState();
-      if (speechAvailable() && state.settings.speech && !wasAvailable && !$("#settings-dialog").open)
-        speakTask();
+      if (wasMissing && !voiceNotice() && !$("#settings-dialog").open) speakTask();
     }
   }
 
@@ -345,9 +374,10 @@
     const pet = C.petAt(state.pet, now);
     const mood = C.petMood(pet);
     const home = $("#home-momo");
-    if (home.dataset.mood !== mood) {
+    const look = G.momoKey(mood, state);
+    if (home.dataset.look !== look) {
       home.innerHTML = G.momoSvg(mood);
-      home.dataset.mood = mood;
+      home.dataset.look = look;
     }
     $("#home-momo-says").textContent = G.petMessage(state, now);
     $("#home-needs").innerHTML = G.needsMarkup(pet);
@@ -521,10 +551,7 @@
     renderTask();
     // Sound files still play without a voice; speak() then shows the reading aid.
     if (state.settings.autoSpeak) speakTask();
-    else if (!speechAvailable() || !state.settings.speech)
-      revealSpeechFallback(
-        "Hier gibt es gerade keine deutsche Stimme. Bitte einen Erwachsenen, dir vorzulesen.",
-      );
+    else if (voiceNotice()) revealSpeechFallback(voiceNotice());
     $("#game-title").focus({ preventScroll: true });
     $(".game-card").scrollIntoView({ block: "nearest", behavior: "instant" });
     if (activeMilliseconds >= 5 * 60 * 1000 && !pauseSuggested) suggestPause();
@@ -587,17 +614,21 @@
     } else {
       const icon = { memory: "🎒", echo: "🦜", movement: "👏" }[mode];
       task.innerHTML = `<div class="echo-symbol" aria-hidden="true">${icon}</div>${listenButton("Anhören")}<p class="together-note"><span aria-hidden="true">👥</span> Ein Erwachsener hört zu und entscheidet.</p><div class="self-check"><button id="echo-done" class="button primary">✓ Hat geklappt</button><button id="echo-retry" class="button secondary">↺ Noch nicht ganz</button></div><button id="compare-echo" class="text-button" aria-expanded="false">Lösung zeigen</button><div id="echo-answer" hidden>${compareMarkup()}</div>`;
-      $("#echo-done").addEventListener("click", () => solved());
-      $("#echo-retry").addEventListener("click", () => mistake(null));
-      $("#compare-echo").addEventListener("click", () => {
-        const answer = $("#echo-answer");
-        answer.hidden = !answer.hidden;
-        $("#compare-echo").setAttribute("aria-expanded", String(!answer.hidden));
-        $("#compare-echo").textContent = answer.hidden
-          ? "Lösung zeigen"
-          : "Lösung verstecken";
-      });
     }
+    // Games played together: an adult decides whether it worked.
+    $("#echo-done")?.addEventListener("click", () => solved());
+    $("#echo-retry")?.addEventListener("click", () => mistake(null));
+    $("#compare-echo")?.addEventListener("click", () => {
+      const answer = $("#echo-answer");
+      answer.hidden = !answer.hidden;
+      $("#compare-echo").setAttribute("aria-expanded", String(!answer.hidden));
+      $("#compare-echo").textContent = answer.hidden
+        ? "Lösung zeigen"
+        : "Lösung verstecken";
+    });
+    $("#solution-listen")?.addEventListener("click", () =>
+      speak(q.solution, $("#solution-listen")),
+    );
     $("#content-listen")?.addEventListener("click", () =>
       speak(q.speech, $("#content-listen")),
     );
@@ -776,7 +807,7 @@
     } else if (viewFor(game.mode)) {
       const hint = viewFor(game.mode).hint(q, n, picked, $("#task-area"), game.built);
       setFeedback(hint.text, "try-again");
-      autoSpeak([hint.speech, q.speech]);
+      autoSpeak([hint.speech, hint.replay !== undefined ? hint.replay : q.speech]);
       return;
     } else if (game.mode === "blend") {
       // Shorter pauses melt the sounds together.
@@ -957,9 +988,10 @@
   }
   function setMomo(mood) {
     const element = $("#game-momo");
-    if (element.dataset.mood === mood) return;
+    const look = G.momoKey(mood, state);
+    if (element.dataset.look === look) return;
     element.innerHTML = G.momoSvg(mood);
-    element.dataset.mood = mood;
+    element.dataset.look = look;
   }
   function updateRoundStars(justEarned = false) {
     $("#game-stars").innerHTML = Array.from(
@@ -1006,8 +1038,33 @@
   }
 
   /* ---------- Settings ---------- */
+  // The adult area is split into tabs, so no section gets lost in a long page.
+  function showSettingsTab(name, focus = false) {
+    $$("#settings-dialog [role=tab]").forEach((tab) => {
+      const active = tab.dataset.tab === name;
+      tab.setAttribute("aria-selected", String(active));
+      tab.tabIndex = active ? 0 : -1;
+      if (active && focus) tab.focus();
+    });
+    $$("#settings-dialog [role=tabpanel]").forEach((panel) => {
+      panel.hidden = panel.dataset.panel !== name;
+    });
+  }
+  $(".settings-tabs").addEventListener("click", (event) => {
+    const tab = event.target.closest("[role=tab]");
+    if (tab) showSettingsTab(tab.dataset.tab);
+  });
+  $(".settings-tabs").addEventListener("keydown", (event) => {
+    const tabs = $$("#settings-dialog [role=tab]");
+    const index = tabs.indexOf(document.activeElement);
+    const step = { ArrowRight: 1, ArrowLeft: -1, Home: -index, End: tabs.length - 1 - index }[event.key];
+    if (index < 0 || step === undefined) return;
+    event.preventDefault();
+    showSettingsTab(tabs[(index + step + tabs.length) % tabs.length].dataset.tab, true);
+  });
   function openSettings() {
     stopSpeech();
+    showSettingsTab("overview");
     $("#settings-dialog").showModal();
     G.setActive(false);
     updateVoices();
@@ -1033,17 +1090,22 @@
     $("#laut-info").textContent = `${letter}: „${laut.say}“ wie am Anfang von „${laut.example}“`;
     speak([{ laut: letter }], button);
   });
+  // One collapsible group per subject, the games listed by category.
   function renderLevelSettings() {
-    const row = (activity) =>
-      `<label class="level-row"><span>${activity.icon} ${activity.title}</span><select data-level-for="${activity.id}">${C.LEVELS[activity.id].map((level, i) => `<option value="${i}"${state.levels[activity.id] === i ? " selected" : ""}>Stufe ${i + 1}: ${level.label}</option>`).join("")}</select></label>`;
-    $("#level-settings").innerHTML = C.SUBJECTS.map(
-      (subject) =>
-        `<h4 class="level-group">${subject.icon} ${subject.title}</h4>${C.ACTIVITIES.filter(
-          (activity) => C.categoryOf(activity.id)?.subject === subject.id,
+    const row = (id) => {
+      const activity = C.ACTIVITIES.find((x) => x.id === id);
+      return `<label class="level-row"><span>${activity.icon} ${activity.title}</span><select data-level-for="${id}">${C.LEVELS[id].map((level, i) => `<option value="${i}"${state.levels[id] === i ? " selected" : ""}>Stufe ${i + 1}: ${level.label}</option>`).join("")}</select></label>`;
+    };
+    $("#level-settings").innerHTML = C.SUBJECTS.map((subject) => {
+      const categories = C.CATEGORIES.filter((x) => x.subject === subject.id);
+      const count = categories.reduce((total, x) => total + x.games.length, 0);
+      return `<details class="level-subject" data-subject-levels="${subject.id}"><summary><span aria-hidden="true">${subject.icon}</span> ${subject.title} <small>${count} Spiele</small></summary>${categories
+        .map(
+          (category) =>
+            `<h4 class="level-group">${category.icon} ${category.title}</h4>${category.games.map(row).join("")}`,
         )
-          .map(row)
-          .join("")}`,
-    ).join("");
+        .join("")}</details>`;
+    }).join("");
   }
   $("#level-settings").addEventListener("change", (event) => {
     const select = event.target.closest("[data-level-for]");
@@ -1135,6 +1197,16 @@
       latest.settings.voice = voice;
     });
   });
+  $("#voice-en-select").addEventListener("change", (event) => {
+    const voice = event.target.value;
+    stopSpeech();
+    save((latest) => {
+      latest.settings.voiceEn = voice;
+    });
+  });
+  $("#test-voice-en").addEventListener("click", () =>
+    speak([{ en: "Hello! I am Momo. Red, blue, yellow. One, two, three!" }]),
+  );
   $("#speech-rate").addEventListener("change", (event) => {
     const rate = Number(event.target.value);
     save((latest) => {

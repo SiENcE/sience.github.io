@@ -98,11 +98,19 @@
     { id: "clock", icon: "🕒", title: "Uhr lesen", color: "mint" },
     { id: "syllables", icon: "🥁", title: "Silben klatschen", color: "peach" },
     { id: "extend", icon: "🐍", title: "Wörter verlängern", color: "mint" },
+    { id: "enwords", icon: "🎧", title: "Hör und zeig", color: "sky" },
+    { id: "enmissing", icon: "🙈", title: "Was fehlt?", color: "rose" },
+    { id: "enpattern", icon: "🔁", title: "Muster-Reihe", color: "lavender" },
+    { id: "encolors", icon: "🎨", title: "Farben und Formen", color: "peach" },
+    { id: "ennumbers", icon: "🔢", title: "Zahlen auf Englisch", color: "yellow" },
+    { id: "ensimon", icon: "🙋", title: "Mach mit!", color: "mint", together: true },
+    { id: "ensay", icon: "🗣️", title: "Sag es auf Englisch", color: "rose", together: true },
   ];
   // Menu: subject → category → game. "report" names the category for adults.
   const SUBJECTS = [
     { id: "deutsch", icon: "📖", title: "Deutsch", color: "mint" },
     { id: "mathe", icon: "🔢", title: "Mathe", color: "sky" },
+    { id: "englisch", icon: "💬", title: "Englisch", color: "rose" },
   ];
   const CATEGORIES = [
     {
@@ -213,14 +221,56 @@
       color: "yellow",
       games: ["graph"],
     },
+    {
+      id: "enlisten",
+      subject: "englisch",
+      icon: "🎧",
+      title: "Hören und zeigen",
+      report: "Englisch: Wörter hören",
+      color: "sky",
+      games: ["enwords", "enmissing", "enpattern"],
+    },
+    {
+      id: "encolors",
+      subject: "englisch",
+      icon: "🎨",
+      title: "Farben und Zahlen",
+      report: "Englisch: Farben, Formen, Zahlen",
+      color: "peach",
+      games: ["encolors", "ennumbers"],
+    },
+    {
+      id: "entogether",
+      subject: "englisch",
+      icon: "👥",
+      title: "Zu zweit",
+      report: "Englisch: Sprechen & Mitmachen",
+      color: "rose",
+      games: ["ensimon", "ensay"],
+    },
   ];
   const MATH_GAMES = CATEGORIES.filter((x) => x.subject === "mathe").flatMap(
+    (x) => x.games,
+  );
+  const ENGLISH_GAMES = CATEGORIES.filter((x) => x.subject === "englisch").flatMap(
     (x) => x.games,
   );
   function categoryOf(mode) {
     return CATEGORIES.find((category) => category.games.includes(mode)) || null;
   }
 
+  // English topics (words in EN_WORDS below), needed by the levels.
+  const EN_TOPICS = {
+    animals: "Tiere",
+    school: "Schulsachen",
+    toys: "Spielzeug",
+    food: "Essen",
+    body: "Körper",
+    clothes: "Kleidung",
+    family: "Familie",
+    nature: "Draußen",
+  };
+  const EN_ALL = Object.keys(EN_TOPICS);
   // Every game gets gradually harder. Each first-try success climbs one step.
   const LEVELS = {
     type: [
@@ -627,6 +677,88 @@
         label: "alles, ohne Bild",
       },
     ],
+    // English: hear a word, tap its picture. Topic by topic, then mixed and
+    // finally words that sound almost the same (cat – hat – cap).
+    enwords: [
+      { topics: ["animals"], choices: 3, label: "Tiere, 3 Bilder" },
+      { topics: ["toys", "school"], choices: 3, label: "Spielzeug und Schulsachen" },
+      { topics: ["food"], choices: 4, label: "Essen, 4 Bilder" },
+      { topics: ["body", "clothes"], choices: 4, label: "Körper und Kleidung" },
+      { topics: ["family", "nature"], choices: 4, label: "Familie und draußen" },
+      { topics: EN_ALL, choices: 4, label: "alles gemischt" },
+      { topics: EN_ALL, choices: 6, label: "alles, 6 Bilder" },
+      { similar: true, choices: 3, label: "ähnlich klingend: cat, hat, cap" },
+      { similar: true, choices: 4, label: "ähnlich klingend, 4 Bilder" },
+    ],
+    // Momo names all pictures but one: which one was not said?
+    enmissing: [
+      { topics: ["animals"], choices: 3, label: "3 Bilder, Tiere" },
+      { topics: ["toys", "school"], choices: 3, label: "3 Bilder, Spielzeug" },
+      { topics: ["food"], choices: 4, label: "4 Bilder, Essen" },
+      { topics: EN_ALL, choices: 4, label: "4 Bilder, gemischt" },
+      { topics: EN_ALL, choices: 5, label: "5 Bilder" },
+      { topics: EN_ALL, choices: 6, label: "6 Bilder" },
+      { similar: true, choices: 4, label: "4 Bilder, ähnlich klingend" },
+    ],
+    // A row of pictures repeats; Momo names them. What comes next?
+    enpattern: [
+      { patterns: ["AB"], choices: 2, label: "AB-Muster, 2 Karten" },
+      { patterns: ["AB"], choices: 3, label: "AB-Muster, 3 Karten" },
+      { patterns: ["AAB", "ABB"], choices: 3, label: "AAB und ABB" },
+      { patterns: ["ABC"], choices: 3, label: "ABC-Muster" },
+      { patterns: ["AABB", "ABAC"], choices: 3, label: "AABB und ABAC" },
+      { patterns: ["AAB", "ABB", "ABC", "AABB"], choices: 4, label: "gemischt, 4 Karten" },
+      { patterns: ["ABCD", "AABC", "ABCC"], choices: 4, label: "lange Muster" },
+    ],
+    encolors: [
+      { ask: "colour", colours: ["red", "blue", "yellow", "green"], choices: 3, label: "4 Farben" },
+      {
+        ask: "colour",
+        colours: ["red", "blue", "yellow", "green", "orange", "pink", "purple"],
+        choices: 4,
+        label: "7 Farben",
+      },
+      { ask: "colour", choices: 4, label: "alle 10 Farben" },
+      { ask: "shape", shapes: ["circle", "square", "triangle"], choices: 3, label: "Formen: circle, square, triangle" },
+      { ask: "shape", choices: 4, label: "alle Formen" },
+      {
+        ask: "both",
+        colours: ["red", "blue", "yellow", "green"],
+        shapes: ["circle", "square", "triangle"],
+        choices: 4,
+        label: "Farbe und Form: a red circle",
+      },
+      { ask: "both", choices: 4, label: "Farbe und Form, alle" },
+      { ask: "count", max: 5, colours: ["red", "blue", "yellow", "green", "orange", "pink"], choices: 4, label: "two blue stars (bis 5)" },
+      { ask: "count", max: 10, choices: 4, label: "Zahl, Farbe und Form bis 10" },
+    ],
+    ennumbers: [
+      { min: 1, max: 5, show: "dots", choices: 3, label: "1–5, Würfelbilder" },
+      { min: 1, max: 6, show: "digits", choices: 3, label: "1–6, Ziffern" },
+      { min: 1, max: 10, show: "digits", choices: 4, label: "1–10" },
+      { min: 1, max: 10, show: "things", choices: 3, label: "1–10, Dinge zählen" },
+      { min: 6, max: 12, show: "digits", choices: 4, label: "6–12" },
+      { min: 11, max: 20, show: "digits", choices: 4, label: "11–20" },
+      { min: 1, max: 20, show: "digits", similar: true, choices: 4, label: "three oder thirteen?" },
+      { min: 1, max: 20, show: "digits", similar: true, choices: 6, label: "1–20, 6 Karten" },
+    ],
+    ensimon: [
+      { length: 1, label: "1 Befehl" },
+      { length: 2, label: "2 Befehle" },
+      { length: 1, touch: true, label: "Körper: Touch your …!" },
+      { length: 2, touch: true, label: "2 × Touch your …!" },
+      { length: 3, label: "3 Befehle" },
+      { length: 3, touch: true, label: "3 × Touch your …!" },
+      { length: 4, label: "4 Befehle" },
+    ],
+    ensay: [
+      { topics: ["animals"], count: 1, label: "1 Bild, Tiere" },
+      { topics: ["toys", "school"], count: 1, label: "1 Bild, Spielzeug" },
+      { topics: ["food"], count: 1, label: "1 Bild, Essen" },
+      { topics: ["body", "clothes"], count: 1, label: "1 Bild, Körper und Kleidung" },
+      { topics: EN_ALL, count: 2, label: "2 Bilder" },
+      { topics: EN_ALL, count: 3, label: "3 Bilder" },
+    ],
     venn: [
       { rings: 1, sets: [0], choices: 2, label: "ein Kreis: drin oder draußen" },
       { rings: 2, sets: [0], noBoth: true, choices: 4, label: "zwei Kreise" },
@@ -906,68 +1038,33 @@
     "pudel",
   ]);
 
+  /*
+   * Food for Momo. Prices, growing times and how much a food fills Momo are
+   * balanced so that a 10-minute session (20–30 stars) buys a few plants,
+   * not a full larder: the beds and real growing time are the limit, and
+   * spare stars go into Momo's treasure chest (WARDROBE).
+   */
   const CROPS = [
-    {
-      id: "carrot",
-      name: "Möhre",
-      plural: "Möhren",
-      icon: "🥕",
-      cost: 1,
-      grow: 60000,
-      yield: 2,
-      full: 20,
-      joy: 5,
-      unlock: 0,
-    },
-    {
-      id: "salad",
-      name: "Salat",
-      plural: "Salatköpfe",
-      icon: "🥬",
-      cost: 2,
-      grow: 120000,
-      yield: 2,
-      full: 30,
-      joy: 8,
-      unlock: 6,
-    },
-    {
-      id: "strawberry",
-      name: "Erdbeere",
-      plural: "Erdbeeren",
-      icon: "🍓",
-      cost: 3,
-      grow: 180000,
-      yield: 3,
-      full: 12,
-      joy: 25,
-      unlock: 15,
-    },
-    {
-      id: "pumpkin",
-      name: "Kürbis",
-      plural: "Kürbisse",
-      icon: "🎃",
-      cost: 4,
-      grow: 300000,
-      yield: 2,
-      full: 50,
-      joy: 15,
-      unlock: 30,
-    },
-    {
-      id: "apple",
-      name: "Apfel",
-      plural: "Äpfel",
-      icon: "🍎",
-      cost: 5,
-      grow: 300000,
-      yield: 4,
-      full: 25,
-      joy: 20,
-      unlock: 60,
-    },
+    { id: "carrot", name: "Möhre", plural: "Möhren", one: "eine Möhre", icon: "🥕", cost: 3, grow: 240000, yield: 2, full: 10, joy: 3, unlock: 0 },
+    { id: "salad", name: "Salat", plural: "Salatköpfe", one: "einen Salat", icon: "🥬", cost: 4, grow: 360000, yield: 2, full: 14, joy: 4, unlock: 10 },
+    { id: "strawberry", name: "Erdbeere", plural: "Erdbeeren", one: "eine Erdbeere", icon: "🍓", cost: 6, grow: 480000, yield: 3, full: 5, joy: 10, unlock: 25 },
+    { id: "pumpkin", name: "Kürbis", plural: "Kürbisse", one: "einen Kürbis", icon: "🎃", cost: 8, grow: 720000, yield: 2, full: 25, joy: 8, unlock: 45 },
+    { id: "apple", name: "Apfel", plural: "Äpfel", one: "einen Apfel", icon: "🍎", cost: 10, grow: 900000, yield: 3, full: 10, joy: 12, unlock: 70 },
   ];
+  // Momo's treasure chest: things to wear (one per slot) and a ball to play with.
+  const WARDROBE = [
+    { id: "flower", icon: "🌼", name: "Blume", slot: "ear", cost: 8 },
+    { id: "bow", icon: "🎀", name: "Schleife", slot: "ear", cost: 12 },
+    { id: "ball", icon: "⚽", name: "Ball", slot: "toy", cost: 15 },
+    { id: "scarf", icon: "🧣", name: "Schal", slot: "neck", cost: 18 },
+    { id: "glasses", icon: "🕶️", name: "Sonnenbrille", slot: "face", cost: 25 },
+    { id: "cap", icon: "🧢", name: "Kappe", slot: "head", cost: 30 },
+    { id: "tophat", icon: "🎩", name: "Zauberhut", slot: "head", cost: 45 },
+    { id: "crown", icon: "👑", name: "Krone", slot: "head", cost: 70 },
+  ];
+  // Momo wishes for one food at a time; the wish changes every few hours.
+  const WISH_WINDOW = 3 * 3600000;
+  const WISH_BONUS = 15;
   const BEDS = [0, 0, 0, 10, 40, 80];
   const DECOR = [
     { at: 20, icon: "🦋", name: "Ein Schmetterling", x: 30, y: 30 },
@@ -992,6 +1089,8 @@
   ].sort((a, b) => a.at - b.at);
   const PET_DECAY = { full: 3, joy: 2 }; // points per hour
   const PET_PETTING_LIMIT = 60;
+  // Playing ball cheers Momo up more than cuddling, but also only so far.
+  const PET_PLAY_LIMIT = 85;
 
   function shuffle(items, random = Math.random) {
     const result = [...items];
@@ -1293,6 +1392,315 @@
       ],
     },
   ];
+  /*
+   * English (grades 1–2): listening first, as in the workbooks (listen and
+   * point, colour and say, numbers, patterns, action songs). The English
+   * word is spoken by an English voice ({ en: "cat" } in the speech queue);
+   * instructions and help stay German. Pictures are emoji; colours and
+   * shapes are drawn, so the child never has to read English.
+   */
+  // [English word, icon, German word, topic]
+  const EN_WORDS = [
+    ["cat", "🐱", "Katze", "animals"], ["dog", "🐶", "Hund", "animals"], ["mouse", "🐭", "Maus", "animals"],
+    ["rabbit", "🐰", "Hase", "animals"], ["bird", "🐦", "Vogel", "animals"], ["fish", "🐟", "Fisch", "animals"],
+    ["duck", "🦆", "Ente", "animals"], ["horse", "🐴", "Pferd", "animals"], ["cow", "🐮", "Kuh", "animals"],
+    ["pig", "🐷", "Schwein", "animals"], ["frog", "🐸", "Frosch", "animals"], ["lion", "🦁", "Löwe", "animals"],
+    ["elephant", "🐘", "Elefant", "animals"], ["monkey", "🐵", "Affe", "animals"], ["bear", "🐻", "Bär", "animals"],
+    ["snake", "🐍", "Schlange", "animals"], ["bee", "🐝", "Biene", "animals"], ["goat", "🐐", "Ziege", "animals"],
+    ["hen", "🐔", "Huhn", "animals"],
+    ["schoolbag", "🎒", "Schulranzen", "school"], ["pencil", "✏️", "Bleistift", "school"], ["book", "📕", "Buch", "school"],
+    ["scissors", "✂️", "Schere", "school"], ["ruler", "📏", "Lineal", "school"], ["crayon", "🖍️", "Wachsmalstift", "school"],
+    ["pen", "🖊️", "Kuli", "school"],
+    ["ball", "⚽", "Ball", "toys"], ["car", "🚗", "Auto", "toys"], ["plane", "✈️", "Flugzeug", "toys"],
+    ["train", "🚂", "Zug", "toys"], ["teddy", "🧸", "Teddy", "toys"], ["kite", "🪁", "Drachen", "toys"],
+    ["boat", "⛵", "Boot", "toys"], ["robot", "🤖", "Roboter", "toys"], ["balloon", "🎈", "Luftballon", "toys"],
+    ["bike", "🚲", "Fahrrad", "toys"],
+    ["apple", "🍎", "Apfel", "food"], ["banana", "🍌", "Banane", "food"], ["orange", "🍊", "Orange", "food"],
+    ["pear", "🍐", "Birne", "food"], ["strawberry", "🍓", "Erdbeere", "food"], ["grapes", "🍇", "Trauben", "food"],
+    ["carrot", "🥕", "Möhre", "food"], ["bread", "🍞", "Brot", "food"], ["cake", "🍰", "Kuchen", "food"],
+    ["milk", "🥛", "Milch", "food"], ["egg", "🥚", "Ei", "food"], ["cheese", "🧀", "Käse", "food"],
+    ["ice cream", "🍦", "Eis", "food"], ["pizza", "🍕", "Pizza", "food"],
+    ["nose", "👃", "Nase", "body"], ["ear", "👂", "Ohr", "body"], ["eye", "👁️", "Auge", "body"],
+    ["mouth", "👄", "Mund", "body"], ["hand", "✋", "Hand", "body"], ["foot", "🦶", "Fuß", "body"],
+    ["leg", "🦵", "Bein", "body"], ["arm", "💪", "Arm", "body"], ["tooth", "🦷", "Zahn", "body"],
+    ["hat", "🎩", "Hut", "clothes"], ["T-shirt", "👕", "T-Shirt", "clothes"], ["shoe", "👟", "Schuh", "clothes"],
+    ["sock", "🧦", "Socke", "clothes"], ["dress", "👗", "Kleid", "clothes"], ["coat", "🧥", "Mantel", "clothes"],
+    ["trousers", "👖", "Hose", "clothes"], ["scarf", "🧣", "Schal", "clothes"], ["cap", "🧢", "Kappe", "clothes"],
+    ["gloves", "🧤", "Handschuhe", "clothes"],
+    ["mum", "👩", "Mama", "family"], ["dad", "👨", "Papa", "family"], ["baby", "👶", "Baby", "family"],
+    ["grandma", "👵", "Oma", "family"], ["grandpa", "👴", "Opa", "family"], ["girl", "👧", "Mädchen", "family"],
+    ["boy", "👦", "Junge", "family"],
+    ["sun", "☀️", "Sonne", "nature"], ["moon", "🌙", "Mond", "nature"], ["star", "⭐", "Stern", "nature"],
+    ["tree", "🌳", "Baum", "nature"], ["flower", "🌸", "Blume", "nature"], ["house", "🏠", "Haus", "nature"],
+    ["cloud", "☁️", "Wolke", "nature"], ["rain", "🌧️", "Regen", "nature"],
+  ].map(([en, icon, de, topic]) => ({ en, icon, de, topic }));
+  const EN_BY_WORD = Object.fromEntries(EN_WORDS.map((item) => [item.en, item]));
+  // Words that sound almost the same: careful listening (cat – hat – cap).
+  const EN_SIMILAR = [
+    ["cat", "hat", "cap"],
+    ["bear", "pear"],
+    ["mouse", "mouth", "house"],
+    ["boat", "coat", "goat"],
+    ["snake", "cake"],
+    ["frog", "dog"],
+    ["car", "star"],
+    ["bee", "tree"],
+    ["pen", "hen"],
+  ];
+  // "stem" takes the German adjective endings (roter Kreis, rotes Herz, rote Sterne).
+  const EN_COLOURS = [
+    { en: "red", de: "rot", stem: "rot", hex: "#e0383e" },
+    { en: "blue", de: "blau", stem: "blau", hex: "#2f6fdf" },
+    { en: "yellow", de: "gelb", stem: "gelb", hex: "#f7cf1f" },
+    { en: "green", de: "grün", stem: "grün", hex: "#2e9e4f" },
+    { en: "orange", de: "orange", stem: "orang", hex: "#f58220" },
+    { en: "pink", de: "rosa", hex: "#f48fbf" },
+    { en: "purple", de: "lila", hex: "#8e4fc9" },
+    { en: "brown", de: "braun", stem: "braun", hex: "#8a5a32" },
+    { en: "black", de: "schwarz", stem: "schwarz", hex: "#2b2b2b" },
+    { en: "white", de: "weiß", stem: "weiß", hex: "#ffffff" },
+  ];
+  const EN_SHAPES = [
+    { en: "circle", plural: "circles", de: "Kreis", dePlural: "Kreise", gender: "m" },
+    { en: "square", plural: "squares", de: "Quadrat", dePlural: "Quadrate", gender: "n" },
+    { en: "triangle", plural: "triangles", de: "Dreieck", dePlural: "Dreiecke", gender: "n" },
+    { en: "star", plural: "stars", de: "Stern", dePlural: "Sterne", gender: "m" },
+    { en: "heart", plural: "hearts", de: "Herz", dePlural: "Herzen", gender: "n" },
+  ];
+  const EN_NUMBERS = [
+    "zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten",
+    "eleven", "twelve", "thirteen", "fourteen", "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty",
+  ];
+  // Action commands (total physical response): Momo says it, the child does it.
+  const EN_ACTIONS = [
+    { en: "Clap your hands!", de: "Klatsch in die Hände!", icon: "👏" },
+    { en: "Stamp your feet!", de: "Stampf mit den Füßen!", icon: "👣" },
+    { en: "Jump!", de: "Spring hoch!", icon: "🐇" },
+    { en: "Turn around!", de: "Dreh dich um!", icon: "🔄" },
+    { en: "Wave!", de: "Wink!", icon: "👋" },
+    { en: "Sit down!", de: "Setz dich hin!", icon: "🪑" },
+    { en: "Stand up!", de: "Steh auf!", icon: "🧍" },
+    { en: "Hands up!", de: "Hände hoch!", icon: "🙌" },
+    { en: "Nod your head!", de: "Nick mit dem Kopf!", icon: "🙂" },
+    { en: "Close your eyes!", de: "Mach die Augen zu!", icon: "😌" },
+    { en: "Be quiet!", de: "Sei ganz leise!", icon: "🤫" },
+    { en: "Touch your nose!", de: "Fass deine Nase an!", icon: "👃", touch: true },
+    { en: "Touch your ears!", de: "Fass deine Ohren an!", icon: "👂", touch: true },
+    { en: "Touch your head!", de: "Fass deinen Kopf an!", icon: "🙆", touch: true },
+    { en: "Touch your toes!", de: "Fass deine Zehen an!", icon: "🦶", touch: true },
+    { en: "Touch your knees!", de: "Fass deine Knie an!", icon: "🦵", touch: true },
+    { en: "Touch your mouth!", de: "Fass deinen Mund an!", icon: "👄", touch: true },
+  ];
+  const enArticle = (word) => (/^[aeiou]/.test(word) ? "an" : "a");
+  function enWordPool(config) {
+    return EN_WORDS.filter((item) => (config.topics || EN_ALL).includes(item.topic));
+  }
+  // English and German name of a coloured shape card (colour, shape, count).
+  function shapeNames(card, ask) {
+    const colour = EN_COLOURS.find((x) => x.en === card.colour);
+    const shape = EN_SHAPES.find((x) => x.en === card.shape);
+    const adjective = (ending) => (colour.stem ? colour.stem + ending : colour.de);
+    if (ask === "colour") return { en: colour.en, de: colour.de };
+    if (ask === "shape") return { en: `a ${shape.en}`, de: `ein ${shape.de}` };
+    const one = { en: `${enArticle(colour.en)} ${colour.en} ${shape.en}`, de: `ein ${adjective(shape.gender === "m" ? "er" : "es")} ${shape.de}` };
+    if (ask === "both") return one;
+    if (card.count === 1) return { en: `one ${colour.en} ${shape.en}`, de: one.de };
+    return {
+      en: `${EN_NUMBERS[card.count]} ${colour.en} ${shape.plural}`,
+      de: `${numberWord(card.count)} ${adjective("e")} ${shape.dePlural}`,
+    };
+  }
+  // Picture cards for word games: value is the English word.
+  const wordItems = (words) =>
+    words.map((en) => ({ value: en, icon: EN_BY_WORD[en].icon, de: EN_BY_WORD[en].de }));
+  const wordExplain = (item, before = "") => ({
+    text: `${before}${item.en} = ${item.de}.`,
+    speech: [{ en: item.en }, `heißt ${item.de}.`],
+  });
+  // A sound-alike group first, filled up with other sound-alike words.
+  function similarWords(answer, count, random) {
+    const group = EN_SIMILAR.find((x) => x.includes(answer));
+    const others = shuffle(EN_SIMILAR.flat().filter((x) => !group.includes(x)), random);
+    return [answer, ...group.filter((x) => x !== answer), ...others].slice(0, count);
+  }
+  function generateEnglish(mode, config, previous, random) {
+    if (mode === "enwords") {
+      const pool = config.similar
+        ? EN_SIMILAR.flat().map((en) => EN_BY_WORD[en])
+        : enWordPool(config);
+      const item = pick(pool.filter((x) => x.en !== previous?.answer), random);
+      const words = config.similar
+        ? similarWords(item.en, config.choices, random)
+        : [item.en, ...shuffle(pool.filter((x) => x !== item), random).map((x) => x.en)].slice(0, config.choices);
+      const choices = shuffle(words, random);
+      return {
+        answer: item.en,
+        word: item.en,
+        de: item.de,
+        icon: item.icon,
+        choices,
+        items: wordItems(choices),
+        speech: [{ en: item.en }],
+        cue: `Englisch: „${item.en}“ (${item.de})`,
+        explain: wordExplain(item),
+      };
+    }
+    if (mode === "enmissing") {
+      let words;
+      if (config.similar) {
+        const group = pick(EN_SIMILAR, random);
+        const rest = shuffle(EN_WORDS.filter((x) => !group.includes(x.en)), random).map((x) => x.en);
+        words = [...group, ...rest].slice(0, config.choices);
+      } else words = shuffle(enWordPool(config), random).slice(0, config.choices).map((x) => x.en);
+      // In sound-alike rounds the missing word is one of the look-alikes.
+      const candidates = (config.similar ? words.slice(0, 2) : words).filter((x) => x !== previous?.answer);
+      const answer = pick(candidates.length ? candidates : words, random);
+      const said = shuffle(words.filter((x) => x !== answer), random);
+      const choices = shuffle(words, random);
+      return {
+        answer,
+        choices,
+        items: wordItems(choices),
+        said,
+        speech: said.map((en) => ({ en, gap: 700 })),
+        cue: `Englisch vorlesen: ${said.join(", ")}`,
+        explain: {
+          text: `Momo hat „${answer}“ nicht gesagt. ${answer} = ${EN_BY_WORD[answer].de}.`,
+          speech: [{ en: answer }, `hat Momo nicht gesagt. Das heißt ${EN_BY_WORD[answer].de}.`],
+        },
+      };
+    }
+    if (mode === "enpattern") {
+      const pattern = pick(config.patterns, random);
+      const letters = [...new Set(pattern)];
+      const topic = pick(["toys", "animals", "food", "nature"], random);
+      const words = shuffle(EN_WORDS.filter((x) => x.topic === topic), random)
+        .slice(0, Math.max(letters.length, config.choices))
+        .map((x) => x.en);
+      const unit = [...pattern].map((letter) => words[letters.indexOf(letter)]);
+      const period = unit.length;
+      const length = Math.min(10, Math.max(5, 2 * period + between(0, period, random)));
+      const row = Array.from({ length }, (_, i) => unit[i % period]);
+      const answer = unit[length % period];
+      const choices = shuffle(words.slice(0, config.choices), random);
+      return {
+        answer,
+        key: `${row.join(",")}>${answer}`,
+        row,
+        period,
+        choices,
+        items: wordItems(choices),
+        speech: [
+          ...row.map((en, i) => ({ en, gap: 250, highlight: `[data-slot="${i}"]` })),
+          "Und dann?",
+        ],
+        cue: `Englisch vorlesen: ${row.join(", ")} … und dann?`,
+        explain: {
+          text: `Dann kommt ${answer}: ${unit.join(" – ")}, immer wieder.`,
+          speech: ["Dann kommt", { en: answer }],
+        },
+      };
+    }
+    if (mode === "encolors") {
+      const colours = config.colours || EN_COLOURS.map((x) => x.en);
+      const shapes = config.shapes || EN_SHAPES.map((x) => x.en);
+      const ask = config.ask;
+      const card = (count, colour, shape) => ({ value: `${count}-${colour}-${shape}`, count, colour, shape });
+      const other = (list, not) => pick(list.filter((x) => x !== not), random);
+      let answer;
+      let candidates;
+      if (ask === "colour") {
+        answer = card(1, pick(colours, random), "blob");
+        candidates = shuffle(colours, random).map((c) => card(1, c, "blob"));
+      } else if (ask === "shape") {
+        // One colour for all cards, so only the shape tells them apart.
+        const colour = pick(colours, random);
+        answer = card(1, colour, pick(shapes, random));
+        candidates = shuffle(shapes, random).map((s) => card(1, colour, s));
+      } else {
+        const count = ask === "count" ? between(1, config.max, random) : 1;
+        const colour = pick(colours, random);
+        const shape = pick(shapes, random);
+        answer = card(count, colour, shape);
+        const anyCount = () => (ask === "count" ? between(1, config.max, random) : 1);
+        // The typical mix-ups first: same colour, other shape – and the reverse.
+        candidates = [
+          ...(ask === "count"
+            ? [card(count === config.max ? count - 1 : count + 1, colour, shape)]
+            : []),
+          card(count, colour, other(shapes, shape)),
+          card(count, other(colours, colour), shape),
+          ...Array.from({ length: 12 }, () =>
+            card(anyCount(), pick(colours, random), pick(shapes, random)),
+          ),
+        ];
+      }
+      const cards = [answer];
+      for (const x of candidates)
+        if (cards.length < config.choices && !cards.some((y) => y.value === x.value)) cards.push(x);
+      for (let i = 0; cards.length < config.choices && i < 50; i++) {
+        const x = card(answer.count, pick(colours, random), ask === "colour" ? "blob" : pick(shapes, random));
+        if (!cards.some((y) => y.value === x.value)) cards.push(x);
+      }
+      const items = shuffle(cards, random).map((x) => ({ ...x, ...shapeNames(x, ask) }));
+      const names = shapeNames(answer, ask);
+      return {
+        answer: answer.value,
+        ask,
+        choices: items.map((x) => x.value),
+        items,
+        speech: [{ en: names.en }],
+        cue: `Englisch: „${names.en}“ (${names.de})`,
+        explain: { text: `${names.en} = ${names.de}.`, speech: [{ en: names.en }, `heißt ${names.de}.`] },
+      };
+    }
+    if (mode === "ennumbers") {
+      let n;
+      do n = between(config.min, config.max, random);
+      while (String(n) === previous?.answer);
+      const inRange = (x) => x >= config.min && x <= config.max;
+      // three – thirteen, four – fourteen: the classic mix-up.
+      const pool = (config.similar ? [n + 10, n - 10, n + 1, n - 1, n + 2] : [n + 1, n - 1, n + 2, n - 2]).filter(inRange);
+      const forced = config.similar ? [n + 10, n - 10].filter((x) => inRange(x) && x > 0) : [];
+      const choices = numberOptions(n, forced, pool, config.choices, random);
+      return {
+        answer: String(n),
+        show: config.show,
+        icon: pick(SET_ICONS, random),
+        choices,
+        speech: [{ en: EN_NUMBERS[n] }],
+        cue: `Englisch: „${EN_NUMBERS[n]}“ (${n})`,
+        explain: { text: `${EN_NUMBERS[n]} = ${n}.`, speech: [{ en: EN_NUMBERS[n] }, `heißt ${numberWord(n)}.`] },
+      };
+    }
+    if (mode === "ensimon") {
+      const actions = shuffle(
+        EN_ACTIONS.filter((x) => !config.touch || x.touch),
+        random,
+      ).slice(0, config.length);
+      return {
+        actions,
+        answer: actions.map((x) => x.en).join(" – "),
+        speech: actions.map((x) => ({ en: x.en, gap: 1200 })),
+        cue: `Englisch vorlesen: ${actions.map((x) => x.en).join(" – ")}`,
+      };
+    }
+    if (mode === "ensay") {
+      const words = shuffle(
+        enWordPool(config).filter((x) => x.en !== previous?.words?.[0]?.en),
+        random,
+      ).slice(0, config.count);
+      return {
+        words,
+        answer: words.map((x) => x.en).join(" – "),
+        // Nothing is read out: the child names the pictures in English.
+        speech: null,
+        solution: words.map((x) => ({ en: x.en, gap: 600 })),
+        cue: `Lösung (Englisch): ${words.map((x) => `${x.en} = ${x.de}`).join(", ")}`,
+      };
+    }
+    throw new Error("Unbekanntes Spiel: " + mode);
+  }
   function digitChoices(answer, other, count, random) {
     // The other digit of the number is the typical mix-up; near digits fill up.
     const pool = [...Array(10).keys()]
@@ -1325,6 +1733,7 @@
     };
   }
   function generate(mode, config, previous, random) {
+    if (ENGLISH_GAMES.includes(mode)) return generateEnglish(mode, config, previous, random);
     if (mode === "type") {
       const clear = (letters) =>
         [...letters].filter((x) => !AMBIGUOUS_LAUTE.includes(x));
@@ -2903,8 +3312,11 @@
       lastPlayed: {},
       pet: { full: 40, joy: 60, updatedAt: 0 },
       food: {},
+      // Wish window + 1 of the last wish that came true (0 = none yet).
+      wishDone: 0,
+      wardrobe: { owned: [], worn: [] },
       plots: BEDS.map(() => ({ crop: null })),
-      settings: { voice: "", rate: 0.8, speech: true, autoSpeak: true, lowercase: false },
+      settings: { voice: "", voiceEn: "", rate: 0.8, speech: true, autoSpeak: true, lowercase: false },
       stats: defaultStats(),
     };
   }
@@ -2946,9 +3358,26 @@
           state.food[crop.id] = Math.min(raw.food[crop.id], 999);
     if (Array.isArray(raw.plots))
       state.plots = state.plots.map((_, i) => sanitizePlot(raw.plots[i]));
+    if (isCount(raw.wishDone)) state.wishDone = raw.wishDone;
+    if (raw.wardrobe && typeof raw.wardrobe === "object") {
+      const owned = WARDROBE.filter(
+        (item) => Array.isArray(raw.wardrobe.owned) && raw.wardrobe.owned.includes(item.id),
+      );
+      state.wardrobe.owned = owned.map((item) => item.id);
+      // Worn: owned, never the toy, at most one thing per slot.
+      for (const item of owned)
+        if (
+          item.slot !== "toy" &&
+          Array.isArray(raw.wardrobe.worn) &&
+          raw.wardrobe.worn.includes(item.id) &&
+          !state.wardrobe.worn.some((id) => WARDROBE.find((x) => x.id === id).slot === item.slot)
+        )
+          state.wardrobe.worn.push(item.id);
+    }
     if (raw.settings && typeof raw.settings === "object") {
-      if (typeof raw.settings.voice === "string")
-        state.settings.voice = raw.settings.voice.slice(0, 500);
+      for (const key of ["voice", "voiceEn"])
+        if (typeof raw.settings[key] === "string")
+          state.settings[key] = raw.settings[key].slice(0, 500);
       if ([0.65, 0.8, 0.95].includes(raw.settings.rate))
         state.settings.rate = raw.settings.rate;
       for (const key of ["speech", "autoSpeak", "lowercase"])
@@ -3139,6 +3568,12 @@
     compare: "Vergleichen im Alltag: Hausnummern, Preise oder Seitenzahlen – „Welche ist größer? Schau zuerst auf die Zehner.“ Das Krokodil frisst immer die größere Zahl.",
     calc: "Mit Zehnern rechnen: 10-Cent-Münzen oder Zehnerstangen legen. Bei 52 + 30 bleiben die Einer gleich, nur die Zehner ändern sich.",
     sets: "Mengen im Alltag: Besteck oder Murmeln zählen, Paare bilden („Wer hat mehr?“), eine Strichliste führen und Spielzeug nach zwei Merkmalen sortieren – z. B. rot und rund. Was gehört in beide Gruppen?",
+    enlisten:
+      "Englisch hören: Dinge im Alltag auf Englisch benennen („Look, a dog!“), Bilderbücher auf Englisch anschauen und auf Bilder zeigen lassen. Kurze englische Lieder helfen sehr.",
+    encolors:
+      "Farben und Zahlen auf Englisch: beim Anziehen oder Malen fragen „What colour is it?“ und beim Treppensteigen auf Englisch zählen.",
+    entogether:
+      "Spiele wie „Simon says“ machen Spaß: Ein Erwachsener sagt „Touch your nose!“, das Kind macht mit. Fehler beim Aussprechen sind ganz normal – nicht korrigieren, sondern schön nachsprechen.",
     charts: "Selbst ein Diagramm machen: Wer mag welches Obst? Für jedes Kind ein Kästchen ausmalen, dann fragen: Was mögen die meisten? Wie viele mehr?",
   };
   const SWAP_TIP =
@@ -3341,6 +3776,14 @@
     if (pet.full >= 70 && pet.joy >= 70) return "happy";
     return "ok";
   }
+  // The food Momo wishes for right now (null once the wish came true).
+  function petWish(state, now) {
+    const window = Math.floor(now / WISH_WINDOW);
+    if (state.wishDone === window + 1) return null;
+    const crops = availableCrops(state.totalStars);
+    return crops[(window * 7 + 3) % crops.length];
+  }
+  // "eaten", "wish" (it was the wished food: extra joy), "full" or "none".
   function feedPet(state, cropId, now) {
     const crop = CROPS.find((item) => item.id === cropId);
     if (!crop || !(state.food[cropId] > 0)) return "none";
@@ -3349,14 +3792,51 @@
       state.pet = pet;
       return "full";
     }
+    const wished = petWish(state, now)?.id === cropId;
     state.food[cropId]--;
     if (!state.food[cropId]) delete state.food[cropId];
     state.pet = {
       ...pet,
       full: Math.min(100, pet.full + crop.full),
-      joy: Math.min(100, pet.joy + crop.joy),
+      joy: Math.min(100, pet.joy + crop.joy + (wished ? WISH_BONUS : 0)),
     };
-    return "eaten";
+    if (wished) state.wishDone = Math.floor(now / WISH_WINDOW) + 1;
+    return wished ? "wish" : "eaten";
+  }
+  // Playing ball (needs the ball from the treasure chest).
+  function playPet(state, now) {
+    if (!state.wardrobe.owned.includes("ball")) return "no";
+    const pet = petAt(state.pet, now);
+    state.pet = {
+      ...pet,
+      joy: pet.joy >= PET_PLAY_LIMIT ? pet.joy : Math.min(PET_PLAY_LIMIT, pet.joy + 6),
+    };
+    return "played";
+  }
+  // Buying from the treasure chest: "bought", "owned" or "stars" (too few).
+  function buyItem(state, id) {
+    const item = WARDROBE.find((x) => x.id === id);
+    if (!item) return "none";
+    if (state.wardrobe.owned.includes(id)) return "owned";
+    if (state.stars < item.cost) return "stars";
+    state.stars -= item.cost;
+    state.wardrobe.owned.push(id);
+    if (item.slot !== "toy") wearItem(state, id);
+    return "bought";
+  }
+  // Puts a thing on (replacing the one in the same slot) or takes it off.
+  function wearItem(state, id) {
+    const item = WARDROBE.find((x) => x.id === id);
+    if (!item || item.slot === "toy" || !state.wardrobe.owned.includes(id)) return "none";
+    if (state.wardrobe.worn.includes(id)) {
+      state.wardrobe.worn = state.wardrobe.worn.filter((x) => x !== id);
+      return "off";
+    }
+    state.wardrobe.worn = [
+      ...state.wardrobe.worn.filter((x) => WARDROBE.find((w) => w.id === x).slot !== item.slot),
+      id,
+    ];
+    return "worn";
   }
   function cuddlePet(state, now) {
     const pet = petAt(state.pet, now);
@@ -3447,6 +3927,13 @@
     SUBJECTS,
     CATEGORIES,
     MATH_GAMES,
+    ENGLISH_GAMES,
+    EN_WORDS,
+    EN_SIMILAR,
+    EN_COLOURS,
+    EN_SHAPES,
+    EN_NUMBERS,
+    EN_ACTIONS,
     LEVELS,
     WORDS,
     BLEND_WORDS,
@@ -3455,6 +3942,8 @@
     MERK_GROUPS,
     CONFUSABLE,
     CROPS,
+    WARDROBE,
+    WISH_WINDOW,
     BEDS,
     DECOR,
     UNLOCKS,
@@ -3477,6 +3966,10 @@
     petAt,
     petMood,
     feedPet,
+    petWish,
+    playPet,
+    buyItem,
+    wearItem,
     cuddlePet,
     cheerPet,
     bedCount,

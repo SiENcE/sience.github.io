@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f8f7f0" />
     <meta
       name="description"
-      content="Wörterwiese: kurze Lernspiele für Deutsch (Laute, ABC, Merkwörter) und Mathe (Zehner und Einer). Mit Momo, dem Hasen, zum Versorgen. Ohne Werbung, ohne Anmeldung."
+      content="Wörterwiese: kurze Lernspiele für Deutsch (Laute, ABC, Merkwörter), Mathe (Zehner und Einer) und Englisch (Wörter, Farben, Zahlen). Mit Momo, dem Hasen, zum Versorgen. Ohne Werbung, ohne Anmeldung."
     />
     <title>Wörterwiese · Lernen mit Momo</title>
     <link rel="stylesheet" href="styles.css" />
@@ -15,6 +15,7 @@
     <script src="garden.js" defer></script>
     <script src="math.js" defer></script>
     <script src="deutsch.js" defer></script>
+    <script src="english.js" defer></script>
     <script src="report.js" defer></script>
     <script src="app.js" defer></script>
   </head>
@@ -212,128 +213,184 @@
           ×
         </button>
       </div>
-      <p class="dialog-intro">
-        Die Schwierigkeit passt sich automatisch an: Gelingt eine Aufgabe
-        sofort, wird die nächste etwas kniffliger. Nach einem Fehler folgt eine
-        ähnliche Aufgabe auf derselben Stufe, nach zwei wird es wieder leichter.
-      </p>
-      <div class="settings-section">
-        <h3>Lernstand</h3>
-        <p class="field-note">
-          Fortschritt, Stärken und was sich zu üben lohnt – laufend aus allen
-          gespielten Aufgaben berechnet.
-        </p>
-        <button id="open-report" class="button primary small">
-          <span aria-hidden="true">📊</span> Lernstand ansehen
+      <div class="settings-tabs" role="tablist" aria-label="Bereiche">
+        <button role="tab" id="tab-overview" data-tab="overview" aria-controls="panel-overview" aria-selected="true">
+          <span aria-hidden="true">📊</span> Überblick
+        </button>
+        <button role="tab" id="tab-levels" data-tab="levels" aria-controls="panel-levels" aria-selected="false" tabindex="-1">
+          <span aria-hidden="true">🪜</span> Stufen
+        </button>
+        <button role="tab" id="tab-speech" data-tab="speech" aria-controls="panel-speech" aria-selected="false" tabindex="-1">
+          <span aria-hidden="true">🔊</span> Vorlesen
+        </button>
+        <button role="tab" id="tab-data" data-tab="data" aria-controls="panel-data" aria-selected="false" tabindex="-1">
+          <span aria-hidden="true">🔒</span> Daten
         </button>
       </div>
-      <div class="settings-section">
-        <h3>Stufen</h3>
-        <p class="field-note">
-          Nur ändern, wenn die automatische Stufe gar nicht passt.
-        </p>
-        <div id="level-settings" class="level-settings"></div>
-      </div>
-      <div class="settings-section">
-        <h3>Vorlesen</h3>
-        <label class="switch-row"
-          ><input type="checkbox" id="speech-on" role="switch" />
-          <span>Sprachausgabe (Stimme und Laute)</span></label
-        >
-        <p class="field-note">
-          Ausgeschaltet bleibt das Spiel ganz still. Dann erscheint bei jeder
-          Aufgabe ein Vorlesetext für Erwachsene.
-        </p>
-        <fieldset id="speech-options" class="speech-options">
-        <legend class="sr-only">Einstellungen der Sprachausgabe</legend>
-        <label for="voice-select">Deutsche Stimme</label
-        ><select id="voice-select">
-          <option value="">Automatisch auswählen</option>
-        </select>
-        <p
-          class="field-note"
-          id="voice-status"
-          role="status"
-          aria-live="polite"
-        ></p>
-        <div class="settings-row">
-          <label for="speech-rate">Tempo</label
-          ><select id="speech-rate">
-            <option value="0.65">Sehr langsam</option>
-            <option value="0.8">Ruhig</option>
-            <option value="0.95">Normal</option>
-          </select>
-        </div>
-        <button id="test-voice" class="button secondary small">
-          🔊 Stimme ausprobieren</button
-        ><label class="check-row"
-          ><input type="checkbox" id="auto-speak" /> Aufgaben automatisch
-          vorlesen</label
-        >
-        </fieldset>
-        <label class="check-row"
-          ><input type="checkbox" id="lowercase" /> Kleine Buchstaben anzeigen
-          (a statt A)</label
-        >
-      </div>
-      <div class="settings-section">
-        <h3>Laute anhören</h3>
-        <p class="field-note">
-          Die Spiele sprechen Laute („mmm“), keine Buchstabennamen („Emm“). Die
-          Aufnahmen stammen aus dem freien KDE-Lernprogramm KLettres (GPL);
-          eigene Aufnahmen können sie ersetzen (siehe README). C, Q, V, X und Y
-          werden nicht als Laut abgefragt.
-        </p>
-        <div class="laute-grid" id="laute-grid"></div>
-        <p class="field-note" id="laut-info" role="status" aria-live="polite"></p>
-      </div>
-      <div class="settings-section">
-        <h3>Gut zu wissen</h3>
-        <ul class="parent-tips">
-          <li>
-            Eine Runde hat 3 Sterne. Einen Stern gibt es nur, wenn die Aufgabe
-            beim ersten Versuch klappt. Nach einem Fehler hilft Momo Schritt
-            für Schritt; danach folgt eine ähnliche Aufgabe.
-          </li>
-          <li>
-            Mit Sternen kauft das Kind im Garten Samen, gießt und erntet und
-            füttert damit Momo. Momo wird langsam hungrig, aber nie krank. Es
-            gibt keine Strafen und keine täglichen Pflichten.
-          </li>
-          <li>
-            Die Spiele mit 👥 spielt ihr gemeinsam: Ihr entscheidet, ob das
-            Nachsprechen oder Nachmachen geklappt hat. Die App hört nicht mit.
-          </li>
-          <li>
-            In Mathe übt Momo Zehner und Einer im Zahlenraum bis 100: mit
-            Zehnerstangen und Einerwürfeln, im Zahlenhaus und beim Zahlenbauen.
-          </li>
-          <li>
-            5–10 Minuten am Stück reichen. Nach etwa 5 Minuten schlägt Momo eine
-            Pause vor. Das Spiel stellt keine Diagnose.
-          </li>
-        </ul>
-      </div>
-      <div class="settings-section">
-        <h3>Privat & ohne Anmeldung</h3>
-        <p>
-          Alles wird nur in diesem Browser gespeichert, auch der Lernstand.
-          Keine Werbung, keine Analyse-Dienste, kein Mikrofon. Je nach gewählter Stimme kann die
-          Sprachausgabe des Geräts einen Online-Dienst nutzen.
-        </p>
-        <button id="reset-progress" class="text-button danger">
-          Fortschritt zurücksetzen …
-        </button>
-        <div id="reset-confirm" class="reset-confirm" hidden>
-          <p>
-            Wirklich alle Sterne, Stufen, Beete, Momos Futter und den
-            Lernstand auf diesem Gerät löschen?
+
+      <div class="settings-panel" role="tabpanel" id="panel-overview" data-panel="overview" aria-labelledby="tab-overview">
+        <div class="settings-section">
+          <h3>Lernstand</h3>
+          <p class="field-note">
+            Fortschritt, Stärken und was sich zu üben lohnt – laufend aus allen
+            gespielten Aufgaben berechnet.
           </p>
-          <button id="confirm-reset" class="button danger-button small">
-            Ja, alles löschen</button
-          ><button id="cancel-reset" class="button secondary small">
-            Behalten
+          <button id="open-report" class="button primary small">
+            <span aria-hidden="true">📊</span> Lernstand ansehen
           </button>
+        </div>
+        <div class="settings-section">
+          <h3>Gut zu wissen</h3>
+          <ul class="parent-tips">
+            <li>
+              Die Schwierigkeit passt sich automatisch an: Gelingt eine Aufgabe
+              sofort, wird die nächste etwas kniffliger. Nach einem Fehler folgt
+              eine ähnliche Aufgabe auf derselben Stufe, nach zwei wird es
+              wieder leichter.
+            </li>
+            <li>
+              Eine Runde hat 3 Sterne. Einen Stern gibt es nur, wenn die Aufgabe
+              beim ersten Versuch klappt. Nach einem Fehler hilft Momo Schritt
+              für Schritt; danach folgt eine ähnliche Aufgabe.
+            </li>
+            <li>
+              Mit Sternen kauft das Kind im Garten Samen, gießt und erntet und
+              füttert damit Momo. Was übrig bleibt, wandert in Momos
+              Schatzkiste (Mützen, Schal, Ball). Momo wird langsam hungrig,
+              aber nie krank. Es gibt keine Strafen und keine täglichen
+              Pflichten.
+            </li>
+            <li>
+              Die Spiele mit 👥 spielt ihr gemeinsam: Ihr entscheidet, ob das
+              Nachsprechen oder Nachmachen geklappt hat. Die App hört nicht mit.
+            </li>
+            <li>
+              In Mathe übt Momo Mengen, Zehner und Einer, Rechnen, Geld und Uhr
+              im Zahlenraum bis 100.
+            </li>
+            <li>
+              Englisch ist ein Hör-Fach wie in Klasse 1 und 2: Momo sagt Wörter,
+              Farben, Zahlen und kleine Befehle, das Kind zeigt oder macht mit.
+              Dafür braucht das Gerät eine englische Stimme (siehe „Vorlesen“).
+            </li>
+            <li>
+              5–10 Minuten am Stück reichen. Nach etwa 5 Minuten schlägt Momo
+              eine Pause vor. Das Spiel stellt keine Diagnose.
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="settings-panel" role="tabpanel" id="panel-levels" data-panel="levels" aria-labelledby="tab-levels" hidden>
+        <div class="settings-section">
+          <h3>Stufen</h3>
+          <p class="field-note">
+            Nur ändern, wenn die automatische Stufe gar nicht passt. Tippe auf
+            ein Fach, um seine Spiele zu sehen.
+          </p>
+          <div id="level-settings" class="level-settings"></div>
+        </div>
+      </div>
+
+      <div class="settings-panel" role="tabpanel" id="panel-speech" data-panel="speech" aria-labelledby="tab-speech" hidden>
+        <div class="settings-section">
+          <h3>Sprachausgabe</h3>
+          <label class="switch-row"
+            ><input type="checkbox" id="speech-on" role="switch" />
+            <span>Sprachausgabe (Stimme und Laute)</span></label
+          >
+          <p class="field-note">
+            Ausgeschaltet bleibt das Spiel ganz still. Dann erscheint bei jeder
+            Aufgabe ein Vorlesetext für Erwachsene.
+          </p>
+          <fieldset id="speech-options" class="speech-options">
+            <legend class="sr-only">Einstellungen der Sprachausgabe</legend>
+            <label for="voice-select">Deutsche Stimme (Momo)</label
+            ><select id="voice-select">
+              <option value="">Automatisch auswählen</option>
+            </select>
+            <p
+              class="field-note"
+              id="voice-status"
+              role="status"
+              aria-live="polite"
+            ></p>
+            <button id="test-voice" class="button secondary small">
+              🔊 Deutsche Stimme ausprobieren
+            </button>
+            <label for="voice-en-select">Englische Stimme (Englisch-Spiele)</label
+            ><select id="voice-en-select">
+              <option value="">Automatisch auswählen</option>
+            </select>
+            <p
+              class="field-note"
+              id="voice-en-status"
+              role="status"
+              aria-live="polite"
+            ></p>
+            <button id="test-voice-en" class="button secondary small">
+              🔊 Englische Stimme ausprobieren
+            </button>
+            <div class="settings-row">
+              <label for="speech-rate">Tempo</label
+              ><select id="speech-rate">
+                <option value="0.65">Sehr langsam</option>
+                <option value="0.8">Ruhig</option>
+                <option value="0.95">Normal</option>
+              </select>
+            </div>
+            <label class="check-row"
+              ><input type="checkbox" id="auto-speak" /> Aufgaben automatisch
+              vorlesen</label
+            >
+          </fieldset>
+        </div>
+        <div class="settings-section">
+          <h3>Anzeige</h3>
+          <label class="check-row"
+            ><input type="checkbox" id="lowercase" /> Kleine Buchstaben anzeigen
+            (a statt A)</label
+          >
+        </div>
+        <details class="settings-section settings-more">
+          <summary><h3>Laute anhören</h3></summary>
+          <p class="field-note">
+            Die Spiele sprechen Laute („mmm“), keine Buchstabennamen („Emm“). Die
+            Aufnahmen stammen aus dem freien KDE-Lernprogramm KLettres (GPL);
+            eigene Aufnahmen können sie ersetzen (siehe README). C, Q, V, X und Y
+            werden nicht als Laut abgefragt.
+          </p>
+          <div class="laute-grid" id="laute-grid"></div>
+          <p class="field-note" id="laut-info" role="status" aria-live="polite"></p>
+        </details>
+      </div>
+
+      <div class="settings-panel" role="tabpanel" id="panel-data" data-panel="data" aria-labelledby="tab-data" hidden>
+        <div class="settings-section">
+          <h3>Privat & ohne Anmeldung</h3>
+          <p>
+            Alles wird nur in diesem Browser gespeichert, auch der Lernstand.
+            Keine Werbung, keine Analyse-Dienste, kein Mikrofon. Je nach
+            gewählter Stimme kann die Sprachausgabe des Geräts einen
+            Online-Dienst nutzen.
+          </p>
+        </div>
+        <div class="settings-section">
+          <h3>Neu anfangen</h3>
+          <button id="reset-progress" class="text-button danger">
+            Fortschritt zurücksetzen …
+          </button>
+          <div id="reset-confirm" class="reset-confirm" hidden>
+            <p>
+              Wirklich alle Sterne, Stufen, Beete, Momos Futter, die Schatzkiste
+              und den Lernstand auf diesem Gerät löschen?
+            </p>
+            <button id="confirm-reset" class="button danger-button small">
+              Ja, alles löschen</button
+            ><button id="cancel-reset" class="button secondary small">
+              Behalten
+            </button>
+          </div>
         </div>
       </div>
     </dialog>
