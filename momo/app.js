@@ -16,6 +16,7 @@
           : null;
   const $ = (selector) => document.querySelector(selector);
   const $$ = (selector) => [...document.querySelectorAll(selector)];
+  // The app was called "Wörterwiese" before; the key stays, so saves are kept.
   const STORAGE_KEY = "woerterwiese.v1";
   const SUCCESS_DELAY = 1700;
   let state = C.defaultState();

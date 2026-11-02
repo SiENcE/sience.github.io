@@ -8,4 +8,4 @@ Die Tondateien in diesem Ordner stammen aus **KLettres**, einem freien Lernprogr
 
 Änderungen gegenüber dem Original (mit `tools/import-klettres.cjs`): von Ogg Vorbis nach WAV (22,05 kHz, mono) umgewandelt, Stille am Anfang und Ende gekürzt, Lautstärke angeglichen, kurz ein- und ausgeblendet. Die unveränderten Originale sind unter der Quelle oben erhältlich.
 
-Hinweis: `c`, `q`, `v`, `x` und `y` enthalten Buchstabennamen bzw. mehrdeutige Laute und werden von der Wörterwiese nicht als Laut abgefragt.
+Hinweis: `c`, `q`, `v`, `x` und `y` enthalten Buchstabennamen bzw. mehrdeutige Laute und werden von Momo (früher „Wörterwiese“) nicht als Laut abgefragt.
