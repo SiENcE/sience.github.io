@@ -49,62 +49,62 @@
   const ROUND_GOAL = 3;
   const ROUND_MAX_TASKS = 6;
 
+  /*
+   * School grades. The grade is only the entry point: every game says from
+   * which level on its tasks belong to a grade (grade → first level of that
+   * grade). A child starts at the levels of its grade, then progression moves
+   * freely up into higher grades and back down below the start. Statistics
+   * record the grade of every task, so adults see how far the child is.
+   * A game appears from its first grade on. A grade without games is listed
+   * for adults but cannot be chosen yet; games naming it make it available.
+   */
+  const GRADES = [
+    { id: 1, title: "1. Klasse" },
+    { id: 2, title: "2. Klasse" },
+    { id: 3, title: "3. Klasse" },
+    { id: 4, title: "4. Klasse" },
+  ];
   const ACTIVITIES = [
-    { id: "type", icon: "⌨️", title: "Hören & tippen", color: "peach" },
-    { id: "initial", icon: "🦊", title: "Anlaut-Detektiv", color: "mint" },
-    { id: "blend", icon: "🪄", title: "Laute-Zauber", color: "rose" },
-    { id: "merk", icon: "🧠", title: "Merkwörter", color: "yellow" },
-    { id: "missing", icon: "🧩", title: "Wer fehlt?", color: "yellow" },
-    { id: "neighbor", icon: "🐛", title: "ABC-Nachbarn", color: "sky" },
-    { id: "order", icon: "🔤", title: "ABC-Werkstatt", color: "lavender" },
-    {
-      id: "memory",
-      icon: "🎒",
-      title: "Wörter-Rucksack",
-      color: "rose",
-      together: true,
-    },
-    {
-      id: "echo",
-      icon: "🦜",
-      title: "Quatschwort-Echo",
-      color: "lavender",
-      together: true,
-    },
-    {
-      id: "movement",
-      icon: "👏",
-      title: "Mitmach-Spiel",
-      color: "peach",
-      together: true,
-    },
-    { id: "bundle", icon: "👀", title: "Zahlen-Blick", color: "sky" },
-    { id: "place", icon: "🏠", title: "Zahlenhaus", color: "mint" },
-    { id: "build", icon: "🏗️", title: "Zahlen bauen", color: "peach" },
-    { id: "line", icon: "📏", title: "Zahlenstrahl", color: "sky" },
-    { id: "chart", icon: "🟩", title: "Hundertertafel", color: "mint" },
-    { id: "steps", icon: "👣", title: "Weiterzählen", color: "yellow" },
-    { id: "compare", icon: "🐊", title: "Krokodil-Vergleich", color: "mint" },
-    { id: "sort", icon: "🪜", title: "Zahlen ordnen", color: "lavender" },
-    { id: "adjacent", icon: "🏘️", title: "Zahlen-Nachbarn", color: "peach" },
-    { id: "calc", icon: "🔟", title: "Zehner rechnen", color: "rose" },
-    { id: "graph", icon: "📶", title: "Säulen lesen", color: "yellow" },
-    { id: "count", icon: "✋", title: "Wie viele?", color: "peach" },
-    { id: "more", icon: "🍎", title: "Mehr oder weniger?", color: "rose" },
-    { id: "venn", icon: "⭕", title: "Mengen-Kreise", color: "lavender" },
-    { id: "cross", icon: "🌉", title: "Über den Zehner", color: "sky" },
-    { id: "times", icon: "🔵", title: "Malfelder", color: "lavender" },
-    { id: "money", icon: "🪙", title: "Geld zählen", color: "yellow" },
-    { id: "clock", icon: "🕒", title: "Uhr lesen", color: "mint" },
-    { id: "syllables", icon: "🥁", title: "Silben klatschen", color: "peach" },
-    { id: "extend", icon: "🐍", title: "Wörter verlängern", color: "mint" },
-    { id: "enwords", icon: "🎧", title: "Hör und zeig", color: "sky" },
-    { id: "enmissing", icon: "🙈", title: "Was fehlt?", color: "rose" },
-    { id: "enpattern", icon: "🔁", title: "Muster-Reihe", color: "lavender" },
-    { id: "encolors", icon: "🎨", title: "Farben und Formen", color: "peach" },
-    { id: "ennumbers", icon: "🔢", title: "Zahlen auf Englisch", color: "yellow" },
-    { id: "ensimon", icon: "🙋", title: "Mach mit!", color: "mint", together: true },
-    { id: "ensay", icon: "🗣️", title: "Sag es auf Englisch", color: "rose", together: true },
+    { id: "type", icon: "⌨️", title: "Hören & tippen", color: "peach", grades: { 1: 0, 2: 4 } },
+    { id: "initial", icon: "🦊", title: "Anlaut-Detektiv", color: "mint", grades: { 1: 0, 2: 4 } },
+    { id: "blend", icon: "🪄", title: "Laute-Zauber", color: "rose", grades: { 1: 0, 2: 3 } },
+    { id: "merk", icon: "🧠", title: "Merkwörter", color: "yellow", grades: { 2: 0 } },
+    { id: "missing", icon: "🧩", title: "Wer fehlt?", color: "yellow", grades: { 1: 0, 2: 4 } },
+    { id: "neighbor", icon: "🐛", title: "ABC-Nachbarn", color: "sky", grades: { 1: 0, 2: 4 } },
+    { id: "order", icon: "🔤", title: "ABC-Werkstatt", color: "lavender", grades: { 1: 0, 2: 4 } },
+    { id: "memory", icon: "🎒", title: "Wörter-Rucksack", color: "rose", together: true, grades: { 1: 0, 2: 3 } },
+    { id: "echo", icon: "🦜", title: "Quatschwort-Echo", color: "lavender", together: true, grades: { 1: 0, 2: 3 } },
+    { id: "movement", icon: "👏", title: "Mitmach-Spiel", color: "peach", together: true, grades: { 1: 0, 2: 3 } },
+    { id: "bundle", icon: "👀", title: "Zahlen-Blick", color: "sky", grades: { 1: 0, 2: 1 } },
+    { id: "place", icon: "🏠", title: "Zahlenhaus", color: "mint", grades: { 2: 0 } },
+    { id: "build", icon: "🏗️", title: "Zahlen bauen", color: "peach", grades: { 1: 0, 2: 1 } },
+    { id: "line", icon: "📏", title: "Zahlenstrahl", color: "sky", grades: { 1: 0, 2: 1 } },
+    { id: "chart", icon: "🟩", title: "Hundertertafel", color: "mint", grades: { 2: 0 } },
+    { id: "steps", icon: "👣", title: "Weiterzählen", color: "yellow", grades: { 2: 0 } },
+    { id: "compare", icon: "🐊", title: "Krokodil-Vergleich", color: "mint", grades: { 2: 0 } },
+    { id: "sort", icon: "🪜", title: "Zahlen ordnen", color: "lavender", grades: { 2: 0 } },
+    { id: "adjacent", icon: "🏘️", title: "Zahlen-Nachbarn", color: "peach", grades: { 2: 0 } },
+    { id: "calc", icon: "🔟", title: "Zehner rechnen", color: "rose", grades: { 2: 0 } },
+    { id: "graph", icon: "📶", title: "Säulen lesen", color: "yellow", grades: { 1: 0, 2: 4 } },
+    { id: "count", icon: "✋", title: "Wie viele?", color: "peach", grades: { 1: 0, 2: 5 } },
+    { id: "more", icon: "🍎", title: "Mehr oder weniger?", color: "rose", grades: { 1: 0, 2: 5 } },
+    { id: "venn", icon: "⭕", title: "Mengen-Kreise", color: "lavender", grades: { 1: 0, 2: 3 } },
+    { id: "cross", icon: "🌉", title: "Über den Zehner", color: "sky", grades: { 1: 0, 2: 2 } },
+    { id: "times", icon: "🔵", title: "Malfelder", color: "lavender", grades: { 2: 0 } },
+    { id: "money", icon: "🪙", title: "Geld zählen", color: "yellow", grades: { 1: 0, 2: 1 } },
+    { id: "clock", icon: "🕒", title: "Uhr lesen", color: "mint", grades: { 1: 0, 2: 2 } },
+    { id: "syllables", icon: "🥁", title: "Silben klatschen", color: "peach", grades: { 1: 0, 2: 4 } },
+    { id: "extend", icon: "🐍", title: "Wörter verlängern", color: "mint", grades: { 2: 0 } },
+    { id: "tenfold", icon: "📦", title: "Immer zehn", color: "peach", grades: { 2: 0, 3: 2, 4: 4 } },
+    { id: "placetable", icon: "🧱", title: "Stellentafel", color: "sky", grades: { 2: 0, 3: 2, 4: 5 } },
+    { id: "lay", icon: "🔘", title: "Zahlen legen", color: "mint", grades: { 2: 0, 3: 2, 4: 5 } },
+    { id: "enwords", icon: "🎧", title: "Hör und zeig", color: "sky", grades: { 1: 0, 2: 5 } },
+    { id: "enmissing", icon: "🙈", title: "Was fehlt?", color: "rose", grades: { 1: 0, 2: 3 } },
+    { id: "enpattern", icon: "🔁", title: "Muster-Reihe", color: "lavender", grades: { 1: 0, 2: 3 } },
+    { id: "encolors", icon: "🎨", title: "Farben und Formen", color: "peach", grades: { 1: 0, 2: 5 } },
+    { id: "ennumbers", icon: "🔢", title: "Zahlen auf Englisch", color: "yellow", grades: { 1: 0, 2: 4 } },
+    { id: "ensimon", icon: "🙋", title: "Mach mit!", color: "mint", together: true, grades: { 1: 0, 2: 4 } },
+    { id: "ensay", icon: "🗣️", title: "Sag es auf Englisch", color: "rose", together: true, grades: { 1: 0, 2: 4 } },
   ];
   // Menu: subject → category → game. "report" names the category for adults.
   const SUBJECTS = [
@@ -186,6 +186,15 @@
       games: ["compare", "sort", "adjacent"],
     },
     {
+      id: "big",
+      subject: "mathe",
+      icon: "🐘",
+      title: "Große Zahlen",
+      report: "Stellenwerte bis zur Million",
+      color: "peach",
+      games: ["tenfold", "placetable", "lay"],
+    },
+    {
       id: "calc",
       subject: "mathe",
       icon: "➕",
@@ -258,6 +267,80 @@
   function categoryOf(mode) {
     return CATEGORIES.find((category) => category.games.includes(mode)) || null;
   }
+  // [grade, first level] pairs of a game, lowest grade first.
+  function gradeSteps(mode) {
+    const activity = ACTIVITIES.find((x) => x.id === mode);
+    return Object.entries(activity?.grades || {})
+      .map(([grade, from]) => [Number(grade), from])
+      .sort((a, b) => a[0] - b[0]);
+  }
+  // The grade a level of a game belongs to.
+  function levelGrade(mode, level) {
+    const steps = gradeSteps(mode);
+    let grade = steps[0]?.[0] || 0;
+    for (const [id, from] of steps) if (level >= from) grade = id;
+    return grade;
+  }
+  // Where a child of this grade starts: the first level of the highest grade
+  // the game has up to the chosen one.
+  function gradeStart(mode, grade) {
+    let start = 0;
+    for (const [id, from] of gradeSteps(mode)) if (id <= grade) start = from;
+    return Math.min(start, LEVELS[mode].length - 1);
+  }
+  const firstGrade = (mode) => gradeSteps(mode)[0]?.[0] || 0;
+  // Grade 0 means "not chosen yet": every game.
+  function inGrade(mode, grade) {
+    const first = firstGrade(mode);
+    return first > 0 && (!grade || first <= grade);
+  }
+  // Highest level a game has reached: the stored record or the level now.
+  const reachedLevel = (state, mode) =>
+    Math.max(state.reached?.[mode] || 0, state.levels?.[mode] || 0);
+  /*
+   * A game of a higher grade opens early once the child has played through
+   * all tasks of its own grade in a related game, i.e. reached the levels of
+   * that higher grade there. Related: the games of the same category with
+   * levels of that grade; if the category has none, those of the subject.
+   * Returns the games that opened it (empty = still closed).
+   */
+  function unlockedBy(state, mode) {
+    const grade = firstGrade(mode);
+    const category = categoryOf(mode);
+    if (!category) return [];
+    const lower = (ids) =>
+      ids.filter(
+        (id) =>
+          id !== mode &&
+          firstGrade(id) < grade &&
+          gradeSteps(id).some(([id2]) => id2 === grade),
+      );
+    let related = lower(category.games);
+    if (!related.length)
+      related = lower(
+        CATEGORIES.filter((x) => x.subject === category.subject).flatMap((x) => x.games),
+      );
+    return related.filter((id) => reachedLevel(state, id) >= gradeStart(id, grade));
+  }
+  // Shown in the menu: games of the grade, plus games opened early by progress.
+  function isOpen(mode, grade, state = null) {
+    return inGrade(mode, grade) || Boolean(state && unlockedBy(state, mode).length);
+  }
+  function openGames(state) {
+    return ACTIVITIES.filter((x) => isOpen(x.id, state.settings.grade, state)).map((x) => x.id);
+  }
+  const availableGrades = () =>
+    GRADES.filter((grade) => ACTIVITIES.some((x) => grade.id in x.grades));
+  // Categories of a subject with only the open games; empty ones dropped.
+  // Without a state only the games of the grade count (grade cards).
+  function categoriesFor(subject, grade, state = null) {
+    return CATEGORIES.filter((x) => x.subject === subject)
+      .map((x) => ({ ...x, games: x.games.filter((id) => isOpen(id, grade, state)) }))
+      .filter((x) => x.games.length);
+  }
+  function subjectsFor(grade, state = null) {
+    return SUBJECTS.filter((subject) => categoriesFor(subject.id, grade, state).length);
+  }
 
   // English topics (words in EN_WORDS below), needed by the levels.
   const EN_TOPICS = {
@@ -273,6 +356,45 @@
   const EN_ALL = Object.keys(EN_TOPICS);
   // Every game gets gradually harder. Each first-try success climbs one step.
   const LEVELS = {
+    // Bundling: ten of a place make one of the next (index into PLACES).
+    tenfold: [
+      { ask: ["bundle"], from: 0, to: 2, choices: 3, label: "10 Einer, 10 Zehner bündeln" },
+      { ask: ["count"], from: 0, to: 2, span: 2, choices: 3, label: "Wie viele Einer hat ein Hunderter?" },
+      { ask: ["bundle", "name"], from: 1, to: 3, choices: 3, label: "10 Hunderter sind 1 Tausender" },
+      { ask: ["count"], from: 0, to: 3, span: 3, choices: 4, label: "Wie viele Einer hat ein Tausender?" },
+      { ask: ["bundle", "name"], from: 2, to: 5, choices: 4, label: "Zehntausender, Hunderttausender" },
+      { ask: ["bundle", "name"], from: 3, to: 6, choices: 4, label: "bis zur Million" },
+      { ask: ["count"], from: 2, to: 6, span: 3, choices: 4, label: "Wie viele Tausender hat eine Million?" },
+      { ask: ["bundle", "name", "count"], from: 0, to: 6, span: 6, choices: 4, label: "alles gemischt" },
+    ],
+    // Laying dots in the chart; ten in a column are bundled automatically.
+    lay: [
+      { ask: ["lay"], places: 3, min: 11, max: 100, label: "bis 100 legen" },
+      { ask: ["change"], places: 3, max: 100, change: [1, -1, 10, -10], label: "1 oder 10 mehr, auch bündeln" },
+      { ask: ["lay"], places: 3, digits: [3], zeros: true, label: "bis 1000 legen, mit Nullen" },
+      { ask: ["change"], places: 4, max: 1000, change: [1, -1, 10, -10, 100, -100], label: "100 mehr oder weniger, bündeln" },
+      { ask: ["lay"], places: 3, digits: [3], zeros: true, hidden: true, label: "Zahl nur hören, bis 1000" },
+      { ask: ["lay"], places: 5, digits: [4, 5], zeros: true, label: "bis 100 000 legen" },
+      {
+        ask: ["change"],
+        places: 7,
+        max: 1000000,
+        change: [1, -1, 1000, -1000, 10000, -10000, 100000],
+        label: "große Schritte, auch bündeln",
+      },
+      { ask: ["lay"], places: 7, digits: [5, 6], zeros: true, hidden: true, label: "Zahl nur hören, bis zur Million" },
+    ],
+    // Place-value chart: "places" columns, numbers with "digits" digits.
+    placetable: [
+      { ask: ["read"], places: 3, min: 11, max: 100, choices: 3, label: "Stellentafel bis 100" },
+      { ask: ["digit"], places: 3, min: 11, max: 100, choices: 3, label: "Zehner und Einer ablesen" },
+      { ask: ["read"], places: 3, digits: [3], choices: 3, label: "Hunderter: bis 1000" },
+      { ask: ["read", "compose"], places: 3, digits: [3], zeros: true, choices: 4, label: "mit Nullen: 405, 730" },
+      { ask: ["digit", "split"], places: 3, digits: [3], zeros: true, choices: 4, label: "zerlegen: 405 = 400 + 5" },
+      { ask: ["read", "compose"], places: 5, digits: [4, 5], zeros: true, choices: 4, label: "Tausender: bis 100 000" },
+      { ask: ["read", "compose"], places: 7, digits: [5, 6], zeros: true, choices: 4, label: "bis zur Million" },
+      { ask: ["digit", "split"], places: 7, digits: [4, 5, 6], zeros: true, choices: 4, label: "große Zahlen zerlegen" },
+    ],
     type: [
       { range: "ABCDEFGH", keys: 5, label: "A–H, 5 Tasten" },
       { range: "ABCDEFGH", keys: 7, label: "A–H, alle Tasten" },
@@ -1171,7 +1293,20 @@
   const TEEN_WORDS = ["zehn", "elf", "zwölf", "dreizehn", "vierzehn", "fünfzehn", "sechzehn", "siebzehn", "achtzehn", "neunzehn"];
   const TEN_WORDS = ["", "zehn", "zwanzig", "dreißig", "vierzig", "fünfzig", "sechzig", "siebzig", "achtzig", "neunzig"];
   function numberWord(n) {
-    if (!Number.isInteger(n) || n < 0 || n > 100) return String(n);
+    if (!Number.isInteger(n) || n < 0 || n > 1000000) return String(n);
+    if (n === 1000000) return "eine Million";
+    if (n >= 1000) {
+      const thousands = Math.floor(n / 1000);
+      const rest = n % 1000;
+      // 101000: "hunderteintausend", not "hunderteinstausend".
+      const head = thousands === 1 ? "" : numberWord(thousands).replace(/eins$/, "ein");
+      return `${head}tausend${rest ? numberWord(rest) : ""}`;
+    }
+    if (n > 100) {
+      const hundreds = Math.floor(n / 100);
+      const rest = n % 100;
+      return `${hundreds === 1 ? "" : UNIT_WORDS[hundreds]}hundert${rest ? numberWord(rest) : ""}`;
+    }
     if (n === 100) return "hundert";
     if (n < 10) return UNIT_WORDS[n];
     if (n < 20) return TEEN_WORDS[n - 10];
@@ -1181,6 +1316,325 @@
   }
   // "ein Zehner", "vier Einer"
   const countWord = (n) => (n === 1 ? "ein" : numberWord(n));
+  // From 10 000 on digits are grouped in threes with a thin space (452 318).
+  const formatNumber = (n) =>
+    n >= 10000 ? String(n).replace(/\B(?=(\d{3})+(?!\d))/g, "\u202F") : String(n);
+
+  /*
+   * The places of our number system, small to large. Shapes and names repeat
+   * in threes: cube, rod, plate – Einer, Zehner, Hunderter; Tausender,
+   * Zehntausender, Hunderttausender; then the Million. Every place is ten
+   * times the one before.
+   */
+  const PLACES = [
+    { id: "E", name: "Einer", plural: "Einer", dativePlural: "Einern", one: "ein Einer", dative: "einem Einer", value: 1 },
+    { id: "Z", name: "Zehner", plural: "Zehner", dativePlural: "Zehnern", one: "ein Zehner", dative: "einem Zehner", value: 10 },
+    { id: "H", name: "Hunderter", plural: "Hunderter", dativePlural: "Hundertern", one: "ein Hunderter", dative: "einem Hunderter", value: 100 },
+    { id: "T", name: "Tausender", plural: "Tausender", dativePlural: "Tausendern", one: "ein Tausender", dative: "einem Tausender", value: 1000 },
+    { id: "ZT", name: "Zehntausender", plural: "Zehntausender", dativePlural: "Zehntausendern", one: "ein Zehntausender", dative: "einem Zehntausender", value: 10000 },
+    { id: "HT", name: "Hunderttausender", plural: "Hunderttausender", dativePlural: "Hunderttausendern", one: "ein Hunderttausender", dative: "einem Hunderttausender", value: 100000 },
+    { id: "M", name: "Million", plural: "Millionen", dativePlural: "Millionen", one: "eine Million", dative: "einer Million", value: 1000000 },
+  ];
+  // "3 Tausender", "1 Million", "2 Millionen" and the spoken twin.
+  const placeCount = (digit, place) => ({
+    text: `${digit} ${digit === 1 ? place.name : place.plural}`,
+    speech: `${digit === 1 ? (place.id === "M" ? "eine" : "ein") : numberWord(digit)} ${digit === 1 ? place.name : place.plural}`,
+  });
+  // Digits of n by place, ones first (3052 → [2, 5, 0, 3]).
+  const digitsOf = (n) => [...String(n)].reverse().map(Number);
+  // "3052 = 3 Tausender, 0 Hunderter, 5 Zehner, 2 Einer" (all places, zeros too).
+  function placesExplain(n, places = digitsOf(n).length) {
+    const digits = digitsOf(n);
+    const parts = Array.from({ length: places }, (_, i) => placeCount(digits[i] || 0, PLACES[i])).reverse();
+    return {
+      text: `${formatNumber(n)} = ${parts.map((x) => x.text).join(", ")}.`,
+      speech: `${capitalize(numberWord(n))}: ${parts.slice(0, -1).map((x) => x.speech).join(", ")} und ${parts.at(-1).speech}.`,
+    };
+  }
+  /*
+   * Answer plus distractors in the given order of priority (typical mistakes
+   * first); only whole numbers from 0 to a million, each once.
+   */
+  function bigOptions(answer, candidates, count, random) {
+    const options = [];
+    for (const x of candidates)
+      if (Number.isInteger(x) && x >= 0 && x <= 1000000 && x !== answer && !options.includes(x))
+        options.push(x);
+    for (let k = 1; options.length < count - 1; k++)
+      for (const x of [answer + k, answer - k])
+        if (x >= 0 && !options.includes(x) && options.length < count - 1) options.push(x);
+    return shuffle([answer, ...options.slice(0, count - 1)], random).map(String);
+  }
+  // A number with a given count of digits; with "zeros" at least one inner 0.
+  function bigNumber(config, random) {
+    if (config.max) return between(config.min, config.max, random);
+    const length = pick(config.digits, random);
+    for (;;) {
+      const digits = Array.from({ length }, (_, i) =>
+        i === 0 ? between(1, 9, random) : config.zeros && random() < 0.35 ? 0 : between(1, 9, random),
+      );
+      const inner = digits.slice(1).includes(0);
+      if (Boolean(config.zeros) === inner || length < 3) return Number(digits.join(""));
+    }
+  }
+  // Value of laid dots (ones first).
+  const layValue = (laid) => Object.values(laid).reduce((sum, d, i) => sum + d * 10 ** i, 0);
+  /*
+   * One + or − in a column of the chart. Ten dots in a column are bundled
+   * into one of the next column (again and again: 999 + 1); taking from an
+   * empty column first changes one of the next column into ten (unbundling).
+   * Returns the new dots and what was bundled, or null when not possible
+   * (no column left, below 0, above a million).
+   */
+  function layStep(laid, place, step, places) {
+    const dots = Array.from({ length: places }, (_, i) => laid[i] || 0);
+    const events = [];
+    if (step > 0) {
+      dots[place]++;
+      for (let i = place; dots[i] === 10; i++) {
+        if (i + 1 >= places) return null;
+        dots[i] = 0;
+        dots[i + 1]++;
+        events.push({ type: "bundle", from: i });
+      }
+    } else {
+      let j = place;
+      while (j < places && dots[j] === 0) j++;
+      if (j >= places) return null;
+      for (; j > place; j--) {
+        dots[j]--;
+        dots[j - 1] += 10;
+        events.push({ type: "unbundle", from: j });
+      }
+      dots[place]--;
+    }
+    if (layValue(dots) > 1000000) return null;
+    return { dots, events };
+  }
+  function generateBig(mode, config, random) {
+    const kind = pick(config.ask, random);
+    if (mode === "lay") {
+      const empty = Array(config.places).fill(0);
+      if (kind === "lay") {
+        const number = bigNumber(config, random);
+        return {
+          kind,
+          number,
+          answer: String(number),
+          places: config.places,
+          start: empty,
+          target: digitsOf(number),
+          hidden: Boolean(config.hidden),
+          shown: formatNumber(number),
+          speech: numberWord(number),
+          explain: placesExplain(number),
+          cue: `Zahl: ${formatNumber(number)}`,
+        };
+      }
+      // "Lege 100 mehr": half of the tasks need bundling (299 + 1, 3000 − 1).
+      const delta = pick(config.change, random);
+      const at = String(Math.abs(delta)).length - 1;
+      const cross = random() < 0.5;
+      let start;
+      let number;
+      // Not every step can cross (10 less up to 100): then a plain task.
+      let tries = 0;
+      do {
+        start = between(10, config.max - 1, random);
+        if (cross && tries++ < 100) {
+          const digits = digitsOf(start);
+          while (digits.length <= at) digits.push(0);
+          digits[at] = delta > 0 ? 9 : 0;
+          if (delta > 0 && at > 0 && random() < 0.5) digits[at - 1] = 9;
+          start = Number([...digits].reverse().join(""));
+        }
+        number = start + delta;
+      } while (
+        start < 1 ||
+        number < 1 ||
+        number > config.max ||
+        String(number).length > config.places ||
+        String(start).length > config.places
+      );
+      const amount = Math.abs(delta);
+      const before = digitsOf(start);
+      const after = digitsOf(number);
+      const bundled = Array.from({ length: config.places }, (_, i) => i).some(
+        (i) => i !== at && (before[i] || 0) !== (after[i] || 0),
+      );
+      const sign = delta > 0 ? "+" : "−";
+      return {
+        kind,
+        number,
+        answer: String(number),
+        places: config.places,
+        start: Array.from({ length: config.places }, (_, i) => digitsOf(start)[i] || 0),
+        startNumber: start,
+        target: digitsOf(number),
+        delta,
+        at,
+        bundled,
+        shown: formatNumber(number),
+        explain: {
+          text: `${formatNumber(start)} ${sign} ${formatNumber(amount)} = ${formatNumber(number)}.${bundled ? (delta > 0 ? " Dabei wird gebündelt." : " Dabei wird entbündelt.") : ""}`,
+          speech: `${capitalize(numberWord(start))} ${delta > 0 ? "plus" : "minus"} ${numberWord(amount)} ist ${numberWord(number)}.${bundled ? (delta > 0 ? " Dabei wird gebündelt." : " Dabei wird entbündelt.") : ""}`,
+        },
+        cue: `Es liegt ${formatNumber(start)}. Gesucht: ${formatNumber(amount)} ${delta > 0 ? "mehr" : "weniger"} – Lösung: ${formatNumber(number)}`,
+      };
+    }
+    if (mode === "tenfold") {
+      if (kind === "count") {
+        // How many of a small place fit into a big one: 10, 100, 1000 …
+        const small = between(config.from, config.to - 1, random);
+        const big = between(small + 1, Math.min(config.to, small + config.span), random);
+        const answer = 10 ** (big - small);
+        const powers = [10, 100, 1000, 10000, 100000, 1000000].sort(
+          (a, b) => Math.abs(Math.log10(a / answer)) - Math.abs(Math.log10(b / answer)),
+        );
+        return {
+          kind,
+          key: `count${small}-${big}`,
+          small,
+          big,
+          answer: String(answer),
+          choices: bigOptions(answer, powers, config.choices, random),
+          explain: {
+            text: `${capitalize(PLACES[big].one)} hat ${formatNumber(answer)} ${PLACES[small].plural}. Jede Stelle ist 10-mal so groß wie die davor.`,
+            speech: `${capitalize(PLACES[big].one)} hat ${numberWord(answer)} ${PLACES[small].plural}. Jede Stelle ist zehnmal so groß wie die davor.`,
+          },
+          cue: `Vorlesen: Wie viele ${PLACES[small].plural} hat ${PLACES[big].one}?`,
+        };
+      }
+      // Ten pieces of one place are bundled: how much is it, what is it called?
+      const from = between(config.from, config.to - 1, random);
+      const unit = PLACES[from];
+      const next = PLACES[from + 1];
+      const explain = {
+        text: `10 ${unit.plural} sind ${next.one}: 10 · ${formatNumber(unit.value)} = ${formatNumber(next.value)}.`,
+        speech: `Zehn ${unit.plural} sind ${next.one}. Zehn mal ${numberWord(unit.value)} ist ${numberWord(next.value)}.`,
+      };
+      if (kind === "name") {
+        const names = [PLACES[from + 2], unit, PLACES[from - 1], PLACES[from + 3], PLACES[from - 2]]
+          .filter(Boolean)
+          .map((x) => x.name);
+        return {
+          kind,
+          key: `name${from}`,
+          from,
+          answer: next.name,
+          choices: shuffle([next.name, ...names.slice(0, config.choices - 1)], random),
+          explain,
+          cue: `Vorlesen: Aus 10 ${unit.dativePlural} wird ein neues Teil. Wie heißt es?`,
+        };
+      }
+      return {
+        kind,
+        key: `bundle${from}`,
+        from,
+        answer: String(next.value),
+        // One piece only, the ten pieces counted, a zero too many, added up.
+        choices: bigOptions(
+          next.value,
+          [unit.value, 10 * next.value, 10, unit.value + 10],
+          config.choices,
+          random,
+        ),
+        explain,
+        cue: `Vorlesen: 10 ${unit.plural} – wie viel ist das?`,
+      };
+    }
+    // placetable
+    let number = bigNumber(config, random);
+    // Splitting needs at least two parts (not 300 = ?).
+    while (kind === "split" && digitsOf(number).filter(Boolean).length < 2) number = bigNumber(config, random);
+    const digits = digitsOf(number);
+    const places = Math.max(config.places, digits.length);
+    const base = { kind, number, digits, places, shown: formatNumber(number) };
+    if (kind === "digit") {
+      // Which digit stands at a place? Typical slip: reading the neighbour.
+      const at = between(0, digits.length - 1, random);
+      const answer = digits[at];
+      const pool = [digits[at + 1], digits[at - 1], answer + 1, answer - 1, ...digits]
+        .filter((x) => Number.isInteger(x) && x >= 0 && x <= 9 && x !== answer);
+      const options = [...new Set(pool)];
+      for (let d = 0; options.length < config.choices - 1; d++) if (d !== answer && !options.includes(d)) options.push(d);
+      return {
+        ...base,
+        at,
+        answer: String(answer),
+        choices: shuffle([answer, ...options.slice(0, config.choices - 1)], random).map(String),
+        speech: numberWord(number),
+        explain: {
+          text: `${formatNumber(number)} hat ${placeCount(answer, PLACES[at]).text}.`,
+          speech: `${capitalize(numberWord(number))} hat ${placeCount(answer, PLACES[at]).speech}.`,
+        },
+        cue: `Zahl: ${formatNumber(number)}`,
+      };
+    }
+    if (kind === "split") {
+      // 3052 = 3000 + ? + 2: the parts with a digit, one of them is the gap.
+      const parts = digits
+        .map((d, i) => ({ d, i, value: d * 10 ** i }))
+        .filter((x) => x.d)
+        .reverse();
+      const gapIndex = between(0, parts.length - 1, random);
+      const gapPart = parts[gapIndex];
+      const answer = gapPart.value;
+      return {
+        ...base,
+        parts: parts.map((x) => x.value),
+        gap: gapIndex,
+        answer: String(answer),
+        // Zeros forgotten, one place too far right or left.
+        choices: bigOptions(answer, [gapPart.d, answer / 10, answer * 10, answer + gapPart.d], config.choices, random),
+        speech: `${numberWord(number)} ist ${parts.map((x, i) => (i === gapIndex ? "wie viel" : numberWord(x.value))).join(" plus ")}?`,
+        explain: {
+          text: `${formatNumber(number)} = ${parts.map((x) => formatNumber(x.value)).join(" + ")}.`,
+          speech: `${capitalize(numberWord(number))} ist ${parts.map((x) => numberWord(x.value)).join(" plus ")}.`,
+        },
+        cue: `Vorlesen: ${formatNumber(number)} = ${parts.map((x, i) => (i === gapIndex ? "?" : formatNumber(x.value))).join(" + ")}`,
+      };
+    }
+    // read (dots in the chart) or compose (3 Tausender, 5 Zehner, 2 Einer).
+    const noZeros = Number(String(number).replace(/0/g, ""));
+    const swapAt = digits.findIndex((d, i) => i > 0 && d && digits[i - 1] && d !== digits[i - 1]);
+    const swapped =
+      swapAt > 0
+        ? Number(
+            [...digits]
+              .map((d, i) => (i === swapAt ? digits[swapAt - 1] : i === swapAt - 1 ? digits[swapAt] : d))
+              .reverse()
+              .join(""),
+          )
+        : null;
+    const sum = digits.reduce((a, b) => a + b, 0);
+    const shift = number * 10 <= 1000000 ? number * 10 : Math.floor(number / 10);
+    const chips = digits
+      .map((d, i) => ({ d, place: PLACES[i] }))
+      .filter((x) => x.d)
+      .reverse()
+      .map((x) => placeCount(x.d, x.place));
+    return {
+      ...base,
+      answer: String(number),
+      swap: swapped == null ? undefined : String(swapped),
+      zeroSlip: noZeros !== number ? String(noZeros) : undefined,
+      choices: bigOptions(
+        number,
+        [noZeros, swapped, kind === "read" ? sum : shift, shift, number + 10 ** between(0, digits.length - 1, random)],
+        config.choices,
+        random,
+      ),
+      chips: chips.map((x) => x.text),
+      speech: kind === "compose" ? chips.map((x) => x.speech).join(", ") : undefined,
+      explain: placesExplain(number),
+      cue:
+        kind === "compose"
+          ? `Vorlesen: ${chips.map((x) => x.text).join(", ")}`
+          : "Vorlesen: Welche Zahl steht in der Stellentafel?",
+    };
+  }
+
   const between = (min, max, random) => min + Math.floor(random() * (max - min + 1));
   const placeOf = (n) => ({ tens: Math.floor(n / 10), ones: n % 10 });
   function placeExplain(n) {
@@ -1734,6 +2188,7 @@
   }
   function generate(mode, config, previous, random) {
     if (ENGLISH_GAMES.includes(mode)) return generateEnglish(mode, config, previous, random);
+    if (["tenfold", "placetable", "lay"].includes(mode)) return generateBig(mode, config, random);
     if (mode === "type") {
       const clear = (letters) =>
         [...letters].filter((x) => !AMBIGUOUS_LAUTE.includes(x));
@@ -3310,13 +3765,24 @@
       rounds: 0,
       levels: defaultLevels(),
       lastPlayed: {},
+      // Highest level reached per game (opens games of higher grades early).
+      reached: {},
       pet: { full: 40, joy: 60, updatedAt: 0 },
       food: {},
       // Wish window + 1 of the last wish that came true (0 = none yet).
       wishDone: 0,
       wardrobe: { owned: [], worn: [] },
       plots: BEDS.map(() => ({ crop: null })),
-      settings: { voice: "", voiceEn: "", rate: 0.8, speech: true, autoSpeak: true, lowercase: false },
+      settings: {
+        // 0 = not chosen yet (asked on the home screen).
+        grade: 0,
+        voice: "",
+        voiceEn: "",
+        rate: 0.8,
+        speech: true,
+        autoSpeak: true,
+        lowercase: false,
+      },
       stats: defaultStats(),
     };
   }
@@ -3341,6 +3807,10 @@
     // Version 1 only had one star counter: it is both balance and lifetime total.
     if (raw.version === 1) state.totalStars = state.stars;
     state.totalStars = Math.max(state.totalStars, state.stars);
+    // Saves from before the grade choice had all games of grade 2.
+    const grade = raw.settings?.grade;
+    if (grade === undefined) state.settings.grade = 2;
+    else if (availableGrades().some((x) => x.id === grade)) state.settings.grade = grade;
     if (raw.levels && typeof raw.levels === "object")
       for (const mode of Object.keys(LEVELS))
         state.levels[mode] = clampLevel(mode, raw.levels[mode]);
@@ -3385,6 +3855,13 @@
           state.settings[key] = raw.settings[key];
     }
     state.stats = sanitizeStats(raw.stats);
+    // Older saves: the highest level in the level history counts as reached.
+    for (const mode of Object.keys(LEVELS)) {
+      const history = state.stats.games[mode]?.levels || [];
+      const stored = clampLevel(mode, raw.reached?.[mode]);
+      const best = Math.max(stored, ...history.map(([, level]) => level));
+      if (best > 0) state.reached[mode] = best;
+    }
     return state;
   }
 
@@ -3400,7 +3877,7 @@
   const ABC_GAMES = ["missing", "neighbor", "order"];
   const AREAS = CATEGORIES.map(({ id, report, games }) => ({ id, title: report, games }));
   function defaultStats() {
-    return { games: {}, sounds: {}, abc: {}, merk: {}, math: { swaps: 0 }, days: {} };
+    return { games: {}, sounds: {}, abc: {}, merk: {}, math: { swaps: 0 }, grades: {}, days: {} };
   }
   function dayKey(time) {
     const date = new Date(time);
@@ -3462,6 +3939,14 @@
         };
     }
     stats.math.swaps = count(raw.math?.swaps);
+    for (const grade of GRADES) {
+      const entry = raw.grades?.[grade.id];
+      if (entry && typeof entry === "object" && count(entry.tasks))
+        stats.grades[grade.id] = {
+          tasks: count(entry.tasks),
+          ok: Math.min(count(entry.ok), count(entry.tasks)),
+        };
+    }
     const days = Object.keys(raw.days || {})
       .filter((key) => /^\d{4}-\d{2}-\d{2}$/.test(key))
       .sort()
@@ -3527,6 +4012,19 @@
       const math = (stats.math ||= { swaps: 0 });
       math.swaps = Math.min(math.swaps + task.swaps, 1000000);
     }
+    if (LEVELS[task.mode] && Number.isInteger(task.level))
+      state.reached = {
+        ...state.reached,
+        [task.mode]: Math.max(state.reached?.[task.mode] || 0, task.level),
+      };
+    // Tasks per grade of the level they were played on (startLevel).
+    const played = Number.isInteger(task.startLevel) ? task.startLevel : task.level;
+    const grade = Number.isInteger(played) && LEVELS[task.mode] ? levelGrade(task.mode, played) : 0;
+    if (grade) {
+      const entry = ((stats.grades ||= {})[grade] ||= { tasks: 0, ok: 0 });
+      entry.tasks++;
+      entry.ok += ok;
+    }
     if (task.mode === "merk" && MERK_GROUPS[task.group]) {
       const entry = (stats.merk[task.group] ||= { seen: 0, ok: 0 });
       entry.seen++;
@@ -3566,6 +4064,7 @@
     tens: "Zehner bündeln mit Alltagsdingen: je 10 Nudeln in einen Becher, die übrigen einzeln daneben. Dann gemeinsam sagen: „4 Zehner und 7 Einer sind 47.“",
     space: "Zahlen verorten: auf einem Maßband oder Lineal zeigen lassen („Wo ist 37?“), eine Hundertertafel ausdrucken und Wege gehen – nach rechts 1 mehr, nach unten 10 mehr.",
     compare: "Vergleichen im Alltag: Hausnummern, Preise oder Seitenzahlen – „Welche ist größer? Schau zuerst auf die Zehner.“ Das Krokodil frisst immer die größere Zahl.",
+    big: "Große Zahlen greifbar machen: 10 Büroklammern zu einer Kette, 10 Ketten zu einem Bündel – so entsteht aus Einern ein Hunderter. Zahlen vom Kassenzettel oder aus der Zeitung in eine selbst gezeichnete Stellentafel schreiben und laut lesen; leere Stellen bekommen eine Null.",
     calc: "Mit Zehnern rechnen: 10-Cent-Münzen oder Zehnerstangen legen. Bei 52 + 30 bleiben die Einer gleich, nur die Zehner ändern sich.",
     sets: "Mengen im Alltag: Besteck oder Murmeln zählen, Paare bilden („Wer hat mehr?“), eine Strichliste führen und Spielzeug nach zwei Merkmalen sortieren – z. B. rot und rund. Was gehört in beide Gruppen?",
     enlisten:
@@ -3607,7 +4106,12 @@
       totalStars: state.totalStars,
       rounds: state.rounds,
     };
-    const games = ACTIVITIES.map((activity) => {
+    // The games of the chosen grade, plus whatever was played before.
+    const grade = state.settings.grade;
+    const shown = ACTIVITIES.filter(
+      (activity) => isOpen(activity.id, grade, state) || stats.games[activity.id]?.tasks,
+    );
+    const games = shown.map((activity) => {
       const game = stats.games[activity.id];
       const recent = game?.recent || [];
       let trend = null;
@@ -3625,6 +4129,7 @@
         together: Boolean(activity.together),
         level: state.levels[activity.id],
         maxLevel: maxLevel(activity.id),
+        grade: levelGrade(activity.id, state.levels[activity.id]),
         levelLabel: LEVELS[activity.id][state.levels[activity.id]].label,
         tasks: game?.tasks || 0,
         recentRate: recent.length >= 3 ? rate(recent.reduce((a, b) => a + b, 0), recent.length) : null,
@@ -3635,18 +4140,22 @@
       };
     });
     const areas = AREAS.map((area) => {
-      const recent = area.games.flatMap((id) => stats.games[id]?.recent || []);
       const members = games.filter((game) => area.games.includes(game.id));
+      if (!members.length) return null;
+      const recent = members.flatMap((game) => stats.games[game.id]?.recent || []);
       return {
         id: area.id,
         title: area.title,
         tasks: members.reduce((total, game) => total + game.tasks, 0),
         rate: recent.length >= 5 ? rate(recent.reduce((a, b) => a + b, 0), recent.length) : null,
         progress:
-          members.reduce((total, game) => total + game.level / game.maxLevel, 0) /
-          members.length,
+          members.reduce(
+            (total, game) =>
+              total + (game.maxLevel ? Math.min(1, game.level / game.maxLevel) : 1),
+            0,
+          ) / members.length,
       };
-    });
+    }).filter(Boolean);
     const letters = (kind) => {
       const entries = Object.entries(stats[kind]).map(([letter, entry]) => ({
         letter,
@@ -3700,6 +4209,26 @@
       if (game.trend === "up") strengths.push(`${game.title}: wird gerade deutlich sicherer.`);
       if (game.trend === "down") focus.push(`${game.title}: zuletzt mehr Fehler als vorher.`);
     }
+    // How far the child is: tasks per grade of the level played, and which
+    // games are already beyond the chosen grade.
+    const gradeLevels = GRADES.map((x) => {
+      const entry = stats.grades[x.id];
+      return {
+        id: x.id,
+        title: x.title,
+        tasks: entry?.tasks || 0,
+        rate: entry ? rate(entry.ok, entry.tasks) : null,
+        games: games.filter((game) => game.grade === x.id).map((game) => game.title),
+      };
+    }).filter((x) => x.tasks || x.games.length);
+    if (grade)
+      for (const level of gradeLevels) {
+        const ahead = games.filter((game) => game.grade === level.id && game.tasks);
+        if (level.id > grade && ahead.length)
+          strengths.push(
+            `Schon Aufgaben der ${level.title}: ${ahead.map((game) => game.title).join(", ")}.`,
+          );
+      }
     if (sounds.strong.length)
       strengths.push(`Sichere Laute: ${sounds.strong.slice(0, 8).map((x) => x.letter).join(", ")}.`);
     if (sounds.weak.length) {
@@ -3746,6 +4275,8 @@
       tips.push(`Noch nicht ausprobiert: ${unplayed.map((game) => game.title).join(", ")}.`);
     return {
       enoughData: totalTasks >= 5,
+      grade: GRADES.find((x) => x.id === grade)?.title || null,
+      gradeLevels,
       kpis,
       activity,
       games,
@@ -3912,9 +4443,27 @@
   function nextUnlock(totalStars) {
     return UNLOCKS.find((item) => item.at > totalStars) || null;
   }
+  /*
+   * Choosing a grade (first start or adults) sets the entry point: games
+   * below the grade's first level move up to it. Levels are never lowered,
+   * so progress beyond the grade is kept.
+   */
+  function setGrade(state, grade) {
+    if (!availableGrades().some((x) => x.id === grade)) return false;
+    state.settings.grade = grade;
+    for (const activity of ACTIVITIES)
+      if (inGrade(activity.id, grade))
+        state.levels[activity.id] = Math.max(
+          gradeStart(activity.id, grade),
+          state.levels[activity.id],
+        );
+    return true;
+  }
   function recommendedGame(state) {
-    const solo = ACTIVITIES.filter((x) => !x.together);
-    return [...solo].sort(
+    const solo = ACTIVITIES.filter(
+      (x) => !x.together && isOpen(x.id, state.settings.grade, state),
+    );
+    return [...(solo.length ? solo : ACTIVITIES)].sort(
       (a, b) => (state.lastPlayed[a.id] || 0) - (state.lastPlayed[b.id] || 0),
     )[0].id;
   }
@@ -3923,6 +4472,7 @@
     ALPHABET,
     LAUTE,
     AMBIGUOUS_LAUTE,
+    GRADES,
     ACTIVITIES,
     SUBJECTS,
     CATEGORIES,
@@ -3955,7 +4505,22 @@
     SYLLABLE_WORDS,
     EXTEND_WORDS,
     categoryOf,
+    inGrade,
+    availableGrades,
+    categoriesFor,
+    subjectsFor,
+    isOpen,
+    openGames,
+    unlockedBy,
+    levelGrade,
+    gradeStart,
+    setGrade,
     numberWord,
+    formatNumber,
+    PLACES,
+    placesExplain,
+    layStep,
+    layValue,
     maxLevel,
     clampLevel,
     makeQuestion,

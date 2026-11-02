@@ -59,8 +59,11 @@
             </div>
           </div>
         </div>
-        <h2 class="grid-title">Was möchtest du üben?</h2>
+        <h2 class="grid-title" id="home-grid-title">Was möchtest du üben?</h2>
         <div class="subject-grid" id="subject-grid"></div>
+        <p class="grade-note" id="grade-note" hidden>
+          Erwachsene können die Klasse später unter „Für Erwachsene“ ändern.
+        </p>
       </section>
 
       <section id="menu-view" class="view" hidden aria-labelledby="menu-title">
@@ -230,6 +233,23 @@
 
       <div class="settings-panel" role="tabpanel" id="panel-overview" data-panel="overview" aria-labelledby="tab-overview">
         <div class="settings-section">
+          <h3>Klasse</h3>
+          <label class="grade-row" for="grade-select"
+            >Einstieg passend zur
+            <select id="grade-select"></select
+          ></label>
+          <p class="field-note">
+            Die Klasse ist nur der Startpunkt: Die Spiele beginnen bei den
+            Aufgaben dieser Klasse. Danach wird es so schwer, wie das Kind
+            schafft – auch mit Aufgaben höherer Klassen – und bei Fehlern
+            wieder leichter, auch unter den Startpunkt. Der Lernstand zeigt,
+            auf welchem Klassen-Niveau das Kind übt. Spiele, die erst in einer
+            höheren Klasse beginnen, erscheinen, sobald das Kind in einem
+            passenden Spiel alle Aufgaben seiner Klasse geschafft hat.
+          </p>
+          <p class="field-note" id="grade-status" role="status"></p>
+        </div>
+        <div class="settings-section">
           <h3>Lernstand</h3>
           <p class="field-note">
             Fortschritt, Stärken und was sich zu üben lohnt – laufend aus allen
@@ -266,7 +286,7 @@
             </li>
             <li>
               In Mathe übt Momo Mengen, Zehner und Einer, Rechnen, Geld und Uhr
-              im Zahlenraum bis 100.
+              – in der 1. Klasse im Zahlenraum bis 20, in der 2. Klasse bis 100.
             </li>
             <li>
               Englisch ist ein Hör-Fach wie in Klasse 1 und 2: Momo sagt Wörter,
@@ -286,7 +306,8 @@
           <h3>Stufen</h3>
           <p class="field-note">
             Nur ändern, wenn die automatische Stufe gar nicht passt. Tippe auf
-            ein Fach, um seine Spiele zu sehen.
+            ein Fach, um seine Spiele zu sehen. Hinter jeder Stufe steht, zu
+            welcher Klasse sie gehört („Kl. 2“).
           </p>
           <div id="level-settings" class="level-settings"></div>
         </div>

@@ -199,6 +199,9 @@
         { class: "report-intro" },
         "So entwickelt sich euer Kind. Alle Angaben stammen nur aus diesem Browser auf diesem Gerät. „Beim 1. Versuch richtig“ zeigt, was schon sicher sitzt – Fehler gehören zum Lernen dazu.",
       ),
+      report.grade
+        ? el("p", { class: "muted", text: `Einstieg: ${report.grade}. Gezeigt werden die Spiele ab dieser Klasse und alles, was schon gespielt wurde.` })
+        : null,
       report.enoughData
         ? null
         : el("p", { class: "report-notice", text: "Noch wenig Daten: Nach ein paar Runden wird die Auswertung aussagekräftiger." }),
@@ -233,6 +236,27 @@
       ),
       report.tips.length
         ? el("section", { class: "report-card" }, el("h2", {}, el("span", { "aria-hidden": "true", text: "💡 " }), "Ideen für zu Hause"), el("ul", { class: "report-list" }, report.tips.map((text) => el("li", { text }))))
+        : null,
+      report.gradeLevels.length
+        ? el(
+            "section",
+            { class: "report-card" },
+            el("h2", { text: "Klassen-Niveau" }),
+            el("p", { class: "muted", text: "Jede Stufe gehört zu einer Klasse. Die Schwierigkeit steigt über die Einstiegsklasse hinaus, wenn es gut klappt." }),
+            el(
+              "div",
+              { class: "area-rows" },
+              report.gradeLevels.map((level) =>
+                el(
+                  "div",
+                  { class: "area-row" },
+                  el("strong", { text: `Aufgaben der ${level.title}` }),
+                  el("span", { class: "area-metric" }, el("span", { class: "muted", text: "Beim 1. Versuch richtig" }), meter(level.rate ?? 0, `${level.title}: ${percent(level.rate)} beim ersten Versuch richtig`), el("span", { text: percent(level.rate) })),
+                  el("span", { class: "muted", text: `${level.tasks} ${level.tasks === 1 ? "Aufgabe" : "Aufgaben"} gelöst · jetzt auf diesem Niveau: ${level.games.length === 0 ? "–" : level.games.length > 4 ? `${level.games.length} Spiele` : level.games.join(", ")}` }),
+                ),
+              ),
+            ),
+          )
         : null,
       el(
         "section",
@@ -279,7 +303,7 @@
                     "td",
                     { "data-label": "Stufe" },
                     el("span", { class: "level-cell" }, meter((game.level + 1) / (game.maxLevel + 1), `Stufe ${game.level + 1} von ${game.maxLevel + 1}`), el("span", { text: `${game.level + 1} / ${game.maxLevel + 1}` })),
-                    el("span", { class: "muted level-label", text: game.levelLabel }),
+                    el("span", { class: "muted level-label", text: `${game.levelLabel} · Kl. ${game.grade}` }),
                   ),
                   el("td", { "data-label": "Verlauf" }, sparkline(game.history, game.maxLevel)),
                   el("td", { class: "num", "data-label": "Beim 1. Versuch", text: percent(game.recentRate) }),

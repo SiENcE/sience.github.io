@@ -379,16 +379,34 @@
       home.innerHTML = G.momoSvg(mood);
       home.dataset.look = look;
     }
-    $("#home-momo-says").textContent = G.petMessage(state, now);
     $("#home-needs").innerHTML = G.needsMarkup(pet);
+    const grade = state.settings.grade;
+    $("#start-button").hidden = !grade;
+    $("#grade-note").hidden = Boolean(grade);
+    if (!grade) {
+      // First start: the child (or an adult) picks the grade once.
+      $("#home-momo-says").textContent = "Hallo! Ich bin Momo. In welche Klasse gehst du?";
+      $("#home-grid-title").textContent = "In welche Klasse gehst du?";
+      const colors = ["mint", "sky", "rose"];
+      $("#subject-grid").innerHTML = C.availableGrades()
+        .map((x, i) => {
+          const icons = C.subjectsFor(x.id).map((subject) => subject.icon).join(" ");
+          return `<button class="subject-card grade-card ${colors[i % colors.length]}" data-grade="${x.id}"><span class="subject-icon" aria-hidden="true">${x.id}</span><span class="subject-title">${x.title}</span><span class="subject-icons" aria-hidden="true">${icons}</span></button>`;
+        })
+        .join("");
+      return;
+    }
+    $("#home-momo-says").textContent = G.petMessage(state, now);
+    const title = C.GRADES.find((x) => x.id === grade).title;
+    $("#home-grid-title").innerHTML = `Was möchtest du üben? <small class="grade-chip">${title}</small>`;
     const next = C.ACTIVITIES.find(
       (activity) => activity.id === C.recommendedGame(state),
     );
     $("#start-button").dataset.activity = next.id;
     $("#start-button").innerHTML =
       `<span aria-hidden="true">▶</span> Spielen<small>${next.icon} ${next.title}</small>`;
-    $("#subject-grid").innerHTML = C.SUBJECTS.map((subject) => {
-      const icons = C.CATEGORIES.filter((x) => x.subject === subject.id)
+    $("#subject-grid").innerHTML = C.subjectsFor(grade, state).map((subject) => {
+      const icons = C.categoriesFor(subject.id, grade, state)
         .map((x) => x.icon)
         .join(" ");
       return `<button class="subject-card ${subject.color}" data-subject="${subject.id}"><span class="subject-icon" aria-hidden="true">${subject.icon}</span><span class="subject-title">${subject.title}</span><span class="subject-icons" aria-hidden="true">${icons}</span></button>`;
@@ -410,8 +428,12 @@
   }
   // One view for both steps: the categories of a subject, or the games of a category.
   function renderMenu() {
-    const subject = C.SUBJECTS.find((x) => x.id === menu.subject) || C.SUBJECTS[0];
-    const category = C.CATEGORIES.find((x) => x.id === menu.category);
+    const grade = state.settings.grade;
+    const subjects = C.subjectsFor(grade, state);
+    const subject = subjects.find((x) => x.id === menu.subject) || subjects[0];
+    const categories = C.categoriesFor(subject.id, grade, state);
+    // After a grade change the open category may be gone: show the subject.
+    const category = categories.find((x) => x.id === menu.category);
     $("#menu-title").textContent = category ? category.title : subject.title;
     $("#menu-path").textContent = category ? `${subject.icon} ${subject.title}` : "";
     $("#menu-back").textContent = category ? `← ${subject.title}` : "← Startseite";
@@ -419,7 +441,7 @@
       ? category.games
           .map((id) => activityCard(C.ACTIVITIES.find((x) => x.id === id)))
           .join("")
-      : C.CATEGORIES.filter((x) => x.subject === subject.id)
+      : categories
           .map((x) => {
             const icons = x.games
               .map((id) => C.ACTIVITIES.find((activity) => activity.id === id).icon)
@@ -442,6 +464,8 @@
       missStreak: 0,
       startLevel: state.levels[mode],
       startingTotal: state.totalStars,
+      // Games of a higher grade can open during the round.
+      openBefore: C.openGames(state),
       question: null,
       answered: false,
       mistakes: 0,
@@ -610,6 +634,38 @@
           }),
         );
         $("#build-done").addEventListener("click", () => checkBuild($("#build-done")));
+      }
+      if (mode === "lay") {
+        // Ten dots in a column are bundled (and unbundled) with a word from Momo.
+        M.renderLaid(task, game.built, false, q.places);
+        $$("#task-area [data-lay]").forEach((button) =>
+          button.addEventListener("click", () => {
+            if (game.answered) return;
+            const step = C.layStep(
+              game.built,
+              Number(button.dataset.lay),
+              Number(button.dataset.step),
+              q.places,
+            );
+            if (!step) return;
+            game.built = step.dots;
+            M.renderLaid(task, game.built, false, q.places);
+            if (!step.events.length) return;
+            const note = M.layNote(step.events);
+            $("#lay-note").textContent = note.text;
+            const column = $(`#lay-dots-${note.column}`);
+            column.classList.remove("bundled");
+            void column.offsetWidth;
+            column.classList.add("bundled");
+            autoSpeak(note.speech);
+          }),
+        );
+        $("#build-done").addEventListener("click", () => {
+          if (!game || game.answered) return;
+          const value = C.layValue(game.built);
+          if (value === game.question.number) solved();
+          else mistake(null, $("#build-done"), String(value));
+        });
       }
     } else {
       const icon = { memory: "🎒", echo: "🦜", movement: "👏" }[mode];
@@ -1005,8 +1061,14 @@
     );
   }
   function finishRound() {
-    const { hits, mode, startLevel, startingTotal } = game;
-    const unlocked = C.newlyUnlocked(startingTotal, state.totalStars);
+    const { hits, mode, startLevel, startingTotal, openBefore } = game;
+    const unlocked = [
+      ...C.openGames(state)
+        .filter((id) => !openBefore.includes(id))
+        .map((id) => C.ACTIVITIES.find((x) => x.id === id))
+        .map((x) => ({ icon: x.icon, name: `Spiel „${x.title}“` })),
+      ...C.newlyUnlocked(startingTotal, state.totalStars),
+    ];
     const level = state.levels[mode];
     $("#result-title").textContent =
       hits === C.ROUND_GOAL ? "Super gemacht!" : "Gut geübt!";
@@ -1074,6 +1136,8 @@
     $("#speech-options").disabled = !state.settings.speech;
     $("#lowercase").checked = state.settings.lowercase;
     $("#reset-confirm").hidden = true;
+    $("#grade-status").textContent = "";
+    renderGradeSelect();
     renderLevelSettings();
     $("#laute-grid").innerHTML = [...C.ALPHABET]
       .map(
@@ -1090,14 +1154,36 @@
     $("#laut-info").textContent = `${letter}: „${laut.say}“ wie am Anfang von „${laut.example}“`;
     speak([{ laut: letter }], button);
   });
-  // One collapsible group per subject, the games listed by category.
+  // Grades without games yet are listed, but cannot be chosen.
+  function renderGradeSelect() {
+    const grade = state.settings.grade;
+    const available = C.availableGrades().map((x) => x.id);
+    $("#grade-select").innerHTML =
+      (grade ? "" : '<option value="0" selected disabled>noch nicht gewählt</option>') +
+      C.GRADES.map((x) => {
+        const open = available.includes(x.id);
+        return `<option value="${x.id}"${x.id === grade ? " selected" : ""}${open ? "" : " disabled"}>${x.title}${open ? "" : " (noch keine Spiele)"}</option>`;
+      }).join("");
+  }
+  $("#grade-select").addEventListener("change", async (event) => {
+    const grade = Number(event.target.value);
+    await save((latest) => {
+      C.setGrade(latest, grade);
+    });
+    $("#grade-status").textContent = `Momo zeigt jetzt die Spiele der ${C.GRADES.find((x) => x.id === grade).title}.`;
+    renderGradeSelect();
+    renderLevelSettings();
+  });
+  // One collapsible group per subject, the games of the grade listed by
+  // category. Every level names the grade it belongs to.
   function renderLevelSettings() {
+    const grade = state.settings.grade;
     const row = (id) => {
       const activity = C.ACTIVITIES.find((x) => x.id === id);
-      return `<label class="level-row"><span>${activity.icon} ${activity.title}</span><select data-level-for="${id}">${C.LEVELS[id].map((level, i) => `<option value="${i}"${state.levels[id] === i ? " selected" : ""}>Stufe ${i + 1}: ${level.label}</option>`).join("")}</select></label>`;
+      return `<label class="level-row"><span>${activity.icon} ${activity.title}</span><select data-level-for="${id}">${C.LEVELS[id].map((level, i) => `<option value="${i}"${state.levels[id] === i ? " selected" : ""}>Stufe ${i + 1}: ${level.label} (Kl. ${C.levelGrade(id, i)})</option>`).join("")}</select></label>`;
     };
-    $("#level-settings").innerHTML = C.SUBJECTS.map((subject) => {
-      const categories = C.CATEGORIES.filter((x) => x.subject === subject.id);
+    $("#level-settings").innerHTML = C.subjectsFor(grade, state).map((subject) => {
+      const categories = C.categoriesFor(subject.id, grade, state);
       const count = categories.reduce((total, x) => total + x.games.length, 0);
       return `<details class="level-subject" data-subject-levels="${subject.id}"><summary><span aria-hidden="true">${subject.icon}</span> ${subject.title} <small>${count} Spiele</small></summary>${categories
         .map(
@@ -1119,6 +1205,11 @@
 
   /* ---------- Events ---------- */
   document.addEventListener("click", (event) => {
+    const grade = event.target.closest("[data-grade]");
+    if (grade)
+      save((latest) => {
+        C.setGrade(latest, Number(grade.dataset.grade));
+      }).then(() => $("#subject-grid [data-subject]")?.focus());
     const subject = event.target.closest("[data-subject]");
     if (subject) openMenu(subject.dataset.subject);
     const category = event.target.closest("[data-category]");

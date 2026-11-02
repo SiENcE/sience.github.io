@@ -148,10 +148,289 @@
     return `<span class="place-chip tens"><strong>${tens}</strong> Z</span><span class="place-chip ones"><strong>${ones}</strong> E</span>`;
   }
 
+  /* ---------- Big numbers ---------- */
+  const P = C.PLACES;
+  const F = C.formatNumber;
+  // Shape colours (top, front, side, line) as in the tens and ones blocks:
+  // cubes orange, rods blue, plates green – the pattern repeats every three places.
+  const HUES = [
+    ["#f7c493", "#f0a35e", "#d98a45", "#a8652c"],
+    ["#a9c9e6", "#6fa3cf", "#4f84b2", "#2f5f88"],
+    ["#c4e2ca", "#8cc49a", "#6aa97a", "#3f7a4f"],
+  ];
+  /*
+   * A place as an isometric block: cube (1), rod (10 cubes), plate (10 × 10).
+   * The cube of a bigger family (Tausender, Million) is made of 10 × 10 × 10
+   * small cubes, so its faces carry a 10 × 10 grid.
+   */
+  function unitSvg(index, width) {
+    const shape = index % 3;
+    const [a, b, c] = [[1, 1, 1], [10, 1, 1], [10, 10, 1]][shape];
+    const [top, front, side, line] = HUES[shape];
+    const fine = shape === 0 && index >= 3;
+    const at = (x, y, z) => [(x - y) * 0.866, (x + y) * 0.5 - z];
+    const pt = (x, y, z) => at(x, y, z).map((v) => v.toFixed(3)).join(",");
+    const face = (points, fill) =>
+      `<polygon points="${points.map((q) => pt(...q)).join(" ")}" fill="${fill}" stroke="${line}" stroke-width="1.2" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>`;
+    const seg = (p1, p2) =>
+      `<line x1="${at(...p1)[0].toFixed(3)}" y1="${at(...p1)[1].toFixed(3)}" x2="${at(...p2)[0].toFixed(3)}" y2="${at(...p2)[1].toFixed(3)}" vector-effect="non-scaling-stroke"/>`;
+    const steps = (length) => (fine ? Array.from({ length: 9 }, (_, i) => (i + 1) / 10) : Array.from({ length: length - 1 }, (_, i) => i + 1));
+    const grid = [
+      ...steps(a).map((i) => seg([i, 0, c], [i, b, c])),
+      ...steps(b).map((j) => seg([0, j, c], [a, j, c])),
+      ...steps(a).map((i) => seg([i, b, 0], [i, b, c])),
+      ...steps(c).map((k) => seg([0, b, k], [a, b, k])),
+      ...steps(b).map((j) => seg([a, j, 0], [a, j, c])),
+      ...steps(c).map((k) => seg([a, 0, k], [a, b, k])),
+    ].join("");
+    const minX = -b * 0.866;
+    const maxX = a * 0.866;
+    const minY = -c;
+    const maxY = (a + b) * 0.5;
+    const box = `${(minX - 0.1).toFixed(2)} ${(minY - 0.1).toFixed(2)} ${(maxX - minX + 0.2).toFixed(2)} ${(maxY - minY + 0.2).toFixed(2)}`;
+    return `<svg class="unit-svg" viewBox="${box}" width="${width}" aria-hidden="true">${face([[0, 0, c], [a, 0, c], [a, b, c], [0, b, c]], top)}${face([[0, b, 0], [a, b, 0], [a, b, c], [0, b, c]], front)}${face([[a, 0, 0], [a, b, 0], [a, b, c], [a, 0, c]], side)}<g stroke="${line}" stroke-width="${fine ? 0.4 : 0.8}" stroke-opacity="${fine ? 0.45 : 0.7}">${grid}</g></svg>`;
+  }
+  // Picture width: small cubes small, the cube of a family bigger.
+  const unitWidth = (index, small = false) =>
+    index % 3 === 0 ? (index >= 3 ? (small ? 40 : 58) : small ? 18 : 26) : small ? 62 : 84;
+  // Steps from one place to the next: picture and name, "×10" and values as help.
+  function ladder(from, to) {
+    const parts = [];
+    for (let i = from; i <= to; i++) {
+      if (i > from) parts.push('<span class="ladder-arrow" hidden>×10</span>');
+      parts.push(
+        `<span class="ladder-step" data-step-place="${i}">${unitSvg(i, unitWidth(i, true))}<span class="ladder-name">${P[i].name}</span><span class="ladder-value" hidden>${F(P[i].value)}</span></span>`,
+      );
+    }
+    return `<div class="place-ladder">${parts.join("")}</div>`;
+  }
+  /*
+   * Place-value chart, highest place left. Dots ("Plättchen") show the
+   * digits; the digit row is help. A thick line separates the groups of three.
+   */
+  function placeTable(q, { dots = true, digits = false } = {}) {
+    const columns = Array.from({ length: q.places }, (_, i) => q.places - 1 - i);
+    const cell = (i, inner, cls) =>
+      `<span class="pt-cell ${cls} shape${i % 3}${i % 3 === 2 && i < q.places - 1 ? " group-start" : ""}${q.digits[i] === 0 ? " zero" : ""}" data-col="${i}">${inner}</span>`;
+    return `<div class="place-table" role="img" aria-label="Stellentafel" style="--places:${q.places}">${columns.map((i) => cell(i, P[i].id, "pt-head")).join("")}${dots ? columns.map((i) => cell(i, '<span class="pt-dot"></span>'.repeat(q.digits[i] || 0), "pt-dots")).join("") : ""}${columns.map((i) => cell(i, i < q.digits.length ? q.digits[i] : "", "pt-digit").replace("<span", digits ? "<span" : "<span hidden")).join("")}</div>`;
+  }
+  const bigButtons = (choices) =>
+    numberButtons(
+      choices,
+      Object.fromEntries(choices.map((x) => [x, F(Number(x))])),
+      Object.fromEntries(choices.map((x) => [x, F(Number(x))])),
+      "big-number",
+    );
+  function tenfoldMarkup(q) {
+    if (q.kind === "count") {
+      const big = P[q.big];
+      const small = P[q.small];
+      return `<div class="unit-equation" role="img" aria-label="${big.one} ist wie viele ${small.plural}?"><span class="unit-pic">${unitSvg(q.big, unitWidth(q.big))}<small>1 ${big.name}</small></span><span class="unit-eq">=</span><span class="math-gap" data-reveal>?</span><span class="unit-eq">×</span><span class="unit-pic">${unitSvg(q.small, unitWidth(q.small))}<small>${small.name}</small></span></div><div class="math-help" id="math-help" hidden>${ladder(q.small, q.big)}</div>${bigButtons(q.choices)}`;
+    }
+    const unit = P[q.from];
+    const pieces = Array.from({ length: 10 }, () => unitSvg(q.from, unitWidth(q.from, true))).join("");
+    const piece = unitWidth(q.from, true);
+    const result =
+      q.kind === "name"
+        ? `10 ${unit.plural} = 1 <span class="math-gap word-gap" data-reveal>?</span>`
+        : `10 ${unit.plural} = <span class="math-gap" data-reveal>?</span>`;
+    const buttons =
+      q.kind === "name"
+        ? `<div class="answer-choices">${q.choices.map((x) => `<button class="letter-button unit-button" data-answer="${x}">${x}</button>`).join("")}</div>`
+        : bigButtons(q.choices);
+    return `<div class="ten-pieces shape${q.from % 3}" style="--piece:${piece}px" role="img" aria-label="10 ${unit.plural}">${pieces}</div><div class="equation unit-result">${result}</div><div class="math-help" id="math-help" hidden>${ladder(Math.max(0, q.from - 1), Math.min(6, q.from + 1))}</div>${buttons}`;
+  }
+  function placetableMarkup(q, listen) {
+    const help = (inner) => `<div class="math-help" id="math-help" hidden>${inner}</div>`;
+    switch (q.kind) {
+      case "digit":
+        return `<div class="number-target big-target" aria-label="Zahl ${q.shown}">${q.shown}</div>${listen("Zahl anhören")}${numberButtons(q.choices)}${help(placeTable(q, { dots: false, digits: true }))}`;
+      case "split": {
+        const terms = q.parts.map((x, i) => (i === q.gap ? gap : F(x)));
+        return `<div class="equation big-equation">${q.shown} = ${terms.join(" + ")}</div>${listen("Anhören")}${bigButtons(q.choices)}${help(placeTable(q, { digits: true }))}`;
+      }
+      case "compose":
+        return `<div class="place-sum big-sum">${q.chips.map((x) => `<span class="place-chip big-chip">${x.replace(/^(\d+)/, "<strong>$1</strong>")}</span>`).join("")}</div>${listen("Anhören")}${bigButtons(q.choices)}${help(placeTable(q, { digits: true }))}`;
+      default:
+        return `${placeTable(q)}<p class="math-help" id="math-help" hidden></p>${bigButtons(q.choices)}`;
+    }
+  }
+  /*
+   * Laying numbers: one column per place with + and − below. The dots are
+   * updated in place by renderLaid, so taps on the buttons are never lost.
+   */
+  function layMarkup(q, listen) {
+    const target = q.delta
+      ? ""
+      : `<div class="number-target big-target${q.hidden ? " no-picture" : ""}" aria-hidden="true">${q.hidden ? "👂" : q.shown}</div>`;
+    const columns = Array.from({ length: q.places }, (_, i) => q.places - 1 - i);
+    const cls = (i) => `pt-cell shape${i % 3}${i % 3 === 2 && i < q.places - 1 ? " group-start" : ""}`;
+    const buttons = (i) =>
+      `<span class="${cls(i)} pt-buttons"><button class="step-button lay-step" data-lay="${i}" data-step="1" aria-label="${P[i].one} dazulegen">+</button><button class="step-button lay-step" data-lay="${i}" data-step="-1" aria-label="${P[i].one} wegnehmen">−</button></span>`;
+    const table = `<div class="place-table lay-table" style="--places:${q.places}">${columns.map((i) => `<span class="${cls(i)} pt-head">${P[i].id}</span>`).join("")}${columns.map((i) => `<span class="${cls(i)} pt-dots" id="lay-dots-${i}"></span>`).join("")}${columns.map((i) => `<span class="${cls(i)} pt-digit lay-digit" id="lay-digit-${i}" hidden></span>`).join("")}${columns.map(buttons).join("")}</div>`;
+    return `${target}${q.speech ? listen("Zahl anhören") : ""}${table}<p class="lay-note" id="lay-note" role="status"></p><p class="math-help" id="math-help" hidden></p><button id="build-done" class="button primary build-done">✓ Fertig</button>`;
+  }
+  function renderLaid(root, laid, answered, places) {
+    const value = C.layValue(laid);
+    const length = String(value).length;
+    for (let i = 0; i < places; i++) {
+      root.querySelector(`#lay-dots-${i}`).innerHTML = '<span class="pt-dot"></span>'.repeat(laid[i] || 0);
+      // Leading columns stay empty, inner empty places show their 0.
+      root.querySelector(`#lay-digit-${i}`).textContent = value && i < length ? laid[i] || 0 : "";
+    }
+    for (const button of root.querySelectorAll("[data-lay]"))
+      button.disabled =
+        answered || !C.layStep(laid, Number(button.dataset.lay), Number(button.dataset.step), places);
+  }
+  // What Momo says when ten dots were bundled or one was unbundled.
+  function layNote(events) {
+    const first = events[0];
+    if (first.type === "bundle") {
+      const from = P[first.from];
+      const to = P[first.from + 1];
+      return {
+        text: `10 ${from.plural} → 1 ${to.name}. Momo bündelt!`,
+        speech: `Zehn ${from.plural} sind ${to.one}. Momo bündelt.`,
+        column: first.from + 1,
+      };
+    }
+    const from = P[first.from];
+    const to = P[first.from - 1];
+    return {
+      text: `1 ${from.name} → 10 ${to.plural}. Momo tauscht.`,
+      speech: `${capitalize(from.one)} wird zu zehn ${to.dativePlural}. Momo tauscht.`,
+      column: events.at(-1).from - 1,
+    };
+  }
+  function layTip(q, n, { showAll, help, built }) {
+    const laid = Array.from({ length: q.places }, (_, i) => built?.[i] || 0);
+    const off = [...laid.keys()].reverse().find((i) => laid[i] !== (q.target[i] || 0));
+    if (n === 1) {
+      if (q.delta) {
+        const amount = Math.abs(q.delta);
+        const place = P[q.at];
+        const way = q.delta > 0 ? "dazu" : "weg";
+        return {
+          text: `${F(amount)} ${q.delta > 0 ? "mehr" : "weniger"} heißt: 1 Plättchen bei den ${place.dativePlural} ${way}. Liegen dort 10, bündelt Momo.`,
+          speech: `${capitalize(W(amount))} ${q.delta > 0 ? "mehr" : "weniger"} heißt: ein Plättchen bei den ${place.dativePlural} ${way}. Liegen dort zehn, bündelt Momo.`,
+        };
+      }
+      return same("Das passt noch nicht. Vergleiche Spalte für Spalte: Stimmt jede Stelle?");
+    }
+    if (n === 2 && off != null) {
+      showAll("#task-area .lay-digit");
+      return same(
+        `Unter jeder Spalte steht jetzt, wie viele es sind. Bei den ${P[off].dativePlural} sind es noch zu ${laid[off] < (q.target[off] || 0) ? "wenige" : "viele"}.`,
+      );
+    }
+    showAll("#task-area .lay-digit");
+    const explain = C.placesExplain(q.number, q.target.length);
+    help(explain.text);
+    return { text: "Schau: So viele Plättchen gehören in jede Spalte.", speech: explain.speech };
+  }
+  function tenfoldTip(q, n, { showAll, help }) {
+    if (q.kind === "count") {
+      if (n === 1) return same("Jede Stelle ist 10-mal so groß wie die davor. Zähle die Schritte.");
+      help();
+      showAll("#math-help .ladder-arrow");
+      if (n === 2) return same("Jeder Pfeil heißt: mal 10. Wie oft musst du mal 10 rechnen?");
+      showAll("#math-help .ladder-value");
+      return same("Schau: Unter jeder Stufe steht jetzt ihr Wert.");
+    }
+    if (n === 1)
+      return q.kind === "name"
+        ? same("Die Namen wiederholen sich: Einer, Zehner, Hunderter. Dann Tausender, Zehntausender, Hunderttausender.")
+        : same("10 gleiche Teile kann man zu einem großen Teil bündeln.");
+    help();
+    showAll("#math-help .ladder-arrow");
+    if (n === 2) return same(`Schau auf die Treppe: Aus 10 ${P[q.from].dativePlural} wird das nächste Teil.`);
+    showAll("#math-help .ladder-value");
+    return same("Unter jeder Stufe steht jetzt ihr Wert.");
+  }
+  function placetableTip(q, n, { find, showAll, help, picked }) {
+    const markColumn = (i) =>
+      document.querySelectorAll(`#task-area [data-col="${i}"]`).forEach((el) => el.classList.add("asked"));
+    if (q.kind === "digit") {
+      if (n === 1)
+        return same(`Von rechts nach links: ${P.slice(0, q.digits.length).map((x) => x.plural).join(", ")}.`);
+      help();
+      if (n === 2) return same("Schau in die Stellentafel: Jede Ziffer steht in ihrer Spalte.");
+      markColumn(q.at);
+      return same(`Die Spalte der ${P[q.at].plural} ist jetzt markiert.`);
+    }
+    if (q.kind === "split") {
+      const other = q.parts.findIndex((_, i) => i !== q.gap);
+      const value = q.parts[other];
+      const place = String(value).length - 1;
+      const digit = value / 10 ** place;
+      if (n === 1)
+        return {
+          text: `Jede Ziffer zählt so viel wie ihre Stelle: ${digit} ${digit === 1 ? P[place].name : P[place].plural} sind ${F(value)}.`,
+          speech: `Jede Ziffer zählt so viel wie ihre Stelle: ${countWord(digit)} ${digit === 1 ? P[place].name : P[place].plural} sind ${W(value)}.`,
+        };
+      help();
+      if (n === 2) return same("Schau in die Stellentafel: Welche Ziffer fehlt noch in der Rechnung?");
+      markColumn(String(q.parts[q.gap]).length - 1);
+      return same("Die fehlende Stelle ist jetzt markiert. Hänge die passenden Nullen an.");
+    }
+    // read and compose
+    if (n === 1) {
+      if (picked != null && picked === q.zeroSlip)
+        return same("Achtung: Eine leere Stelle schreibt man als 0. Die Null hält den Platz frei.");
+      return same(
+        q.kind === "read"
+          ? "Zähle die Plättchen in jeder Spalte. Jede Spalte ist eine Stelle der Zahl."
+          : "Schreib zu jeder Stelle die Ziffer. Wo nichts ist, steht eine 0.",
+      );
+    }
+    if (n === 2) {
+      if (q.kind === "read") showAll("#task-area .pt-digit");
+      else help();
+      return same("Unter jeder Spalte steht jetzt die Ziffer. Lies von links nach rechts, auch die Nullen.");
+    }
+    if (q.kind === "read") showAll("#task-area .pt-digit");
+    else help();
+    find(".place-table").classList.add("show-zeros");
+    return {
+      text: `Die Zahl hat ${q.digits.length} Stellen. Leere Stellen sind Nullen.`,
+      speech: `Die Zahl hat ${W(q.digits.length)} Stellen. Leere Stellen sind Nullen.`,
+    };
+  }
+
   /* ---------- Instructions ---------- */
   // The number to find is never spoken; numbers in speech are words.
   function instruction(q) {
     switch (q.mode) {
+      case "tenfold":
+        if (q.kind === "count") return same(`Wie viele ${P[q.small].plural} hat ${P[q.big].one}?`);
+        return same(
+          q.kind === "name"
+            ? `Aus zehn ${P[q.from].dativePlural} wird ein neues Teil. Wie heißt es?`
+            : `Momo bündelt zehn ${P[q.from].plural}. Wie viel ist das zusammen?`,
+        );
+      case "lay": {
+        if (!q.delta)
+          return same(
+            q.hidden
+              ? "Hör gut zu und lege die Zahl in die Stellentafel."
+              : "Lege die Zahl mit Plättchen in die Stellentafel.",
+          );
+        const amount = Math.abs(q.delta);
+        const way = q.delta > 0 ? "mehr" : "weniger";
+        return {
+          text: `Hier liegt ${F(q.startNumber)}. Lege ${F(amount)} ${way}!`,
+          speech: `Hier liegt ${W(q.startNumber)}. Lege ${W(amount)} ${way}!`,
+        };
+      }
+      case "placetable":
+        return same(
+          {
+            read: "Welche Zahl steht in der Stellentafel?",
+            compose: "Welche Zahl ist das?",
+            digit: `Wie viele ${P[q.at]?.plural} hat die Zahl?`,
+            split: "Zerlege die Zahl. Was fehlt?",
+          }[q.kind],
+        );
       case "bundle":
         return same("Welche Zahl ist das? Zähle die Zehner und die Einer.");
       case "place":
@@ -242,6 +521,12 @@
   /* ---------- Task markup ---------- */
   function markup(q, listen) {
     switch (q.mode) {
+      case "tenfold":
+        return tenfoldMarkup(q);
+      case "placetable":
+        return placetableMarkup(q, listen);
+      case "lay":
+        return layMarkup(q, listen);
       case "bundle":
         return `${blocks(q.tens, q.ones, { onesFirst: q.onesFirst })}<p class="math-help" id="math-help" hidden></p>${numberButtons(q.choices)}`;
       case "place": {
@@ -464,13 +749,15 @@
     }
     const target = root.querySelector("[data-reveal]");
     if (!target) return;
-    target.textContent = value;
+    target.textContent = /^\d+$/.test(value) ? F(Number(value)) : value;
     target.classList.add("found");
   }
 
   /* ---------- Stepped help ---------- */
   function namedPick(q, picked) {
-    if (picked == null || q.mode === "build") return null;
+    if (picked == null || q.mode === "build" || q.mode === "lay") return null;
+    if (["tenfold", "placetable"].includes(q.mode) && /^\d+$/.test(picked))
+      return { text: `${F(Number(picked))} passt nicht.`, speech: `${capitalize(W(Number(picked)))} passt nicht.` };
     if (q.mode === "sort")
       return { text: `${picked} ist noch nicht dran.`, speech: `${capitalize(W(Number(picked)))} ist noch nicht dran.` };
     if (q.mode === "compare")
@@ -503,15 +790,21 @@
       if (text != null) element.textContent = text;
       element.hidden = false;
     };
-    const tip = tipFor(q, n, { find, showAll, help, built });
+    const tip = tipFor(q, n, { find, showAll, help, built, picked });
     const named = namedPick(q, picked);
     return {
       text: [named?.text, tip.text].filter(Boolean).join(" "),
       speech: [named?.speech, tip.speech].filter(Boolean).join(" "),
     };
   }
-  function tipFor(q, n, { find, showAll, help, built }) {
+  function tipFor(q, n, { find, showAll, help, built, picked }) {
     switch (q.mode) {
+      case "tenfold":
+        return tenfoldTip(q, n, { showAll, help });
+      case "placetable":
+        return placetableTip(q, n, { find, showAll, help, picked });
+      case "lay":
+        return layTip(q, n, { showAll, help, built });
       case "bundle":
         if (n === 1) return same("Zähle zuerst die Zehner, dann die Einer.");
         if (n === 2) {
@@ -891,5 +1184,5 @@
     return same("Zähle die Dinge in den hellen Feldern.");
   }
 
-  window.WieseMath = { instruction, markup, renderBuilt, reveal, hint };
+  window.WieseMath = { instruction, markup, renderBuilt, renderLaid, layNote, reveal, hint };
 })();
