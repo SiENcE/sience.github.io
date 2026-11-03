@@ -80,21 +80,26 @@
     { id: "build", icon: "🏗️", title: "Zahlen bauen", color: "peach", grades: { 1: 0, 2: 1 } },
     { id: "line", icon: "📏", title: "Zahlenstrahl", color: "sky", grades: { 1: 0, 2: 1 } },
     { id: "chart", icon: "🟩", title: "Hundertertafel", color: "mint", grades: { 2: 0 } },
-    { id: "steps", icon: "👣", title: "Weiterzählen", color: "yellow", grades: { 2: 0 } },
-    { id: "compare", icon: "🐊", title: "Krokodil-Vergleich", color: "mint", grades: { 2: 0 } },
+    { id: "steps", icon: "👣", title: "Weiterzählen", color: "yellow", grades: { 2: 0, 3: 7, 4: 9 } },
+    { id: "compare", icon: "🐊", title: "Krokodil-Vergleich", color: "mint", grades: { 2: 0, 3: 6, 4: 8 } },
     { id: "sort", icon: "🪜", title: "Zahlen ordnen", color: "lavender", grades: { 2: 0 } },
     { id: "adjacent", icon: "🏘️", title: "Zahlen-Nachbarn", color: "peach", grades: { 2: 0 } },
-    { id: "calc", icon: "🔟", title: "Zehner rechnen", color: "rose", grades: { 2: 0 } },
+    { id: "calc", icon: "🔟", title: "Zehner rechnen", color: "rose", grades: { 2: 0, 3: 7, 4: 10 } },
     { id: "graph", icon: "📶", title: "Säulen lesen", color: "yellow", grades: { 1: 0, 2: 4 } },
     { id: "count", icon: "✋", title: "Wie viele?", color: "peach", grades: { 1: 0, 2: 5 } },
     { id: "more", icon: "🍎", title: "Mehr oder weniger?", color: "rose", grades: { 1: 0, 2: 5 } },
     { id: "venn", icon: "⭕", title: "Mengen-Kreise", color: "lavender", grades: { 1: 0, 2: 3 } },
     { id: "cross", icon: "🌉", title: "Über den Zehner", color: "sky", grades: { 1: 0, 2: 2 } },
-    { id: "times", icon: "🔵", title: "Malfelder", color: "lavender", grades: { 2: 0 } },
+    { id: "times", icon: "🔵", title: "Malfelder", color: "lavender", grades: { 2: 0, 3: 7, 4: 10 } },
+    { id: "column", icon: "🧾", title: "Schriftlich rechnen", color: "sky", grades: { 3: 0, 4: 4 } },
+    { id: "units", icon: "📏", title: "Umrechnen", color: "peach", grades: { 3: 0, 4: 4 } },
     { id: "money", icon: "🪙", title: "Geld zählen", color: "yellow", grades: { 1: 0, 2: 1 } },
     { id: "clock", icon: "🕒", title: "Uhr lesen", color: "mint", grades: { 1: 0, 2: 2 } },
     { id: "syllables", icon: "🥁", title: "Silben klatschen", color: "peach", grades: { 1: 0, 2: 4 } },
     { id: "extend", icon: "🐍", title: "Wörter verlängern", color: "mint", grades: { 2: 0 } },
+    { id: "spell", icon: "🔍", title: "Schreib-Detektiv", color: "lavender", grades: { 2: 0, 3: 3, 4: 6 } },
+    { id: "wordtype", icon: "🏷️", title: "Wortarten", color: "sky", grades: { 2: 0, 3: 3, 4: 6 } },
+    { id: "tense", icon: "⏳", title: "Zeitformen", color: "rose", grades: { 3: 0, 4: 3 } },
     { id: "tenfold", icon: "📦", title: "Immer zehn", color: "peach", grades: { 2: 0, 3: 2, 4: 4 } },
     { id: "placetable", icon: "🧱", title: "Stellentafel", color: "sky", grades: { 2: 0, 3: 2, 4: 5 } },
     { id: "lay", icon: "🔘", title: "Zahlen legen", color: "mint", grades: { 2: 0, 3: 2, 4: 5 } },
@@ -138,7 +143,16 @@
       title: "Richtig schreiben",
       report: "Rechtschreiben",
       color: "yellow",
-      games: ["syllables", "extend", "merk"],
+      games: ["syllables", "extend", "merk", "spell"],
+    },
+    {
+      id: "grammar",
+      subject: "deutsch",
+      icon: "🧩",
+      title: "Wörter und Sätze",
+      report: "Wortarten & Zeitformen",
+      color: "sky",
+      games: ["wordtype", "tense"],
     },
     {
       id: "memory",
@@ -199,18 +213,27 @@
       subject: "mathe",
       icon: "➕",
       title: "Rechnen",
-      report: "Rechnen bis 100",
+      report: "Rechnen",
       color: "rose",
-      games: ["calc", "cross"],
+      games: ["calc", "cross", "column"],
     },
     {
       id: "times",
       subject: "mathe",
       icon: "✖️",
       title: "Einmaleins",
-      report: "Einmaleins",
+      report: "Einmaleins & Teilen",
       color: "lavender",
       games: ["times"],
+    },
+    {
+      id: "measure",
+      subject: "mathe",
+      icon: "📏",
+      title: "Messen",
+      report: "Größen umrechnen",
+      color: "peach",
+      games: ["units"],
     },
     {
       id: "sizes",
@@ -640,6 +663,18 @@
       { steps: [5, -5], length: 4, choices: 4, label: "5er-Schritte" },
       { steps: [1, -1, 2, -2, 10], length: 5, gap: true, choices: 4, label: "Lücke in der Reihe" },
       { steps: [2, -2, 3, 5, -5, 10, -10], length: 5, gap: true, choices: 4, label: "alles gemischt" },
+      { steps: [100, -100], length: 5, max: 1000, align: 10, choices: 3, label: "100er-Schritte bis 1000" },
+      { steps: [20, -20, 25, 50, -50], length: 5, max: 1000, align: 5, gap: true, choices: 4, label: "20er, 25er, 50er bis 1000" },
+      { steps: [1000, -1000, 500], length: 5, max: 10000, align: 100, choices: 4, label: "1000er-Schritte bis 10 000" },
+      {
+        steps: [250, -250, 10000, -10000, 100000],
+        length: 5,
+        max: 1000000,
+        align: 1000,
+        gap: true,
+        choices: 4,
+        label: "große Schritte bis zur Million",
+      },
     ],
     // The crocodile always eats the bigger number: <, > (and =).
     compare: [
@@ -649,6 +684,11 @@
       { kind: "swapped", choices: 2, label: "Zahlendreher: 62 und 26" },
       { kind: "mixed", equal: true, choices: 3, label: "gemischt, auch =" },
       { kind: "sum", equal: true, choices: 3, label: "30 + 5 mit einer Zahl vergleichen" },
+      // Bigger numbers: more places means bigger, else compare from the front.
+      { kind: "big", digits: [3], choices: 2, label: "bis 1000: Hunderter vergleichen" },
+      { kind: "bigMixed", digits: [3], equal: true, choices: 3, label: "bis 1000, Zahlendreher, auch =" },
+      { kind: "bigMixed", digits: [4, 5], choices: 2, label: "bis 100 000, auch verschieden lang" },
+      { kind: "bigMixed", digits: [5, 6], equal: true, choices: 3, label: "bis zur Million" },
     ],
     // Tap the numbers in order.
     sort: [
@@ -688,6 +728,13 @@
         choices: 4,
         label: "alles gemischt",
       },
+      // The same steps with hundreds (grade 3), thousands and more (grade 4).
+      { ops: ["T+T", "T-T"], unit: 100, choices: 3, label: "Hunderter: 300 + 400, 700 − 200" },
+      { ops: ["N+T", "N-T"], unit: 100, choices: 4, label: "Zahl und Hunderter: 352 + 300" },
+      { ops: ["fillUp", "fillDown"], unit: 100, choices: 4, label: "bis zum Nachbarhunderter: 370 + _ = 400" },
+      { ops: ["T+T", "T-T"], unit: 1000, choices: 4, label: "Tausender: 3000 + 4000" },
+      { ops: ["N+T", "N-T", "fillUp", "fillDown"], unit: 1000, choices: 4, label: "Tausender, bis zum Nachbartausender" },
+      { ops: ["T+T", "T-T", "N+T", "N-T"], unit: 100000, choices: 4, label: "Hunderttausender: 300 000 + 400 000" },
     ],
     // Bar charts with one box per child.
     // Grasp a quantity: ten frames, dice, tally marks, scattered things.
@@ -744,6 +791,41 @@
       { ask: "neighbor", rows: [2, 3, 4, 5, 10], max: 10, choices: 4, label: "Nachbaraufgaben: 6 · 5 = 5 · 5 + 5" },
       { ask: "swap", rows: [3, 4, 6, 7, 8, 9], max: 10, choices: 4, label: "Tauschaufgaben: 4 · 7 = 7 · 4" },
       { ask: "result", rows: [2, 3, 4, 5, 6, 7, 8, 9, 10], max: 10, choices: 4, label: "alle Reihen" },
+      // Grade 3: dividing as the reverse of multiplying.
+      { ask: "divide", rows: [2, 5, 10], max: 10, choices: 3, label: "Geteiltaufgaben: 2er, 5er, 10er" },
+      { ask: "divide", rows: [2, 3, 4, 5, 6, 7, 8, 9, 10], max: 10, choices: 4, label: "geteilt, alle Reihen: 42 : 7" },
+      { ask: "missing", rows: [2, 3, 4, 5, 6, 7, 8, 9, 10], max: 10, choices: 4, label: "Was fehlt? _ · 7 = 42" },
+      // Grade 4: tens, splitting a factor, division with remainder.
+      { ask: "tens", rows: [2, 3, 4, 5, 6, 7, 8, 9], max: 9, choices: 4, label: "Zehnereinmaleins: 3 · 40, 120 : 4" },
+      { ask: "split", rows: [2, 3, 4, 5, 6, 7, 8, 9], max: 9, choices: 4, label: "zerlegen: 4 · 23 = 4 · 20 + 4 · 3" },
+      { ask: "remainder", rows: [2, 3, 4, 5, 6, 7, 8, 9], max: 9, choices: 4, label: "mit Rest: 23 : 5 = 4 R 3" },
+    ],
+    // Written addition and subtraction in columns, with carries.
+    column: [
+      { ops: ["+"], digits: [3], carries: [1, 1], choices: 3, label: "plus, ein Übertrag (bis 1000)" },
+      { ops: ["+"], digits: [3], carries: [2, 3], choices: 4, label: "plus, mehrere Überträge" },
+      { ops: ["-"], digits: [3], carries: [1, 1], choices: 4, label: "minus, ein Übertrag" },
+      { ops: ["-"], digits: [3], carries: [2, 3], choices: 4, label: "minus, mehrere Überträge" },
+      { ops: ["+"], digits: [4, 5], carries: [1, 4], choices: 4, label: "plus bis 100 000" },
+      { ops: ["-"], digits: [4, 5], carries: [1, 4], choices: 4, label: "minus bis 100 000" },
+      { ops: ["+"], digits: [3, 4], terms: 3, carries: [1, 4], choices: 4, label: "drei Zahlen plus" },
+      { ops: ["+", "-"], digits: [5, 6], carries: [1, 5], choices: 4, label: "plus und minus bis zur Million" },
+    ],
+    // Converting units: length, money, time, weight, volume.
+    units: [
+      { kinds: ["down"], pairs: ["m_cm", "euro_ct"], choices: 3, label: "3 m = 300 cm, 2 € = 200 ct" },
+      { kinds: ["up"], pairs: ["m_cm", "euro_ct", "cm_mm"], choices: 3, label: "400 cm = 4 m, 50 mm = 5 cm" },
+      { kinds: ["down", "up"], pairs: ["h_min", "min_s"], choices: 4, label: "Stunden, Minuten, Sekunden" },
+      { kinds: ["mixed"], pairs: ["m_cm", "euro_ct", "h_min"], choices: 4, label: "3 m 25 cm = 325 cm" },
+      { kinds: ["down", "up"], pairs: ["kg_g", "km_m", "l_ml"], choices: 4, label: "kg, km und l: 2 kg = 2000 g" },
+      { kinds: ["half"], choices: 4, label: "½ kg, ¼ h, ¾ l" },
+      { kinds: ["comma"], choices: 4, label: "mit Komma: 2,50 € = 250 ct" },
+      {
+        kinds: ["down", "up", "mixed", "half", "comma"],
+        pairs: ["m_cm", "euro_ct", "cm_mm", "h_min", "min_s", "kg_g", "km_m", "l_ml"],
+        choices: 4,
+        label: "alles gemischt",
+      },
     ],
     // Coins and notes: count, pay exactly, change.
     money: [
@@ -798,6 +880,44 @@
         choices: 2,
         label: "alles, ohne Bild",
       },
+    ],
+    // Spelling rules: which letters fill the gap? Never spoken as letters.
+    spell: [
+      { rules: ["double"], picture: true, choices: 2, label: "doppelt oder einfach: Sonne, Hose" },
+      { rules: ["ie"], picture: true, choices: 2, label: "i oder ie: Kind, Biene" },
+      { rules: ["double", "ie"], picture: false, choices: 2, label: "doppelt oder ie, ohne Bild" },
+      { rules: ["ck", "tz"], picture: false, choices: 2, label: "ck oder k, tz oder z" },
+      { rules: ["ae"], picture: false, choices: 2, label: "ä oder e, äu oder eu: Baum – Bäume" },
+      { rules: ["double", "ie", "ck", "tz", "ae"], picture: false, choices: 2, label: "alles bis zur 3. Klasse" },
+      { rules: ["ss"], picture: false, choices: 2, label: "ss oder ß: Wasser, Fuß" },
+      { rules: ["dass"], picture: false, choices: 2, label: "das oder dass" },
+      {
+        rules: ["double", "ie", "ck", "tz", "ae", "ss", "dass"],
+        picture: false,
+        choices: 2,
+        label: "alles gemischt",
+      },
+    ],
+    // Word types: noun, verb, adjective, later pronoun and article, in sentences.
+    wordtype: [
+      { types: ["N", "V"], picture: true, choices: 2, label: "Nomen oder Verb? mit Bild" },
+      { types: ["N", "A"], picture: true, choices: 2, label: "Nomen oder Adjektiv? mit Bild" },
+      { types: ["N", "V", "A"], picture: true, choices: 3, label: "Nomen, Verb, Adjektiv" },
+      { types: ["N", "V", "A"], picture: false, choices: 3, label: "ohne Bild" },
+      { types: ["N", "V", "A"], sentence: true, choices: 3, label: "im Satz" },
+      { types: ["N", "V", "A", "P"], sentence: true, choices: 4, label: "im Satz, auch Pronomen" },
+      { types: ["N", "V", "A", "P"], sentence: true, tricky: true, choices: 4, label: "Achtung: das Schwimmen, beim Lesen" },
+      { types: ["N", "V", "A", "P", "R"], sentence: true, tricky: true, choices: 4, label: "alle Wortarten, auch Artikel" },
+    ],
+    // Tenses: past forms, participles, haben or sein, naming the tense.
+    tense: [
+      { ask: ["past"], strong: false, choices: 3, label: "Vergangenheit: spielen – spielte" },
+      { ask: ["past"], strong: true, choices: 3, label: "unregelmäßig: gehen – ging" },
+      { ask: ["name"], tenses: ["present", "past"], choices: 2, label: "Gegenwart oder Vergangenheit?" },
+      { ask: ["part"], choices: 3, label: "Perfekt: habe gespielt, bin gegangen" },
+      { ask: ["aux"], choices: 2, label: "habe oder bin?" },
+      { ask: ["name"], tenses: ["present", "past", "perfect", "future"], choices: 4, label: "Welche Zeitform? alle vier" },
+      { ask: ["past", "part"], choices: 3, label: "alles gemischt" },
     ],
     // English: hear a word, tap its picture. Topic by topic, then mixed and
     // finally words that sound almost the same (cat – hat – cap).
@@ -1660,13 +1780,14 @@
     );
   }
   /*
-   * Answer, forced typical mistakes, then distractors from the pool (1–100).
+   * Answer, forced typical mistakes, then distractors from the pool (1 to
+   * "max", 100 by default).
    * Near the ends of the number range the pool can run short; then the
    * closest free numbers fill up (never one of "exclude", e.g. shown ones).
    */
-  function numberOptions(answer, forced, pool, count, random, exclude = []) {
+  function numberOptions(answer, forced, pool, count, random, exclude = [], max = 100) {
     const free = (x) =>
-      Number.isInteger(x) && x >= 1 && x <= 100 && x !== answer && !exclude.includes(x);
+      Number.isInteger(x) && x >= 1 && x <= max && x !== answer && !exclude.includes(x);
     const must = [
       ...new Set(forced.filter((x) => Number.isInteger(x) && x >= 0 && x !== answer)),
     ].slice(0, count - 1);
@@ -1686,7 +1807,7 @@
   // "34 + 10 = 44." with the spoken twin.
   function sumExplain(from, delta, result) {
     return {
-      text: `${from} ${sign(delta)} ${Math.abs(delta)} = ${result}.`,
+      text: `${formatNumber(from)} ${sign(delta)} ${formatNumber(Math.abs(delta))} = ${formatNumber(result)}.`,
       speech: `${capitalize(numberWord(from))} ${signWord(delta)} ${numberWord(Math.abs(delta))} ist ${numberWord(result)}.`,
     };
   }
@@ -1726,6 +1847,232 @@
     ["💖", "lieb", "liebe", "adjective"], ["🦉", "klug", "kluge", "adjective"], ["💪", "stark", "starke", "adjective"],
     ["🤒", "krank", "kranke", "adjective"],
   ];
+  /*
+   * Spelling detective: [icon, word with the [gap], related word]. The
+   * other choice comes from the rule (nn ↔ n, ie ↔ i, ck ↔ k, tz ↔ z,
+   * ä ↔ e, äu ↔ eu, ss ↔ ß, dass ↔ das). Choices are never spoken.
+   */
+  const SPELL_WORDS = {
+    double: [
+      ["☀️", "So[nn]e"], ["⚽", "Ba[ll]"], ["🍽️", "Te[ll]er"], ["🪆", "Pu[pp]e"], ["💧", "Wa[ss]er"],
+      ["☕", "Ta[ss]e"], ["🧳", "Ko[ff]er"], ["🛏️", "Be[tt]"], ["🚢", "Schi[ff]"], ["👓", "Bri[ll]e"],
+      ["🧶", "Wo[ll]e"], ["🍲", "Su[pp]e"], ["🌲", "Ta[nn]e"], ["🔨", "Ha[mm]er"], ["🍳", "Pfa[nn]e"],
+      ["🐒", "A[ff]e"], ["🥄", "Lö[ff]el"], ["🧈", "Bu[tt]er"], ["🛴", "Ro[ll]er"], ["", "Mu[tt]er"],
+      ["", "Ka[mm]"], ["", "Hi[mm]el"], ["", "So[mm]er"], ["", "Zi[mm]er"], ["", "Ka[nn]e"],
+      ["👖", "Ho[s]e"], ["👃", "Na[s]e"], ["🌹", "Ro[s]e"], ["🐰", "Ha[s]e"], ["🥫", "Do[s]e"],
+      ["🫏", "E[s]el"], ["👑", "Kro[n]e"], ["🏫", "Schu[l]e"], ["🍅", "Toma[t]e"], ["", "Na[m]e"],
+      ["", "Ta[f]el"], ["", "O[f]en"],
+    ],
+    ie: [
+      ["🐝", "B[ie]ne"], ["✉️", "Br[ie]f"], ["🪞", "Sp[ie]gel"], ["🐐", "Z[ie]ge"], ["🪰", "Fl[ie]ge"],
+      ["🎲", "Sp[ie]l"], ["🦹", "D[ie]b"], ["📄", "Pap[ie]r"], ["", "T[ie]r"], ["", "L[ie]d"],
+      ["", "v[ie]l"], ["", "W[ie]se"], ["", "R[ie]se"], ["", "Kn[ie]"],
+      ["🧒", "K[i]nd"], ["🐟", "F[i]sch"], ["🖼️", "B[i]ld"], ["💡", "L[i]cht"], ["🥛", "M[i]lch"],
+      ["💍", "R[i]ng"], ["🍒", "K[i]rsche"], ["🎪", "Z[i]rkus"], ["🍄", "P[i]lz"], ["✏️", "St[i]ft"],
+      ["", "T[i]sch"], ["", "W[i]nd"], ["", "K[i]ste"],
+    ],
+    ck: [
+      ["🧥", "Ja[ck]e"], ["🔔", "Glo[ck]e"], ["🧦", "So[ck]e"], ["🐌", "Schne[ck]e"], ["🌉", "Brü[ck]e"],
+      ["⏰", "We[ck]er"], ["🔌", "Ste[ck]er"], ["🦟", "Mü[ck]e"], ["", "De[ck]e"], ["", "Zu[ck]er"],
+      ["", "Bä[ck]er"], ["", "Rü[ck]en"],
+      ["☁️", "Wol[k]e"], ["🥁", "Pau[k]e"], ["🥒", "Gur[k]e"], ["🪝", "Ha[k]en"], ["👻", "Spu[k]"],
+      ["", "On[k]el"], ["", "Schau[k]el"], ["", "Ban[k]"], ["", "Schran[k]"],
+    ],
+    tz: [
+      ["🐱", "Ka[tz]e"], ["🧢", "Mü[tz]e"], ["🐦", "Spa[tz]"], ["🥵", "Hi[tz]e"], ["⚡", "Bli[tz]"],
+      ["🐾", "Ta[tz]e"], ["🥅", "Ne[tz]"], ["💉", "Spri[tz]e"], ["", "Pfü[tz]e"], ["", "Pla[tz]"],
+      ["", "Wi[tz]"], ["", "Sa[tz]"],
+      ["❤️", "Her[z]"], ["🪵", "Hol[z]"], ["🧂", "Sal[z]"], ["🍄", "Pil[z]"], ["🕯️", "Ker[z]e"],
+      ["🥨", "Bre[z]el"], ["🌾", "Wei[z]en"], ["", "Wur[z]el"], ["", "Schmer[z]"], ["", "Hei[z]ung"],
+    ],
+    ae: [
+      ["🌳", "B[äu]me", "Baum"], ["🏠", "H[äu]ser", "Haus"], ["🐭", "M[äu]se", "Maus"],
+      ["", "Tr[äu]me", "Traum"], ["", "Z[äu]ne", "Zaun"], ["", "l[äu]ft", "laufen"],
+      ["", "R[ä]der", "Rad"], ["", "H[ä]nde", "Hand"], ["", "Gl[ä]ser", "Glas"], ["", "Bl[ä]tter", "Blatt"],
+      ["", "W[ä]lder", "Wald"], ["", "L[ä]nder", "Land"], ["", "K[ä]lte", "kalt"], ["", "B[ä]cker", "backen"],
+      ["", "F[ä]hre", "fahren"], ["", "N[ä]chte", "Nacht"], ["", "G[ä]rten", "Garten"], ["", "B[ä]lle", "Ball"],
+      ["", "F[e]der"], ["", "F[e]nster"], ["", "H[e]ft"], ["", "K[e]tte"], ["", "B[e]cher"], ["", "M[e]sser"],
+      ["", "N[e]st"], ["", "W[e]lt"], ["", "F[e]ld"],
+      ["", "L[eu]te"], ["", "F[eu]er"], ["", "Fr[eu]nd"], ["", "h[eu]te"], ["", "B[eu]tel"], ["", "n[eu]n"],
+    ],
+    ss: [
+      ["🦶", "Fu[ß]"], ["", "Stra[ß]e"], ["", "Spa[ß]"], ["", "Gru[ß]"], ["", "Klo[ß]"], ["", "gro[ß]"],
+      ["", "So[ß]e"], ["", "Flo[ß]"], ["", "hei[ß]"], ["", "wei[ß]"], ["", "Strau[ß]"], ["", "drau[ß]en"],
+      ["", "sü[ß]"], ["", "flie[ß]en"],
+      ["💧", "Wa[ss]er"], ["", "Ki[ss]en"], ["🔑", "Schlü[ss]el"], ["", "Kla[ss]e"], ["", "Flu[ss]"],
+      ["🏰", "Schlo[ss]"], ["", "Nu[ss]"], ["", "na[ss]"], ["", "e[ss]en"], ["", "be[ss]er"],
+      ["", "Me[ss]er"], ["", "Fa[ss]"],
+    ],
+    // Sentences: das (dieses, welches would fit) or dass (a joining word).
+    dass: [
+      ["", "Ich hoffe, [dass] du morgen kommst."], ["", "Ich glaube, [dass] es gleich regnet."],
+      ["", "Weißt du, [dass] Momo Möhren mag?"], ["", "Mama sagt, [dass] wir jetzt gehen."],
+      ["", "Ich finde es schön, [dass] du da bist."], ["", "Es ist gut, [dass] wir Zeit haben."],
+      ["", "Tim freut sich, [dass] die Sonne scheint."],
+      ["", "Ich sehe [das] Pferd auf der Wiese."], ["", "Wo ist [das] Buch von Lena?"],
+      ["", "Momo frisst [das] frische Gras."], ["", "Hier ist ein Kind, [das] laut lacht."],
+      ["", "Ich mag [das] Bild an der Wand."], ["", "Das ist das Auto, [das] so schnell fährt."],
+      ["", "Wir kaufen [das] große Eis."],
+    ],
+  };
+  // The other spelling for the gap, by rule.
+  const SPELL_TWINS = {
+    ie: "i", i: "ie", ck: "k", k: "ck", tz: "z", z: "tz", ä: "e", e: "ä", äu: "eu", eu: "äu",
+    ss: "ß", ß: "ss", das: "dass", dass: "das",
+  };
+  const SPELL_VOWELS = "aeiouäöü";
+  const SPELL_DIPHTHONGS = ["ei", "ai", "au", "eu", "äu"];
+  // Hints per rule; the voice never gets the letters.
+  const SPELL_TIPS = {
+    double: {
+      text: "Sprich das Wort langsam. Ist der Selbstlaut vor der Lücke kurz, kommt oft ein doppelter Mitlaut.",
+      speech: "Sprich das Wort langsam. Ist der Selbstlaut vor der Lücke kurz, kommt oft ein doppelter Mitlaut.",
+    },
+    ie: {
+      text: "Hör genau: Klingt der Laut in der Lücke lang, schreibt man meistens ie. Kurz: nur i.",
+      speech: "Hör genau: Klingt der Laut in der Lücke lang oder kurz?",
+    },
+    ck: {
+      text: "Kurzer Selbstlaut davor: ck. Nach einem Mitlaut, nach au, ei, eu oder einem langen Selbstlaut: nur k.",
+      speech: "Ist der Selbstlaut davor kurz, schreibt man doppelt. Nach einem Mitlaut, nach einem Zwielaut oder einem langen Selbstlaut nie.",
+    },
+    tz: {
+      text: "Kurzer Selbstlaut davor: tz. Nach einem Mitlaut, nach au, ei, eu oder einem langen Selbstlaut: nur z.",
+      speech: "Ist der Selbstlaut davor kurz, schreibt man doppelt. Nach einem Mitlaut, nach einem Zwielaut oder einem langen Selbstlaut nie.",
+    },
+    ae: {
+      text: "Such ein verwandtes Wort: Gibt es eins mit a oder au? Dann schreibt man ä oder äu.",
+      speech: "Such ein verwandtes Wort. Kennst du eins, das ähnlich klingt?",
+    },
+    ss: {
+      text: "Kurzer Selbstlaut davor: ss. Langer Selbstlaut oder au, ei, eu davor: ß.",
+      speech: "Sprich das Wort langsam. Ist der Laut vor der Lücke kurz oder lang?",
+    },
+    dass: {
+      text: "Kannst du „dieses“ oder „welches“ einsetzen? Dann schreibt man das, sonst dass.",
+      speech: "Kannst du dieses oder welches einsetzen?",
+    },
+  };
+
+  /*
+   * Word types. Words: [icon, word, type, probe]. The probe proves the type:
+   * "der Hund", "ich laufe", "sehr groß".
+   */
+  const WORD_TYPES = {
+    N: { name: "Nomen", rule: "Nomen sind Namen für Menschen, Tiere, Pflanzen und Dinge. Man schreibt sie groß." },
+    V: { name: "Verb", rule: "Verben sagen, was jemand tut oder was geschieht." },
+    A: { name: "Adjektiv", rule: "Adjektive sagen, wie etwas ist." },
+    P: { name: "Pronomen", rule: "Pronomen wie ich, du, er, sie, es, wir, ihr stehen für Personen oder Dinge." },
+    R: { name: "Artikel", rule: "Artikel wie der, die, das, ein, eine stehen vor einem Nomen." },
+  };
+  const WORDTYPE_WORDS = [
+    ["🐶", "Hund", "N", "der Hund"], ["🐱", "Katze", "N", "die Katze"], ["🌳", "Baum", "N", "der Baum"],
+    ["🏠", "Haus", "N", "das Haus"], ["⚽", "Ball", "N", "der Ball"], ["🌼", "Blume", "N", "die Blume"],
+    ["🚗", "Auto", "N", "das Auto"], ["🍎", "Apfel", "N", "der Apfel"], ["📖", "Buch", "N", "das Buch"],
+    ["☀️", "Sonne", "N", "die Sonne"], ["🐟", "Fisch", "N", "der Fisch"], ["👟", "Schuh", "N", "der Schuh"],
+    ["🍞", "Brot", "N", "das Brot"], ["⭐", "Stern", "N", "der Stern"], ["☕", "Tasse", "N", "die Tasse"],
+    ["🚆", "Zug", "N", "der Zug"], ["🍰", "Kuchen", "N", "der Kuchen"], ["🏫", "Schule", "N", "die Schule"],
+    ["🐴", "Pferd", "N", "das Pferd"], ["🛏️", "Bett", "N", "das Bett"],
+    ["🏃", "laufen", "V", "ich laufe"], ["🏊", "schwimmen", "V", "ich schwimme"], ["😴", "schlafen", "V", "ich schlafe"],
+    ["🍽️", "essen", "V", "ich esse"], ["🥤", "trinken", "V", "ich trinke"], ["🎤", "singen", "V", "ich singe"],
+    ["🎨", "malen", "V", "ich male"], ["💃", "tanzen", "V", "ich tanze"], ["😂", "lachen", "V", "ich lache"],
+    ["😢", "weinen", "V", "ich weine"], ["🦘", "springen", "V", "ich springe"], ["🍳", "kochen", "V", "ich koche"],
+    ["✍️", "schreiben", "V", "ich schreibe"], ["📚", "lesen", "V", "ich lese"], ["🧱", "bauen", "V", "ich baue"],
+    ["👋", "winken", "V", "ich winke"], ["🧗", "klettern", "V", "ich klettere"],
+    ["🦒", "groß", "A", "sehr groß"], ["🐜", "klein", "A", "sehr klein"], ["🔥", "heiß", "A", "sehr heiß"],
+    ["🧊", "kalt", "A", "sehr kalt"], ["🐆", "schnell", "A", "sehr schnell"], ["🐌", "langsam", "A", "sehr langsam"],
+    ["📢", "laut", "A", "sehr laut"], ["🤫", "leise", "A", "sehr leise"], ["💧", "nass", "A", "sehr nass"],
+    ["🍬", "süß", "A", "sehr süß"], ["🍋", "sauer", "A", "sehr sauer"], ["🥱", "müde", "A", "sehr müde"],
+    ["🤡", "lustig", "A", "sehr lustig"], ["😞", "traurig", "A", "sehr traurig"], ["💡", "hell", "A", "sehr hell"],
+    ["🌑", "dunkel", "A", "sehr dunkel"], ["🧸", "weich", "A", "sehr weich"], ["🪨", "hart", "A", "sehr hart"],
+    ["💪", "stark", "A", "sehr stark"], ["🔵", "rund", "A", "ganz rund"],
+  ];
+  /*
+   * Sentences with tagged words: [word|type]. "Nv" is a verb used as a noun
+   * (das Schwimmen), "Ng" a noun for a feeling or thought (die Freude); both
+   * only on the tricky levels.
+   */
+  const WORDTYPE_SENTENCES = [
+    "[Der|R] [Hund|N] [bellt|V] [laut|A].",
+    "[Die|R] [kleine|A] [Katze|N] [schläft|V] im Korb.",
+    "[Ich|P] [esse|V] [einen|R] [roten|A] [Apfel|N].",
+    "[Momo|N] [hüpft|V] [schnell|A] über die Wiese.",
+    "[Wir|P] [bauen|V] [eine|R] [große|A] [Burg|N].",
+    "[Er|P] [liest|V] [ein|R] [spannendes|A] [Buch|N].",
+    "[Die|R] [Sonne|N] [scheint|V] [hell|A].",
+    "[Sie|P] [malt|V] [ein|R] [buntes|A] [Bild|N].",
+    "[Der|R] [Ball|N] [ist|V] [rund|A].",
+    "[Du|P] [trinkst|V] [kalten|A] [Saft|N].",
+    "[Das|R] [Pferd|N] [läuft|V] auf der [grünen|A] [Wiese|N].",
+    "[Ihr|P] [singt|V] [ein|R] [lustiges|A] [Lied|N].",
+    "[Es|P] [ist|V] heute sehr [kalt|A].",
+    "[Die|R] [Kinder|N] [spielen|V] [fröhlich|A] im [Garten|N].",
+    "[Der|R] [alte|A] [Mann|N] [geht|V] [langsam|A] nach Hause.",
+    "[Wir|P] [fahren|V] mit dem [neuen|A] [Fahrrad|N].",
+    "[Sie|P] [kocht|V] [eine|R] [heiße|A] [Suppe|N].",
+    "[Er|P] [schwimmt|V] im [tiefen|A] [See|N].",
+    "Das [Schwimmen|Nv] [macht|V] [großen|A] [Spaß|Ng].",
+    "Beim [Lesen|Nv] [bin|V] [ich|P] [leise|A].",
+    "Zum [Spielen|Nv] [gehen|V] [wir|P] nach draußen.",
+    "Momo [liebt|V] das [Hüpfen|Nv].",
+    "Beim [Essen|Nv] [reden|V] [wir|P] über den [Tag|N].",
+    "[Die|R] [Freude|Ng] [ist|V] [groß|A].",
+    "[Ich|P] [habe|V] [große|A] [Angst|Ng] vor [Gewittern|N].",
+    "Das [Malen|Nv] [macht|V] [mich|P] [froh|A].",
+  ];
+
+  /*
+   * Tenses: [infinitive, ich (present), ich (past), participle, haben or
+   * sein, words after the verb, irregular]. Sentences: "Heute spiele ich
+   * Fußball." – "Gestern spielte ich Fußball." – "Gestern habe ich Fußball
+   * gespielt." – "Morgen werde ich Fußball spielen."
+   */
+  const TENSE_VERBS = [
+    ["spielen", "spiele", "spielte", "gespielt", "habe", "Fußball", false],
+    ["malen", "male", "malte", "gemalt", "habe", "ein Bild", false],
+    ["kochen", "koche", "kochte", "gekocht", "habe", "Nudeln", false],
+    ["bauen", "baue", "baute", "gebaut", "habe", "eine Burg", false],
+    ["lachen", "lache", "lachte", "gelacht", "habe", "laut", false],
+    ["tanzen", "tanze", "tanzte", "getanzt", "habe", "im Garten", false],
+    ["kaufen", "kaufe", "kaufte", "gekauft", "habe", "ein Eis", false],
+    ["suchen", "suche", "suchte", "gesucht", "habe", "meinen Ball", false],
+    ["machen", "mache", "machte", "gemacht", "habe", "Hausaufgaben", false],
+    ["lernen", "lerne", "lernte", "gelernt", "habe", "Englisch", false],
+    ["putzen", "putze", "putzte", "geputzt", "habe", "die Zähne", false],
+    ["hüpfen", "hüpfe", "hüpfte", "gehüpft", "bin", "auf dem Trampolin", false],
+    ["gehen", "gehe", "ging", "gegangen", "bin", "in die Schule", true],
+    ["laufen", "laufe", "lief", "gelaufen", "bin", "schnell", true],
+    ["schwimmen", "schwimme", "schwamm", "geschwommen", "bin", "im See", true],
+    ["fahren", "fahre", "fuhr", "gefahren", "bin", "mit dem Rad", true],
+    ["kommen", "komme", "kam", "gekommen", "bin", "spät nach Hause", true],
+    ["springen", "springe", "sprang", "gesprungen", "bin", "hoch", true],
+    ["essen", "esse", "aß", "gegessen", "habe", "einen Apfel", true],
+    ["trinken", "trinke", "trank", "getrunken", "habe", "Saft", true],
+    ["singen", "singe", "sang", "gesungen", "habe", "ein Lied", true],
+    ["lesen", "lese", "las", "gelesen", "habe", "ein Buch", true],
+    ["schreiben", "schreibe", "schrieb", "geschrieben", "habe", "einen Brief", true],
+    ["sehen", "sehe", "sah", "gesehen", "habe", "einen Vogel", true],
+    ["finden", "finde", "fand", "gefunden", "habe", "einen Stein", true],
+    ["schlafen", "schlafe", "schlief", "geschlafen", "habe", "lange", true],
+    ["helfen", "helfe", "half", "geholfen", "habe", "Oma", true],
+    ["werfen", "werfe", "warf", "geworfen", "habe", "den Ball", true],
+  ].map(([inf, present, past, part, aux, rest, strong]) => ({ inf, present, past, part, aux, rest, strong }));
+  const TENSES = {
+    present: { label: "Gegenwart (Präsens)", speech: "Gegenwart, Präsens" },
+    past: { label: "Vergangenheit (Präteritum)", speech: "Vergangenheit, Präteritum" },
+    perfect: { label: "Perfekt", speech: "Perfekt" },
+    future: { label: "Zukunft (Futur)", speech: "Zukunft, Futur" },
+  };
+  // "Ich spielte Fußball." – sentences without a time word (for naming the tense).
+  function tenseSentence(verb, tense, when = "") {
+    const start = when ? `${when} ` : "";
+    const subject = when ? " ich" : "Ich";
+    const lead = (word) => (when ? `${start}${word}${subject}` : `${subject} ${word}`);
+    if (tense === "present") return `${lead(verb.present)} ${verb.rest}.`;
+    if (tense === "past") return `${lead(verb.past)} ${verb.rest}.`;
+    if (tense === "perfect") return `${lead(verb.aux)} ${verb.rest} ${verb.part}.`;
+    return `${lead("werde")} ${verb.rest} ${verb.inf}.`;
+  }
   // Endings that sound alike at the end of a word.
   const SOUND_TWINS = { d: "t", t: "d", g: "k", k: "g", b: "p", p: "b" };
   const SHOP_ITEMS = [
@@ -1741,12 +2088,12 @@
    * Set diagrams: two properties ("rings") and things with [icon, article,
    * word, in ring 1, in ring 2]. Only clear cases, so every thing has one place.
    */
-  const TIER = { label: "Tier", ask: "Ist es ein Tier?", yes: "ist ein Tier", no: "ist kein Tier" };
+  const TIER = { label: "Tier", icon: "🐾", ask: "Ist es ein Tier?", yes: "ist ein Tier", no: "ist kein Tier" };
   const VENN_SETS = [
     {
       rings: [
-        { label: "rot", ask: "Ist es rot?", yes: "ist rot", no: "ist nicht rot" },
-        { label: "Obst", ask: "Ist es Obst?", yes: "ist Obst", no: "ist kein Obst" },
+        { label: "rot", icon: "🔴", ask: "Ist es rot?", yes: "ist rot", no: "ist nicht rot" },
+        { label: "Obst", icon: "🧺", ask: "Ist es Obst?", yes: "ist Obst", no: "ist kein Obst" },
       ],
       items: [
         ["🍎", "der", "Apfel", 1, 1],
@@ -1768,7 +2115,7 @@
     },
     {
       rings: [
-        { label: "kann fliegen", ask: "Kann es fliegen?", yes: "kann fliegen", no: "kann nicht fliegen" },
+        { label: "kann fliegen", icon: "🪶", ask: "Kann es fliegen?", yes: "kann fliegen", no: "kann nicht fliegen" },
         TIER,
       ],
       items: [
@@ -1792,7 +2139,7 @@
     },
     {
       rings: [
-        { label: "im Wasser", ask: "Ist es im Wasser?", yes: "ist im Wasser", no: "ist nicht im Wasser" },
+        { label: "im Wasser", icon: "💧", ask: "Ist es im Wasser?", yes: "ist im Wasser", no: "ist nicht im Wasser" },
         TIER,
       ],
       items: [
@@ -2155,6 +2502,737 @@
     }
     throw new Error("Unbekanntes Spiel: " + mode);
   }
+  // Distractors beyond 100: typical mistakes first, then the shuffled pool.
+  const wideOptions = (answer, forced, pool, count, random) =>
+    bigOptions(answer, [...forced, ...shuffle(pool, random)], count, random);
+
+  // Two numbers to compare with the given counts of digits (grades 3 and 4).
+  function bigComparison(config, random, side) {
+    const kinds =
+      config.kind === "big"
+        ? ["lead", "same"]
+        : ["lead", "same", "swap", ...(config.digits.length > 1 ? ["length"] : [])];
+    const kind = pick(kinds, random);
+    const length = pick(config.digits, random);
+    const digitsOfLength = (n) => Array.from({ length: n }, (_, i) => between(i ? 0 : 1, 9, random));
+    const value = (digits) => Number(digits.join(""));
+    let a = digitsOfLength(length);
+    let b;
+    let swapped = false;
+    if (config.equal && random() < 0.2) b = [...a];
+    else if (kind === "lead") {
+      b = digitsOfLength(length);
+      while (b[0] === a[0]) b[0] = between(1, 9, random);
+    } else if (kind === "same") {
+      // The same digits in front; the first difference comes later.
+      const at = between(1, length - 1, random);
+      b = a.map((d, i) => (i < at ? d : between(0, 9, random)));
+      while (b[at] === a[at]) b[at] = between(0, 9, random);
+    } else if (kind === "swap") {
+      // The same digits, two of them swapped (352 and 325).
+      let i;
+      let j;
+      do {
+        a = digitsOfLength(length);
+        i = between(0, length - 2, random);
+        j = between(i + 1, length - 1, random);
+      } while (a[i] === a[j] || (i === 0 && a[j] === 0));
+      b = [...a];
+      [b[i], b[j]] = [b[j], b[i]];
+      swapped = true;
+    } else {
+      // Fewer places but a big first digit: 9876 against 12 345.
+      a = digitsOfLength(Math.min(...config.digits));
+      a[0] = between(7, 9, random);
+      b = digitsOfLength(Math.max(...config.digits));
+      b[0] = between(1, 3, random);
+    }
+    let [x, y] = [value(a), value(b)];
+    if (random() < 0.5) [x, y] = [y, x];
+    return { left: side(x), right: side(y), swapped };
+  }
+
+  /*
+   * Times tables in grades 3 and 4: dividing (42 : 7), the missing factor,
+   * tens (3 · 40, 120 : 4), splitting (4 · 23 = 4 · 20 + 4 · 3) and division
+   * with a remainder (23 : 5 = 4 R 3). "parts" is the equation, null the gap.
+   */
+  const TIMES_MORE = ["divide", "missing", "tens", "split", "remainder"];
+  function timesMore(config, previous, random) {
+    const times = (x, y) => `${x} · ${y}`;
+    const timesWord = (x, y) => `${numberWord(x)} mal ${numberWord(y)}`;
+    const count = config.choices;
+    let question;
+    do {
+      const k = pick(config.rows, random);
+      const n = between(2, config.max, random);
+      const product = n * k;
+      let q;
+      if (config.ask === "divide" || config.ask === "missing") {
+        const divide = config.ask === "divide";
+        q = {
+          key: `${n}x${k}`,
+          parts: divide ? [product, ":", k, "=", null] : [null, "·", k, "=", product],
+          number: n,
+          choices: numberOptions(n, [], [n + 1, n - 1, n + 2, n - 2, k], count, random),
+          speech: divide
+            ? `${numberWord(product)} geteilt durch ${numberWord(k)}`
+            : `Wie viel mal ${numberWord(k)} ist ${numberWord(product)}?`,
+          explain: divide
+            ? {
+                text: `${product} : ${k} = ${n}, denn ${times(n, k)} = ${product}.`,
+                speech: `${capitalize(numberWord(product))} geteilt durch ${numberWord(k)} ist ${numberWord(n)}, denn ${timesWord(n, k)} ist ${numberWord(product)}.`,
+              }
+            : { text: `${times(n, k)} = ${product}.`, speech: `${capitalize(timesWord(n, k))} ist ${numberWord(product)}.` },
+        };
+      } else if (config.ask === "tens") {
+        const tens = 10 * k;
+        const result = n * tens;
+        // Forgetting the zero (3 · 40 = 12) or adding one too many (1200).
+        q =
+          random() < 0.5
+            ? {
+                key: `${result}:${n}`,
+                parts: [result, ":", n, "=", null],
+                number: tens,
+                choices: wideOptions(tens, [k, tens * 10], [tens + 10, tens - 10, tens + 1], count, random),
+                speech: `${numberWord(result)} geteilt durch ${numberWord(n)}`,
+                helpText: `Ohne die Null: ${n * k} : ${n}`,
+                explain: {
+                  text: `${n * k} : ${n} = ${k}, also ${result} : ${n} = ${tens}.`,
+                  speech: `${capitalize(numberWord(n * k))} geteilt durch ${numberWord(n)} ist ${numberWord(k)}. Also ist ${numberWord(result)} geteilt durch ${numberWord(n)} ${numberWord(tens)}.`,
+                },
+              }
+            : {
+                key: `${n}x${tens}`,
+                parts: [n, "·", tens, "=", null],
+                number: result,
+                choices: wideOptions(result, [n * k, result * 10], [result + 10, result - 10, result + tens, result - tens], count, random),
+                speech: timesWord(n, tens),
+                helpText: `Ohne die Null: ${times(n, k)}`,
+                explain: {
+                  text: `${times(n, k)} = ${n * k}, also ${times(n, tens)} = ${result}.`,
+                  speech: `${capitalize(timesWord(n, k))} ist ${numberWord(n * k)}. Also ist ${timesWord(n, tens)} ${numberWord(result)}.`,
+                },
+              };
+      } else if (config.ask === "split") {
+        let m;
+        do m = between(12, 49, random);
+        while (m % 10 === 0);
+        const high = m - (m % 10);
+        const low = m % 10;
+        const result = n * m;
+        // Forgetting to multiply the ones (4 · 23 = 83) or the zero (20).
+        q = {
+          key: `${n}x${m}`,
+          parts: [n, "·", m, "=", null],
+          number: result,
+          choices: wideOptions(
+            result,
+            [n * high + low, n * (high / 10) + n * low],
+            [result + 10, result - 10, result + n, result - n],
+            count,
+            random,
+          ),
+          speech: timesWord(n, m),
+          helpText: `${times(n, m)} = ${times(n, high)} + ${times(n, low)}`,
+          explain: {
+            text: `${times(n, high)} = ${n * high}, ${times(n, low)} = ${n * low}, zusammen ${result}.`,
+            speech: `${capitalize(timesWord(n, high))} ist ${numberWord(n * high)}, ${timesWord(n, low)} ist ${numberWord(n * low)}, zusammen ${numberWord(result)}.`,
+          },
+        };
+      } else {
+        // Division with remainder: the classic slip is a remainder that is too big.
+        const r = between(1, k - 1, random);
+        const dividend = n * k + r;
+        const label = ([x, y]) => `${x} R ${y}`;
+        const answer = label([n, r]);
+        const wrong = [
+          [n - 1, r + k],
+          ...shuffle(
+            [
+              [n, r + 1],
+              [n + 1, r],
+              [n, r - 1],
+              [n - 1, r],
+              [n + 1, 0],
+            ],
+            random,
+          ),
+        ]
+          .filter(([x, y]) => x >= 1 && y >= 0 && !(x === n && y === r))
+          .map(label);
+        const choices = shuffle([answer, ...[...new Set(wrong)].slice(0, count - 1)], random);
+        q = {
+          key: `${dividend}:${k}`,
+          parts: [dividend, ":", k, "=", null],
+          number: n,
+          answer,
+          choices,
+          say: Object.fromEntries(
+            choices.map((choice) => {
+              const [x, , y] = choice.split(" ");
+              return [choice, `${numberWord(Number(x))} Rest ${numberWord(Number(y))}`];
+            }),
+          ),
+          speech: `${numberWord(dividend)} geteilt durch ${numberWord(k)}`,
+          helpText: `${times(n, k)} = ${n * k}, ${times(n + 1, k)} = ${(n + 1) * k}`,
+          explain: {
+            text: `${times(n, k)} = ${n * k}, bis ${dividend} fehlen noch ${r}: ${dividend} : ${k} = ${answer}.`,
+            speech: `${capitalize(timesWord(n, k))} ist ${numberWord(n * k)}. Bis ${numberWord(dividend)} fehlen noch ${numberWord(r)}. Also ${numberWord(n)} Rest ${numberWord(r)}.`,
+          },
+        };
+      }
+      question = {
+        ask: config.ask,
+        rows: n,
+        cols: k,
+        answer: String(q.number),
+        ...q,
+        key: `${q.key}|${config.ask}`,
+        cue: `Vorlesen: ${q.parts.map((x) => (x === null ? "?" : x)).join(" ")}`,
+      };
+    } while (question.key === previous?.key);
+    return question;
+  }
+
+  /*
+   * Written addition and subtraction in columns. Carries are counted per
+   * column; the distractors are the classic slips: a forgotten carry, the
+   * smaller digit taken from the bigger one, a forgotten borrow.
+   */
+  function columnDigits(n) {
+    return [...String(n)].reverse().map(Number);
+  }
+  function columnSum(terms) {
+    const length = Math.max(...terms.map((x) => String(x).length));
+    const carries = [0];
+    let carry = 0;
+    let noCarry = 0;
+    for (let i = 0; i < length; i++) {
+      const sum = terms.reduce((total, x) => total + (columnDigits(x)[i] || 0), 0);
+      noCarry += (sum % 10) * 10 ** i;
+      carry = Math.floor((sum + carry) / 10);
+      carries.push(carry);
+    }
+    return { carries, noCarry };
+  }
+  function columnDifference(a, b) {
+    const da = columnDigits(a);
+    const db = columnDigits(b);
+    const carries = [0];
+    let borrow = 0;
+    let flipped = 0;
+    let noBorrow = 0;
+    for (let i = 0; i < da.length; i++) {
+      const top = da[i];
+      const bottom = db[i] || 0;
+      flipped += Math.abs(top - bottom) * 10 ** i;
+      noBorrow += ((top - bottom + 10) % 10) * 10 ** i;
+      borrow = top - bottom - borrow < 0 ? 1 : 0;
+      carries.push(borrow);
+    }
+    return { carries, flipped, noBorrow };
+  }
+  function generateColumn(config, previous, random) {
+    const limit = 10 ** Math.max(...config.digits);
+    const numberOf = (length) => between(10 ** (length - 1), 10 ** length - 1, random);
+    let question;
+    for (;;) {
+      const op = pick(config.ops, random);
+      const length = pick(config.digits, random);
+      let terms;
+      let result;
+      let carries;
+      let forced;
+      if (op === "+") {
+        const count = config.terms || 2;
+        terms = Array.from({ length: count }, (_, i) =>
+          numberOf(i && random() < 0.3 ? Math.max(2, length - 1) : length),
+        );
+        result = terms.reduce((sum, x) => sum + x, 0);
+        const sum = columnSum(terms);
+        carries = sum.carries;
+        forced = [sum.noCarry];
+      } else {
+        let b;
+        const a = numberOf(length);
+        do b = numberOf(random() < 0.3 ? Math.max(2, length - 1) : length);
+        while (b >= a);
+        terms = [a, b];
+        result = a - b;
+        const difference = columnDifference(a, b);
+        carries = difference.carries;
+        forced = [difference.noBorrow, difference.flipped];
+      }
+      const used = carries.filter(Boolean).length;
+      if (result >= limit || used < config.carries[0] || used > config.carries[1]) continue;
+      if (String(result) === previous?.answer) continue;
+      const sign = op === "+" ? "+" : "−";
+      const word = op === "+" ? "plus" : "minus";
+      const width = Math.max(...terms.map((x) => String(x).length)) + (op === "+" ? 1 : 0);
+      // The ones column as worked example (third help step).
+      const ones = terms.map((x) => x % 10);
+      const onesResult = result % 10;
+      const first =
+        op === "+"
+          ? (() => {
+              const sum = ones.reduce((total, x) => total + x, 0);
+              return {
+                text: `Einer: ${ones.join(" + ")} = ${sum}. Schreibe ${sum % 10}${sum >= 10 ? `, der Übertrag ${Math.floor(sum / 10)} kommt zu den Zehnern` : ""}.`,
+                speech: `Einer: ${ones.map(numberWord).join(" plus ")} ist ${numberWord(sum)}. Schreibe ${numberWord(sum % 10)}${sum >= 10 ? `, der Übertrag ${numberWord(Math.floor(sum / 10))} kommt zu den Zehnern` : ""}.`,
+              };
+            })()
+          : ones[0] >= ones[1]
+            ? {
+                text: `Einer: ${ones[0]} − ${ones[1]} = ${onesResult}. Schreibe ${onesResult}.`,
+                speech: `Einer: ${numberWord(ones[0])} minus ${numberWord(ones[1])} ist ${numberWord(onesResult)}. Schreibe ${numberWord(onesResult)}.`,
+              }
+            : {
+                text: `Einer: ${ones[0]} − ${ones[1]} geht nicht. Mit Übertrag: ${ones[0] + 10} − ${ones[1]} = ${onesResult}. Schreibe ${onesResult}.`,
+                speech: `Einer: ${numberWord(ones[0])} minus ${numberWord(ones[1])} geht nicht. Mit Übertrag: ${numberWord(ones[0] + 10)} minus ${numberWord(ones[1])} ist ${numberWord(onesResult)}. Schreibe ${numberWord(onesResult)}.`,
+              };
+      question = {
+        op,
+        terms,
+        result,
+        carries,
+        width,
+        first,
+        number: result,
+        answer: String(result),
+        choices: wideOptions(
+          result,
+          forced,
+          [result + 10, result - 10, result + 100, result - 100, result + 1, result - 1, result + 1000],
+          config.choices,
+          random,
+        ),
+        speech: terms.map(numberWord).join(` ${word} `),
+        explain: {
+          text: `${terms.map(formatNumber).join(` ${sign} `)} = ${formatNumber(result)}.`,
+          speech: `${capitalize(terms.map(numberWord).join(` ${word} `))} ist ${numberWord(result)}.`,
+        },
+        cue: `Vorlesen: ${terms.map(formatNumber).join(` ${sign} `)}`,
+      };
+      return question;
+    }
+  }
+
+  /*
+   * Units: "m_cm" means 1 m = 100 cm. Spoken with words ("drei Meter"),
+   * shown with the short signs.
+   */
+  const UNITS = {
+    m: ["ein Meter", "Meter"],
+    cm: ["ein Zentimeter", "Zentimeter"],
+    mm: ["ein Millimeter", "Millimeter"],
+    km: ["ein Kilometer", "Kilometer"],
+    "€": ["ein Euro", "Euro"],
+    ct: ["ein Cent", "Cent"],
+    h: ["eine Stunde", "Stunden"],
+    min: ["eine Minute", "Minuten"],
+    s: ["eine Sekunde", "Sekunden"],
+    kg: ["ein Kilogramm", "Kilogramm"],
+    g: ["ein Gramm", "Gramm"],
+    l: ["ein Liter", "Liter"],
+    ml: ["ein Milliliter", "Milliliter"],
+  };
+  const UNIT_PAIRS = {
+    m_cm: { big: "m", small: "cm", factor: 100 },
+    euro_ct: { big: "€", small: "ct", factor: 100 },
+    cm_mm: { big: "cm", small: "mm", factor: 10 },
+    h_min: { big: "h", small: "min", factor: 60 },
+    min_s: { big: "min", small: "s", factor: 60 },
+    kg_g: { big: "kg", small: "g", factor: 1000 },
+    km_m: { big: "km", small: "m", factor: 1000 },
+    l_ml: { big: "l", small: "ml", factor: 1000 },
+  };
+  // Halves and quarters: [shown, pair, fraction, spoken].
+  const UNIT_PARTS = [
+    ["½ m", "m_cm", 1 / 2, "ein halber Meter"],
+    ["½ kg", "kg_g", 1 / 2, "ein halbes Kilogramm"],
+    ["¼ kg", "kg_g", 1 / 4, "ein viertel Kilogramm"],
+    ["¾ kg", "kg_g", 3 / 4, "drei viertel Kilogramm"],
+    ["½ l", "l_ml", 1 / 2, "ein halber Liter"],
+    ["¼ l", "l_ml", 1 / 4, "ein viertel Liter"],
+    ["¾ l", "l_ml", 3 / 4, "drei viertel Liter"],
+    ["½ km", "km_m", 1 / 2, "ein halber Kilometer"],
+    ["½ h", "h_min", 1 / 2, "eine halbe Stunde"],
+    ["¼ h", "h_min", 1 / 4, "eine Viertelstunde"],
+    ["¾ h", "h_min", 3 / 4, "eine Dreiviertelstunde"],
+    ["½ min", "min_s", 1 / 2, "eine halbe Minute"],
+  ];
+  const amountWord = (n, unit) => (n === 1 ? UNITS[unit][0] : `${numberWord(n)} ${UNITS[unit][1]}`);
+  function generateUnits(config, previous, random) {
+    const kind = pick(config.kinds, random);
+    let pairId;
+    let left;
+    let leftSpeech;
+    let unit;
+    let answer;
+    let forced = [];
+    let pool;
+    let steps = null;
+    if (kind === "half") {
+      const [shown, id, part, spoken] = pick(UNIT_PARTS, random);
+      pairId = id;
+      const { factor, small } = UNIT_PAIRS[id];
+      answer = factor * part;
+      left = shown;
+      leftSpeech = spoken;
+      unit = small;
+      // Thinking 1 h = 100 min (½ h = 50 min), or 1 kg = 100 g.
+      forced = [factor === 60 ? 100 * part : factor === 1000 ? 100 * part : 1000 * part];
+      pool = UNIT_PARTS.filter((x) => x[1] === id).map((x) => UNIT_PAIRS[id].factor * x[2]);
+      pool.push(answer + 10 ** Math.floor(Math.log10(answer)), answer / 2);
+    } else if (kind === "comma") {
+      const decimals = pick(["euro_ct", "m_cm", "km_m", "kg_g", "l_ml"].filter((x) => !config.pairs || config.pairs.includes(x)), random);
+      pairId = decimals;
+      const { big, small, factor } = UNIT_PAIRS[decimals];
+      unit = small;
+      const whole = between(1, 9, random);
+      if (factor === 100) {
+        // 2,50 € = 250 ct; 3,05 m = 305 cm (spoken like on a price tag).
+        const rest = random() < 0.3 ? between(1, 9, random) : 5 * between(2, 19, random);
+        answer = whole * 100 + rest;
+        left = `${whole},${String(rest).padStart(2, "0")} ${big}`;
+        leftSpeech = `${numberWord(whole)} ${UNITS[big][1]} ${numberWord(rest)}`;
+        forced = [Number(`${whole}${rest}`), whole * 1000 + rest];
+      } else {
+        // 1,5 km = 1500 m.
+        const tenth = between(1, 9, random);
+        answer = whole * 1000 + tenth * 100;
+        left = `${whole},${tenth} ${big}`;
+        leftSpeech = `${numberWord(whole)} Komma ${numberWord(tenth)} ${UNITS[big][1]}`;
+        forced = [whole * 1000 + tenth, whole * 100 + tenth * 10];
+      }
+      pool = [answer + 10, answer - 10, answer + 100, answer - 100];
+    } else {
+      pairId = pick(
+        config.pairs.filter((x) => kind !== "mixed" || UNIT_PAIRS[x].factor !== 1000),
+        random,
+      );
+      const { big, small, factor } = UNIT_PAIRS[pairId];
+      const n = between(1, factor === 60 ? 5 : 9, random);
+      if (kind === "down") {
+        answer = n * factor;
+        left = `${n} ${big}`;
+        leftSpeech = amountWord(n, big);
+        unit = small;
+        // A wrong factor: 1 h = 100 min, or one zero too few or too many.
+        forced = factor === 60 ? [n * 100] : [n * factor * 10, (n * factor) / 10];
+        pool = [answer + factor, answer - factor, answer + 10];
+        steps = { text: `${n} · ${factor} ${small}`, speech: `Rechne ${numberWord(n)} mal ${numberWord(factor)}.` };
+      } else if (kind === "up") {
+        answer = n;
+        left = `${n * factor} ${small}`;
+        leftSpeech = amountWord(n * factor, small);
+        unit = big;
+        forced = [(n * factor) / 10, n * 10];
+        pool = [n + 1, n - 1, n + 2];
+        steps = {
+          text: `${n * factor} : ${factor}`,
+          speech: `Wie oft passen ${numberWord(factor)} in ${numberWord(n * factor)}?`,
+        };
+      } else {
+        // 3 m 25 cm = 325 cm; the trap: writing the numbers side by side.
+        const rest =
+          factor === 10 || (factor === 100 && random() < 0.3)
+            ? between(1, 9, random)
+            : between(factor === 60 ? 5 : 11, factor - 1, random);
+        answer = n * factor + rest;
+        left = `${n} ${big} ${rest} ${small}`;
+        leftSpeech = `${amountWord(n, big)} und ${amountWord(rest, small)}`;
+        unit = small;
+        forced = [Number(`${n}${rest}`), factor === 60 ? n * 100 + rest : n * factor * 10 + rest];
+        pool = [answer + 10, answer - 10, answer + factor, answer - factor];
+        steps = {
+          text: `${n} · ${factor} ${small} + ${rest} ${small}`,
+          speech: `Rechne ${numberWord(n)} mal ${numberWord(factor)} und dann plus ${numberWord(rest)}.`,
+        };
+      }
+    }
+    const { big, small, factor } = UNIT_PAIRS[pairId];
+    const fact = {
+      text: `1 ${big} = ${factor} ${small}`,
+      speech: `${capitalize(UNITS[big][0])} hat ${amountWord(factor, small)}.`,
+    };
+    const factQuestion = {
+      text: `Wie viele ${small} hat 1 ${big}?`,
+      speech: `Wie viele ${UNITS[small][1]} hat ${UNITS[big][0]}?`,
+    };
+    return {
+      kind,
+      pair: pairId,
+      left,
+      unit,
+      fact,
+      factQuestion,
+      steps,
+      number: answer,
+      key: `${left}|${unit}`,
+      answer: String(answer),
+      choices: wideOptions(answer, forced.filter(Number.isInteger), pool.filter(Number.isInteger), config.choices, random),
+      speech: `Wie viele ${UNITS[unit][1]} sind ${leftSpeech}?`,
+      explain: {
+        text: `${left} = ${answer} ${unit}, denn ${fact.text}.`,
+        speech: `${capitalize(leftSpeech)} sind ${amountWord(answer, unit)}. ${fact.speech}`,
+      },
+      cue: `Vorlesen: ${left} = ? ${unit}`,
+    };
+  }
+
+  /* ---------- German: spelling, word types, tenses ---------- */
+  // "So[nn]e" → { before: "So", unit: "nn", after: "e", word: "Sonne" }.
+  function gapWord(text) {
+    const [, before, unit, after] = text.match(/^(.*)\[(.+)\](.*)$/);
+    return { before, unit, after, word: before + unit + after };
+  }
+  // What comes right before the gap: a consonant, a diphthong or a vowel.
+  function soundBefore(before) {
+    const low = before.toLowerCase();
+    if (SPELL_DIPHTHONGS.some((x) => low.endsWith(x))) return "diphthong";
+    return SPELL_VOWELS.includes(low.at(-1)) ? "vowel" : "consonant";
+  }
+  function spellExplain(rule, item) {
+    const { word, unit, before } = item;
+    const doubled = unit.length === 2 && unit[0] === unit[1];
+    const sound = soundBefore(before);
+    if (rule === "double")
+      return doubled
+        ? { text: `${word}: kurzer Selbstlaut, darum ${unit}.`, speech: `${word}. Der Selbstlaut ist kurz, darum doppelt.` }
+        : { text: `${word}: langer Selbstlaut, darum nur ein ${unit}.`, speech: `${word}. Der Selbstlaut ist lang, darum nicht doppelt.` };
+    if (rule === "ie")
+      return unit === "ie"
+        ? { text: `${word}: langes i, darum ie.`, speech: `${word}. Hörst du? Der Laut ist lang.` }
+        : { text: `${word}: kurzes i, darum nur i.`, speech: `${word}. Hörst du? Der Laut ist kurz.` };
+    if (rule === "ck" || rule === "tz" || rule === "ss") {
+      if (["ck", "tz", "ss"].includes(unit))
+        return { text: `${word}: kurzer Selbstlaut, darum ${unit}.`, speech: `${word}. Der Selbstlaut ist kurz, darum doppelt.` };
+      if (sound === "consonant")
+        return { text: `${word}: Nach einem Mitlaut steht nur ${unit}.`, speech: `${word}. Nach einem Mitlaut schreibt man nie doppelt.` };
+      if (sound === "diphthong")
+        return { text: `${word}: Nach au, ei, eu steht ${unit}.`, speech: `${word}. Nach einem Zwielaut schreibt man nie doppelt.` };
+      return { text: `${word}: langer Selbstlaut, darum ${unit}.`, speech: `${word}. Der Selbstlaut ist lang, darum nicht doppelt.` };
+    }
+    if (rule === "ae")
+      return item.related
+        ? { text: `${word} kommt von ${item.related}, darum ${unit}.`, speech: `${word} kommt von ${item.related}. Darum mit Umlaut.` }
+        : { text: `${word}: Hier hilft kein verwandtes Wort mit a oder au, darum ${unit}.`, speech: `${word}. Hier hilft kein verwandtes Wort, darum ohne Umlaut.` };
+    return unit === "das"
+      ? { text: "Hier passt auch „dieses“ oder „welches“, darum das.", speech: "Hier passt auch dieses oder welches." }
+      : { text: "Hier passt weder „dieses“ noch „welches“, darum dass.", speech: "Hier passt weder dieses noch welches. Es verbindet zwei Satzteile." };
+  }
+  function generateSpell(config, previous, random) {
+    const items = config.rules.flatMap((rule) =>
+      SPELL_WORDS[rule].map(([icon, text, related]) => ({ rule, icon, related, ...gapWord(text) })),
+    );
+    const item = pick(
+      items.filter((x) => (!config.picture || x.icon) && x.word !== previous?.word),
+      random,
+    );
+    const twin =
+      item.rule === "double"
+        ? item.unit.length === 2
+          ? item.unit[0]
+          : item.unit + item.unit
+        : SPELL_TWINS[item.unit];
+    const sentence = item.rule === "dass";
+    return {
+      rule: item.rule,
+      icon: item.icon,
+      picture: Boolean(config.picture && item.icon),
+      sentence,
+      before: item.before,
+      after: item.after,
+      word: item.word,
+      related: item.related || null,
+      key: item.word,
+      answer: item.unit,
+      choices: shuffle([item.unit, twin], random),
+      speech: item.word,
+      tip: SPELL_TIPS[item.rule],
+      explain: spellExplain(item.rule, item),
+      cue: sentence ? `Satz: „${item.word}“` : `Wort: „${item.word}“`,
+    };
+  }
+  // A tagged sentence: words with their types and the plain text.
+  function parseTagged(sentence) {
+    const words = [];
+    const text = sentence.replace(/\[([^|\]]+)\|([A-Za-z]+)\]/g, (_, word, type) => {
+      words.push({ word, type });
+      return word;
+    });
+    return { text, words };
+  }
+  function generateWordtype(config, previous, random) {
+    const names = (type) => WORD_TYPES[type].name;
+    let item;
+    if (config.sentence) {
+      const candidates = WORDTYPE_SENTENCES.flatMap((sentence) => {
+        const { text, words } = parseTagged(sentence);
+        return words.map((word, index) => ({ ...word, index, text, sentence }));
+      }).filter((x) => {
+        const tricky = x.type.length > 1;
+        return config.types.includes(x.type[0]) && (config.tricky || !tricky);
+      });
+      // Tricky levels: every second task is a verb used as a noun or a feeling.
+      const tricky = config.tricky && random() < 0.5;
+      const pool = candidates.filter(
+        (x) => (!tricky || x.type.length > 1) && `${x.text}|${x.word}` !== previous?.key,
+      );
+      item = pick(pool, random);
+    } else {
+      const words = WORDTYPE_WORDS.map(([icon, word, type, probe]) => ({ icon, word, type, probe })).filter(
+        (x) => config.types.includes(x.type) && x.word !== previous?.word,
+      );
+      item = pick(words, random);
+    }
+    const type = item.type[0];
+    const answer = names(type);
+    const others = shuffle(config.types.filter((x) => x !== type), random).slice(0, config.choices - 1);
+    const choices = shuffle([type, ...others], random).map(names);
+    const rule = WORD_TYPES[type].rule;
+    let explain;
+    if (item.type === "Nv")
+      explain = {
+        text: `„${item.word}“ ist hier ein Nomen: Mit das, beim oder zum davor wird ein Verb zum Nomen. Dann schreibt man es groß.`,
+        speech: `${item.word} ist hier ein Nomen. Mit das, beim oder zum davor wird ein Verb zum Nomen. Dann schreibt man es groß.`,
+      };
+    else if (item.type === "Ng")
+      explain = {
+        text: `„${item.word}“ ist ein Nomen. Auch Gefühle und Gedanken sind Nomen, man schreibt sie groß.`,
+        speech: `${item.word} ist ein Nomen. Auch Gefühle und Gedanken sind Nomen. Man schreibt sie groß.`,
+      };
+    else if (item.probe)
+      explain = { text: `${item.probe}: „${item.word}“ ist ein ${answer}. ${rule}`, speech: `${item.probe}. ${item.word} ist ein ${answer}. ${rule}` };
+    else explain = { text: `„${item.word}“ ist ein ${answer}. ${rule}`, speech: `${item.word} ist ein ${answer}. ${rule}` };
+    const base = {
+      word: item.word,
+      type,
+      tricky: item.type.length > 1,
+      answer,
+      choices,
+      explain,
+    };
+    if (config.sentence) {
+      // The word to name is shown in capitals, so its spelling gives nothing away.
+      let seen = -1;
+      const marked = item.sentence.replace(/\[([^|\]]+)\|[A-Za-z]+\]/g, (_, word) => {
+        seen++;
+        return seen === item.index ? "\u0000" : word;
+      });
+      const [before, after] = marked.split("\u0000");
+      return {
+        ...base,
+        sentence: true,
+        before,
+        after,
+        shown: item.word.toUpperCase(),
+        key: `${item.text}|${item.word}`,
+        speech: [`${item.text}`, `Das Wort: ${item.word}.`],
+        cue: `Satz: „${item.text}“ – Wort: „${item.word}“`,
+      };
+    }
+    return {
+      ...base,
+      sentence: false,
+      icon: item.icon,
+      picture: Boolean(config.picture),
+      shown: item.word.toUpperCase(),
+      key: item.word,
+      speech: item.word,
+      cue: `Wort: „${item.word}“`,
+    };
+  }
+  function generateTense(config, previous, random) {
+    const kind = pick(config.ask, random);
+    const verbs = TENSE_VERBS.filter(
+      (x) => (config.strong == null || x.strong === config.strong) && x.inf !== previous?.verb,
+    );
+    const verb = pick(verbs, random);
+    const stem = verb.inf.slice(0, -2);
+    // Regular endings on an irregular verb: "gehte", "gegeht".
+    const regularPast = stem + (/[dt]$/.test(stem) ? "ete" : "te");
+    const regularPart = `ge${stem}${/[dt]$/.test(stem) ? "et" : "t"}`;
+    const present = tenseSentence(verb, "present", "Heute");
+    // An example with another verb of the same kind (second help step).
+    const other = pick(
+      TENSE_VERBS.filter((x) => x.strong === verb.strong && x.inf !== verb.inf),
+      random,
+    );
+    const base = { kind, verb: verb.inf, strong: verb.strong, key: `${kind}|${verb.inf}` };
+    if (kind === "past" || kind === "part") {
+      const past = kind === "past";
+      const answer = past ? verb.past : verb.part;
+      const wrong = past
+        ? verb.strong
+          ? [regularPast, verb.part, verb.present]
+          : [verb.present, verb.part]
+        : verb.strong
+          ? [regularPart, verb.past]
+          : [`ge${stem}en`, verb.past];
+      const sentence = past
+        ? { before: "Gestern", after: `ich ${verb.rest}.` }
+        : { before: `Gestern ${verb.aux} ich ${verb.rest}`, after: "." };
+      const full = tenseSentence(verb, past ? "past" : "perfect", "Gestern");
+      const example = past
+        ? [tenseSentence(other, "present", "Heute"), tenseSentence(other, "past", "Gestern")]
+        : [tenseSentence(other, "present", "Heute"), tenseSentence(other, "perfect", "Gestern")];
+      return {
+        ...base,
+        present,
+        ...sentence,
+        answer,
+        choices: shuffle([answer, ...wrong.slice(0, config.choices - 1)], random),
+        example,
+        speech: [present, `${sentence.before} …${sentence.after === "." ? "" : ` ${sentence.after}`}`],
+        explain: { text: `${present} ${full}`, speech: [present, full] },
+        cue: `Vorlesen: ${present} ${sentence.before} … ${sentence.after}`,
+      };
+    }
+    if (kind === "aux") {
+      const full = tenseSentence(verb, "perfect", "Gestern");
+      return {
+        ...base,
+        present,
+        before: "Gestern",
+        after: `ich ${verb.rest} ${verb.part}.`,
+        answer: verb.aux,
+        choices: shuffle(["habe", "bin"], random),
+        speech: [present, `Gestern … ich ${verb.rest} ${verb.part}.`],
+        explain: {
+          text: `${full} ${verb.aux === "bin" ? "Bei Bewegung von einem Ort zum anderen sagt man meistens bin." : "Die meisten Verben bilden das Perfekt mit habe."}`,
+          speech: [full],
+        },
+        cue: `Vorlesen: ${present} Gestern … ich ${verb.rest} ${verb.part}.`,
+      };
+    }
+    // Name the tense of a sentence without a time word.
+    const tense = pick(config.tenses, random);
+    const sentence = tenseSentence(verb, tense);
+    const choices = shuffle([...config.tenses], random).slice(0, config.choices);
+    if (!choices.includes(tense)) choices[0] = tense;
+    return {
+      ...base,
+      key: `${tense}|${verb.inf}`,
+      tense,
+      sentence,
+      answer: tense,
+      choices: shuffle(choices, random),
+      labels: Object.fromEntries(Object.entries(TENSES).map(([id, x]) => [id, x.label])),
+      say: Object.fromEntries(Object.entries(TENSES).map(([id, x]) => [id, x.speech])),
+      forms: config.tenses.map((id) => ({ id, label: TENSES[id].label, text: tenseSentence(other, id) })),
+      speech: sentence,
+      explain: {
+        text: `„${sentence}“ – ${TENSES[tense].label}.`,
+        speech: [sentence, `Das ist ${TENSES[tense].speech}.`],
+      },
+      cue: `Satz: „${sentence}“`,
+    };
+  }
+
   function digitChoices(answer, other, count, random) {
     // The other digit of the number is the typical mix-up; near digits fill up.
     const pool = [...Array(10).keys()]
@@ -2189,6 +3267,12 @@
   function generate(mode, config, previous, random) {
     if (ENGLISH_GAMES.includes(mode)) return generateEnglish(mode, config, previous, random);
     if (["tenfold", "placetable", "lay"].includes(mode)) return generateBig(mode, config, random);
+    if (mode === "column") return generateColumn(config, previous, random);
+    if (mode === "units") return generateUnits(config, previous, random);
+    if (mode === "times" && TIMES_MORE.includes(config.ask)) return timesMore(config, previous, random);
+    if (mode === "spell") return generateSpell(config, previous, random);
+    if (mode === "wordtype") return generateWordtype(config, previous, random);
+    if (mode === "tense") return generateTense(config, previous, random);
     if (mode === "type") {
       const clear = (letters) =>
         [...letters].filter((x) => !AMBIGUOUS_LAUTE.includes(x));
@@ -2743,21 +3827,27 @@
       return question;
     }
     if (mode === "steps") {
+      // Grades 3 and 4 count in bigger steps up to "max" (100 by default);
+      // "align" makes starts round enough (multiples of 10, 100 …).
+      const max = config.max || 100;
       let question;
       do {
         const step = pick(config.steps, random);
-        const span = Math.abs(step) * (config.length - 1);
-        const align = [2, 5].includes(Math.abs(step)) ? Math.abs(step) : 1;
-        const starts = [];
-        for (let x = step > 0 ? 1 : span + 1; x <= (step > 0 ? 100 - span : 100); x++)
-          if (x % align === 0) starts.push(x);
-        const start = pick(starts, random);
+        const size = Math.abs(step);
+        const span = size * (config.length - 1);
+        const align = config.align ? Math.min(config.align, size) : [2, 5].includes(size) ? size : 1;
+        const low = step > 0 ? 1 : span + 1;
+        const high = step > 0 ? max - span : max;
+        const start = align * between(Math.ceil(low / align), Math.floor(high / align), random);
         const sequence = Array.from({ length: config.length }, (_, i) => start + i * step);
         const gap = config.gap ? between(1, config.length - 2, random) : config.length - 1;
         const answer = sequence[gap];
         const words = sequence.map((x, i) =>
           i === gap ? (gap === config.length - 1 ? "und dann?" : "Lücke") : numberWord(x),
         );
+        // Small steps: one or ten off. Big steps: off by the next smaller place.
+        const place = 10 ** Math.floor(Math.log10(size));
+        const near = size < 20 ? [1, 10] : [place / 10, place];
         question = {
           sequence,
           gap,
@@ -2767,17 +3857,18 @@
           choices: numberOptions(
             answer,
             [],
-            [answer + 1, answer - 1, answer + step, answer - 2 * step, answer + 10, answer - 10],
+            [answer + step, answer - 2 * step, ...near.flatMap((d) => [answer + d, answer - d])],
             config.choices,
             random,
             sequence,
+            max,
           ),
           speech: words.join(", "),
           explain: {
-            text: `Immer ${sign(step)} ${Math.abs(step)}: ${answer}.`,
-            speech: `Immer ${signWord(step)} ${numberWord(Math.abs(step))}. Also ${numberWord(answer)}.`,
+            text: `Immer ${sign(step)} ${formatNumber(size)}: ${formatNumber(answer)}.`,
+            speech: `Immer ${signWord(step)} ${numberWord(size)}. Also ${numberWord(answer)}.`,
           },
-          cue: `Vorlesen: ${sequence.map((x, i) => (i === gap ? "?" : x)).join(", ")}`,
+          cue: `Vorlesen: ${sequence.map((x, i) => (i === gap ? "?" : formatNumber(x))).join(", ")}`,
         };
       } while (question.answer === previous?.answer);
       return question;
@@ -2786,11 +3877,12 @@
       const kind =
         config.kind === "mixed" ? pick(["far", "near", "sameTens", "swapped"], random) : config.kind;
       const digit = () => between(1, 9, random);
-      const side = (value) => ({ text: String(value), value, speech: numberWord(value) });
+      const side = (value) => ({ text: formatNumber(value), value, speech: numberWord(value) });
       let left;
       let right;
       let swapped = false;
-      if (kind === "sum") {
+      if (config.digits) ({ left, right, swapped } = bigComparison(config, random, side));
+      else if (kind === "sum") {
         // 30 + 5 against 35 (equal), 53 (swapped digits) or a near number.
         let tens;
         let ones;
@@ -2841,6 +3933,7 @@
       const words = { "<": "ist kleiner als", ">": "ist größer als", "=": "ist genauso viel wie" };
       return {
         kind,
+        big: Boolean(config.digits),
         left,
         right,
         key: `${left.text}|${right.text}`,
@@ -2954,36 +4047,45 @@
       return question;
     }
     if (mode === "calc") {
+      // unit 10: tens up to 100; 100: hundreds up to 1000; 1000 and 100 000
+      // the same with bigger places. "step" is the next smaller place, the
+      // granularity of the numbers when filling up to the next full unit.
+      const unit = config.unit || 10;
+      const step = unit / 10;
       let question;
       do {
         const op = pick(config.ops, random);
         const nonRound = (min, max) => {
           let x;
           do x = between(min, max, random);
-          while (x % 10 === 0);
+          while (x % unit === 0);
           return x;
         };
         let a;
         let b;
         const minus = op.includes("-") || op === "fillDown";
         if (op === "T+T") {
-          a = 10 * between(1, 8, random);
-          b = 10 * between(1, 10 - a / 10, random);
+          a = unit * between(1, 8, random);
+          b = unit * between(1, 10 - a / unit, random);
         } else if (op === "T-T") {
-          a = 10 * between(2, 10, random);
-          b = 10 * between(1, a / 10 - 1, random);
+          // Never half of a (80 − 40): the answer would already be on screen.
+          a = unit * between(3, 10, random);
+          do b = unit * between(1, a / unit - 1, random);
+          while (2 * b === a);
         } else if (op === "N+T") {
-          a = nonRound(11, 89);
-          b = 10 * between(1, Math.floor((99 - a) / 10), random);
+          a = nonRound(unit + 1, 9 * unit - 1);
+          b = unit * between(1, Math.floor((10 * unit - 1 - a) / unit), random);
         } else if (op === "N-T") {
-          a = nonRound(21, 99);
-          b = 10 * between(1, Math.floor(a / 10) - 1, random);
+          a = nonRound(2 * unit + 1, 10 * unit - 1);
+          b = unit * between(1, Math.floor(a / unit) - 1, random);
         } else if (op === "fillUp") {
-          a = nonRound(11, 99);
-          b = 10 - (a % 10);
+          a = step * nonRound(11, 99);
+          if (unit > 10) while (a % unit === 0 || (a / step) % 10 === 0) a = step * between(11, 99, random);
+          b = unit - (a % unit);
         } else {
-          a = nonRound(11, 99);
-          b = a % 10;
+          a = step * nonRound(11, 99);
+          if (unit > 10) while (a % unit === 0 || (a / step) % 10 === 0) a = step * between(11, 99, random);
+          b = a % unit;
         }
         const result = minus ? a - b : a + b;
         const fill = op.startsWith("fill");
@@ -2992,16 +4094,20 @@
         // Typical slips: forgetting the zero (5 + 3 = 8), adding to the ones
         // (52 + 3 = 55), or taking the ones digit when filling up.
         const forced = {
-          "T+T": [a / 10 + b / 10],
-          "T-T": [a / 10 - b / 10],
+          "T+T": [a / unit + b / unit],
+          "T-T": [a / unit - b / unit],
           "N+T": [a + b / 10],
           "N-T": [a - b / 10],
-          fillUp: [a % 10],
-          fillDown: [10 - b],
+          fillUp: [a % unit, b / step],
+          fillDown: [unit - b, b / step],
         }[op];
-        const pool = fill ? [b + 1, b - 1, 10, b + 10] : [result + 10, result - 10, result + 1, result - 1];
+        const pool = fill
+          ? [b + step, b - step, unit, b + unit]
+          : [result + unit, result - unit, result + step, result - step];
+        const F = formatNumber;
         question = {
           op,
+          unit,
           a,
           b,
           minus,
@@ -3009,12 +4115,12 @@
           fill,
           number: answer,
           answer: String(answer),
-          choices: numberOptions(answer, forced, pool, config.choices, random),
+          choices: numberOptions(answer, forced, pool, config.choices, random, [], 10 * unit),
           speech: fill
             ? `${numberWord(a)} ${word} wie viel ist ${numberWord(result)}?`
             : `${numberWord(a)} ${word} ${numberWord(b)}`,
           explain: sumExplain(a, minus ? -b : b, result),
-          cue: `Vorlesen: ${a} ${minus ? "−" : "+"} ${fill ? "?" : b} = ${fill ? result : "?"}`,
+          cue: `Vorlesen: ${F(a)} ${minus ? "−" : "+"} ${fill ? "?" : F(b)} = ${fill ? F(result) : "?"}`,
         };
       } while (question.answer === previous?.answer);
       return question;
@@ -3578,6 +4684,16 @@
         return { icon, article, word, a: Boolean(a), b: Boolean(b), zone };
       });
       const rings = one ? [ringA] : [ringA, ringB];
+      // A new rule (first task, other rings) is said with the task:
+      // "Blauer Kreis: rot. Oranger Kreis: Obst. Mitte: beides."
+      const ruleKey = rings.map((ring) => ring.label).join("|");
+      const middle = !one && !config.noBoth;
+      const rule =
+        previous?.ruleKey === ruleKey
+          ? ""
+          : one
+            ? `Kreis: ${ringA.label}.`
+            : `Blauer Kreis: ${ringA.label}. Oranger Kreis: ${ringB.label}.${middle ? " Mitte: beides." : ""}`;
       if (!config.ask) {
         const pool = config.noBoth ? items.filter((x) => x.zone !== "both") : items;
         const item = pick(
@@ -3594,6 +4710,8 @@
         return {
           ask: "place",
           rings,
+          ruleKey,
+          rule,
           item,
           placed,
           key: `${ringA.label}|${item.word}`,
@@ -3638,6 +4756,8 @@
       return {
         ask: kind,
         rings,
+        ruleKey,
+        rule,
         ring: ringIndex,
         placed,
         question: text,
@@ -3811,9 +4931,13 @@
     const grade = raw.settings?.grade;
     if (grade === undefined) state.settings.grade = 2;
     else if (availableGrades().some((x) => x.id === grade)) state.settings.grade = grade;
+    // Games added after the save start at the levels of the chosen grade.
     if (raw.levels && typeof raw.levels === "object")
       for (const mode of Object.keys(LEVELS))
-        state.levels[mode] = clampLevel(mode, raw.levels[mode]);
+        state.levels[mode] =
+          raw.levels[mode] === undefined && raw.settings?.grade && inGrade(mode, state.settings.grade)
+            ? gradeStart(mode, state.settings.grade)
+            : clampLevel(mode, raw.levels[mode]);
     if (raw.lastPlayed && typeof raw.lastPlayed === "object")
       for (const mode of Object.keys(LEVELS))
         if (isTime(raw.lastPlayed[mode]))
@@ -4056,8 +5180,12 @@
       "Laute gemeinsam dehnen und hören: „Mmmaus – was hörst du am Anfang?“ Wörter langsam in Laute zerlegen und wieder zusammenziehen.",
     abc: "Das ABC-Lied singen, eine Buchstabenleiste aufhängen und Nachbarn zeigen lassen: „Wer kommt nach F?“",
     spelling:
-      "Wörter in Silben klatschen, am Wortende verlängern (Hund – Hunde) und Merkwörter auf Kärtchen schreiben, den besonderen Buchstaben farbig markieren und täglich einmal gemeinsam lesen.",
-    times: "Einmaleins im Alltag: Eierkartons (2 · 5), Hände (5er) und Socken (2er) zählen. Erst die Kernaufgaben 2 ·, 5 ·, 10 · sicher können, dann von dort aus weiterrechnen.",
+      "Wörter in Silben klatschen, am Wortende verlängern (Hund – Hunde) und Merkwörter auf Kärtchen schreiben, den besonderen Buchstaben farbig markieren und täglich einmal gemeinsam lesen. Bei doppelten Mitlauten, ck und tz hilft lautes, langsames Sprechen: Ist der Selbstlaut davor kurz? Bei ä und äu nach einem verwandten Wort suchen (Bäume – Baum).",
+    grammar:
+      "Wortarten im Alltag suchen: Was kann man anfassen (Nomen, mit der, die, das)? Was kann man tun (Verben)? Wie ist etwas (Adjektive)? Beim Erzählen vom Vortag gemeinsam auf die Verbformen achten: „Gestern ging ich …“ statt „gehte“.",
+    times: "Einmaleins im Alltag: Eierkartons (2 · 5), Hände (5er) und Socken (2er) zählen. Erst die Kernaufgaben 2 ·, 5 ·, 10 · sicher können, dann von dort aus weiterrechnen. Geteiltaufgaben immer mit der Malaufgabe prüfen: 42 : 7 = 6, denn 6 · 7 = 42.",
+    measure:
+      "Messen und wiegen im Alltag: mit dem Zollstock Möbel messen, beim Backen Zutaten abwiegen, Preise vergleichen. Dabei laut umrechnen: „1 m sind 100 cm, also sind 2 m 200 cm.“ Eine Merktabelle (1 km = 1000 m, 1 kg = 1000 g, 1 h = 60 min) an den Kühlschrank hängen.",
     sizes: "Mit echtem Geld einkaufen spielen und gemeinsam auf die Uhr schauen: „Es ist halb vier – in einer halben Stunde ist es vier Uhr.“",
     memory:
       "Merkspiele im Alltag: Einkaufsliste mit 3–4 Dingen merken, „Ich packe meinen Koffer“ spielen.",
@@ -4065,7 +5193,7 @@
     space: "Zahlen verorten: auf einem Maßband oder Lineal zeigen lassen („Wo ist 37?“), eine Hundertertafel ausdrucken und Wege gehen – nach rechts 1 mehr, nach unten 10 mehr.",
     compare: "Vergleichen im Alltag: Hausnummern, Preise oder Seitenzahlen – „Welche ist größer? Schau zuerst auf die Zehner.“ Das Krokodil frisst immer die größere Zahl.",
     big: "Große Zahlen greifbar machen: 10 Büroklammern zu einer Kette, 10 Ketten zu einem Bündel – so entsteht aus Einern ein Hunderter. Zahlen vom Kassenzettel oder aus der Zeitung in eine selbst gezeichnete Stellentafel schreiben und laut lesen; leere Stellen bekommen eine Null.",
-    calc: "Mit Zehnern rechnen: 10-Cent-Münzen oder Zehnerstangen legen. Bei 52 + 30 bleiben die Einer gleich, nur die Zehner ändern sich.",
+    calc: "Mit Zehnern rechnen: 10-Cent-Münzen oder Zehnerstangen legen. Bei 52 + 30 bleiben die Einer gleich, nur die Zehner ändern sich – genauso bei 352 + 300 mit den Hundertern. Beim schriftlichen Rechnen hilft kariertes Papier: jede Ziffer in ein Kästchen, Einer unter Einer, und immer hinten anfangen.",
     sets: "Mengen im Alltag: Besteck oder Murmeln zählen, Paare bilden („Wer hat mehr?“), eine Strichliste führen und Spielzeug nach zwei Merkmalen sortieren – z. B. rot und rund. Was gehört in beide Gruppen?",
     enlisten:
       "Englisch hören: Dinge im Alltag auf Englisch benennen („Look, a dog!“), Bilderbücher auf Englisch anschauen und auf Bilder zeigen lassen. Kurze englische Lieder helfen sehr.",
@@ -4504,6 +5632,12 @@
     VENN_SETS,
     SYLLABLE_WORDS,
     EXTEND_WORDS,
+    SPELL_WORDS,
+    WORD_TYPES,
+    WORDTYPE_WORDS,
+    WORDTYPE_SENTENCES,
+    TENSE_VERBS,
+    UNIT_PAIRS,
     categoryOf,
     inGrade,
     availableGrades,

@@ -3666,3 +3666,167 @@ body:has(dialog[open]) {
     font-size: 1.3rem;
   }
 }
+
+/* Written calculation in columns (Schriftlich rechnen) */
+.column-calc {
+  display: grid;
+  grid-template-columns: 36px repeat(var(--cols), 48px);
+  justify-content: center;
+  align-items: center;
+  margin: 10px auto 6px;
+  font-size: 2.1rem;
+  font-weight: 800;
+  color: #45603e;
+  font-variant-numeric: tabular-nums;
+}
+.col-head {
+  margin-bottom: 4px;
+  border-radius: 8px 8px 0 0;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.col-head.shape0 {
+  background: #fde6d6;
+}
+.col-head.shape1 {
+  background: #dcecf7;
+}
+.col-head.shape2 {
+  background: #dcf0e4;
+}
+.col-digit,
+.col-sign {
+  text-align: center;
+  line-height: 1.25;
+}
+.col-carry {
+  min-height: 1.2rem;
+  font-size: 1rem;
+  color: #b5560f;
+  text-align: center;
+}
+.col-carry[hidden] {
+  display: block;
+  visibility: hidden;
+}
+.col-line {
+  grid-column: 1 / -1;
+  height: 3px;
+  margin: 2px 0 6px;
+  border-radius: 2px;
+  background: #45603e;
+}
+.col-result {
+  height: 52px;
+  margin: 0 3px;
+  display: grid;
+  place-items: center;
+  border: 3px dashed #b9cba6;
+  border-radius: 12px;
+  background: #fafbf5;
+}
+.col-result.found {
+  border-style: solid;
+  border-color: #8fb575;
+  background: #dcedc6;
+}
+.unit-task {
+  gap: 12px;
+}
+.compare-help .place-chip.shape0 {
+  background: #fde6d6;
+  border-color: #f0a35e;
+}
+.compare-help .place-chip.shape1 {
+  background: #dcecf7;
+  border-color: #6fa3cf;
+}
+.compare-help .place-chip.shape2 {
+  background: #dcf0e4;
+  border-color: #6aa97a;
+}
+.number-tile.big-tile {
+  font-size: 1.7rem;
+  white-space: nowrap;
+}
+
+/* Spelling detective, word types and tenses */
+.spell-sentence,
+.type-sentence,
+.tense-sentence {
+  max-width: 560px;
+  margin: 8px auto 4px;
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.6;
+  color: #3e5a36;
+}
+.spell-sentence .merk-gap,
+.tense-sentence .merk-gap {
+  min-width: 2.4em;
+}
+.tense-present {
+  margin: 4px auto 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+.type-single {
+  margin: 6px 0 4px;
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+.type-word {
+  padding: 0 8px;
+  border-radius: 10px;
+  background: #fff1c2;
+  box-shadow: inset 0 -3px 0 #f0d27a;
+  color: #3e5a36;
+}
+.type-word.found {
+  background: #dcedc6;
+  box-shadow: inset 0 -3px 0 #8fb575;
+}
+.type-help {
+  max-width: 480px;
+  margin: 8px auto 0;
+  padding: 10px 14px 10px 30px;
+  border-radius: 14px;
+  background: #fff8e3;
+  border: 1px solid #f0e2b6;
+  color: #6f6036;
+  font-weight: 700;
+  text-align: left;
+}
+.tense-help {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+}
+.tense-help[hidden] {
+  display: none;
+}
+.answer-choices .type-button,
+.answer-choices .tense-button {
+  height: auto;
+  min-height: 64px;
+  font-size: 1.3rem;
+  white-space: normal;
+  line-height: 1.2;
+}
+@media (max-width: 420px) {
+  .column-calc {
+    grid-template-columns: 26px repeat(var(--cols), 36px);
+    font-size: 1.6rem;
+  }
+  .col-result {
+    height: 42px;
+    margin: 0 2px;
+  }
+  .spell-sentence,
+  .type-sentence,
+  .tense-sentence {
+    font-size: 1.3rem;
+  }
+}

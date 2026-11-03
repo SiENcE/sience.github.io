@@ -40,7 +40,10 @@
     return `<div class="blocks" role="img" aria-label="Zehnerstangen und Einerwürfel">${onesFirst ? cubes + rods : rods + cubes}</div>`;
   }
   function numberButtons(choices, labels = {}, shown = {}, cls = "") {
-    return `<div class="answer-choices">${choices.map((value) => `<button class="letter-button number-button${cls ? ` ${cls}` : ""}" data-answer="${value}" aria-label="${labels[value] || value}">${shown[value] || value}</button>`).join("")}</div>`;
+    const show = (value) => (/^\d+$/.test(value) ? C.formatNumber(Number(value)) : value);
+    const wide = choices.some((value) => /^\d{5,}$/.test(value));
+    const classes = [cls, wide && !cls.includes("big-number") ? "big-number" : ""].filter(Boolean).join(" ");
+    return `<div class="answer-choices">${choices.map((value) => `<button class="letter-button number-button${classes ? ` ${classes}` : ""}" data-answer="${value}" aria-label="${labels[value] || show(value)}">${shown[value] || show(value)}</button>`).join("")}</div>`;
   }
   // Coins (cent and euro) and notes (from 5 €), not real images of money.
   function coin(value, unit) {
@@ -397,6 +400,38 @@
     };
   }
 
+  // "3 H 5 Z 2 E" for comparing bigger numbers place by place.
+  function placeDigits(value) {
+    const digits = [...String(value)];
+    return digits
+      .map((d, i) => `<span class="place-chip shape${(digits.length - 1 - i) % 3}"><strong>${d}</strong> ${P[digits.length - 1 - i].id}</span>`)
+      .join("");
+  }
+  /*
+   * Written calculation: one column per place (headers E, Z, H …), the sign
+   * before the last number, small carries above the line (help) and one box
+   * per column for the result, so its length gives nothing away.
+   */
+  function columnMarkup(q) {
+    const width = q.width;
+    const cells = (n) => {
+      const digits = String(n).padStart(width, " ");
+      return [...digits].map((d) => `<span class="col-digit">${d.trim()}</span>`).join("");
+    };
+    const head = Array.from({ length: width }, (_, i) => `<span class="col-head shape${(width - 1 - i) % 3}">${P[width - 1 - i].id}</span>`).join("");
+    const sign = q.op === "+" ? "+" : "−";
+    const rows = q.terms
+      .map((n, i) => `<span class="col-sign">${i === q.terms.length - 1 ? sign : ""}</span>${cells(n)}`)
+      .join("");
+    const carries = Array.from({ length: width }, (_, i) => {
+      const place = width - 1 - i;
+      return `<span class="col-carry" hidden>${q.carries[place] ? q.carries[place] : ""}</span>`;
+    }).join("");
+    const result = Array.from({ length: width }, (_, i) => `<span class="col-result" data-place="${width - 1 - i}"></span>`).join("");
+    const aria = `${q.terms.map(F).join(` ${sign} `)} schriftlich`;
+    return `<div class="column-calc" style="--cols:${width}" role="img" aria-label="${aria}"><span class="col-sign"></span>${head}${rows}<span class="col-sign"></span>${carries}<span class="col-line"></span><span class="col-sign"></span>${result}</div>`;
+  }
+
   /* ---------- Instructions ---------- */
   // The number to find is never spoken; numbers in speech are words.
   function instruction(q) {
@@ -494,21 +529,35 @@
           { more: "Wo sind mehr?", fewer: "Wo sind weniger?", diff: `Wie viele sind ${q.bigger} mehr?` }[q.kind],
         );
       case "venn":
-        return same(q.ask === "place" ? `Wohin gehört ${q.item.article} ${q.item.word}?` : q.question);
-      case "calc":
+        return same(
+          [q.rule, q.ask === "place" ? `Wohin gehört ${q.item.article} ${q.item.word}?` : q.question]
+            .filter(Boolean)
+            .join(" "),
+        );
+      case "calc": {
+        const place = P[Math.log10(q.unit)].name;
         return same(
           q.op === "fillUp"
-            ? "Wie viel fehlt bis zum vollen Zehner?"
+            ? `Wie viel fehlt bis zum vollen ${place}?`
             : q.op === "fillDown"
-              ? "Wie viel musst du wegnehmen bis zum vollen Zehner?"
+              ? `Wie viel musst du wegnehmen bis zum vollen ${place}?`
               : "Rechne aus.",
         );
+      }
+      case "column":
+        return same(q.op === "+" ? "Rechne schriftlich: Was kommt heraus?" : "Rechne schriftlich minus: Was kommt heraus?");
+      case "units":
+        return same("Rechne um.");
       case "cross":
         return same(q.op.startsWith("step") ? "Rechne in Schritten. Was fehlt?" : "Rechne aus.");
       case "times":
         return same(
-          { count: "Wie viele Punkte sind es?", task: "Welche Malaufgabe passt zum Punktefeld?" }[q.ask] ||
-            "Rechne aus.",
+          {
+            count: "Wie viele Punkte sind es?",
+            task: "Welche Malaufgabe passt zum Punktefeld?",
+            missing: "Welche Zahl fehlt?",
+            remainder: "Teile mit Rest.",
+          }[q.ask] || "Rechne aus.",
         );
       case "money":
         if (q.ask === "count") return same("Wie viel Geld ist das?");
@@ -567,13 +616,13 @@
           )
           .join("")}</div>${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${hundredChart(q.shown)}</div>`;
       case "steps": {
-        const arrow = `<span class="step-arrow" hidden>${sign(q.step)}${Math.abs(q.step)}</span>`;
-        const row = q.sequence.map((n, i) => tile(n, { hole: i === q.gap })).join(arrow);
+        const arrow = `<span class="step-arrow" hidden>${sign(q.step)}${F(Math.abs(q.step))}</span>`;
+        const row = q.sequence.map((n, i) => tile(F(n), { hole: i === q.gap })).join(arrow);
         return `<div class="number-row">${row}</div>${listen("Zahlen anhören")}${numberButtons(q.choices)}`;
       }
       case "compare": {
         const side = (part) =>
-          `<span class="compare-side"><span class="number-tile wide">${part.text}</span><span class="compare-help" hidden>${placeChips(Math.floor(part.value / 10), part.value % 10)}</span></span>`;
+          `<span class="compare-side"><span class="number-tile wide${q.big ? " big-tile" : ""}">${part.text}</span><span class="compare-help" hidden>${q.big ? placeDigits(part.value) : placeChips(Math.floor(part.value / 10), part.value % 10)}</span></span>`;
         return `<div class="compare-row">${side(q.left)}<span class="number-tile hole compare-gap" data-reveal>?</span>${side(q.right)}</div>${listen("Zahlen anhören")}${numberButtons(q.choices, COMPARE_WORDS)}`;
       }
       case "sort": {
@@ -596,11 +645,20 @@
       case "calc": {
         const op = q.minus ? "−" : "+";
         const task = q.fill
-          ? `${q.a} ${op} ${gap} = ${q.result}`
-          : `${q.a} ${op} ${q.b} = ${gap}`;
-        const help = q.fill
-          ? tenFrame(q.a % 10)
-          : `${blocks(Math.floor(q.a / 10), q.a % 10)}<p>${op} ${q.b / 10} Zehner</p>`;
+          ? `${F(q.a)} ${op} ${gap} = ${F(q.result)}`
+          : `${F(q.a)} ${op} ${F(q.b)} = ${gap}`;
+        // Tens: rods and cubes. Bigger units: the digit of that place, and
+        // when filling up a ten frame where every box is one smaller unit.
+        const place = P[Math.log10(q.unit)];
+        const step = q.unit / 10;
+        const help =
+          q.unit === 10
+            ? q.fill
+              ? tenFrame(q.a % 10)
+              : `${blocks(Math.floor(q.a / 10), q.a % 10)}<p>${op} ${q.b / 10} Zehner</p>`
+            : q.fill
+              ? `${tenFrame((q.a % q.unit) / step)}<p>Jedes Kästchen ist ${F(step)}.</p>`
+              : `<p>${Math.floor(q.a / q.unit) % 10} ${place.plural} ${op} ${q.b / q.unit} ${place.plural}</p>`;
         return `<div class="equation">${task}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${help}</div>`;
       }
       case "cross": {
@@ -620,6 +678,11 @@
         return `<div class="equation">${task}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${help}</div>`;
       }
       case "times": {
+        if (q.parts) {
+          const task = q.parts.map((part) => (part === null ? gap : part)).join(" ");
+          const help = q.helpText ? `<p>${q.helpText}</p>` : dotField(q.rows, q.cols);
+          return `<div class="equation">${task}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices, q.say || {}, {}, q.say ? "expression" : "")}<div class="math-help" id="math-help" hidden>${help}</div>`;
+        }
         if (q.ask === "count" || q.ask === "task")
           return `${dotField(q.rows, q.cols)}${numberButtons(q.choices, q.say || {}, {}, q.ask === "task" ? "expression" : "")}`;
         const known = q.known ? `<p class="equation known">${q.known.text}</p>` : "";
@@ -654,6 +717,10 @@
       }
       case "clock":
         return `${clockFace(q.hour, q.minute)}${numberButtons(q.choices, q.say, {}, "word-answer")}`;
+      case "column":
+        return `${columnMarkup(q)}${listen("Aufgabe anhören")}${numberButtons(q.choices)}<p class="math-help" id="math-help" hidden></p>`;
+      case "units":
+        return `<div class="equation unit-task"><span>${q.left}</span><span>=</span>${gap}<span>${q.unit}</span></div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}<p class="math-help" id="math-help" hidden></p>`;
       case "count": {
         const shown =
           q.show === "dice"
@@ -701,7 +768,7 @@
             ? `<button class="venn-zone zone-${name}" data-answer="${name}" aria-label="${aria[name]}">${inner}</button>`
             : `<div class="venn-zone zone-${name}">${inner}</div>`;
         };
-        const diagram = `<div class="venn${one ? " one" : ""}">${q.rings.map((ring, i) => `<span class="venn-ring ring-${i}"></span><span class="venn-label label-${i}">${ring.label}</span>`).join("")}${zones.map(zone).join("")}</div>`;
+        const diagram = `<div class="venn${one ? " one" : ""}">${q.rings.map((ring, i) => `<span class="venn-ring ring-${i}"></span><span class="venn-label label-${i}"><span aria-hidden="true">${ring.icon}</span> ${ring.label}</span>`).join("")}${zones.map(zone).join("")}</div>`;
         return place
           ? `<div class="venn-target" aria-hidden="true">${q.item.icon}</div>${diagram}`
           : `${diagram}${numberButtons(q.choices)}`;
@@ -747,6 +814,14 @@
       root.querySelector(".venn-target").classList.add("placed");
       return;
     }
+    if (q.mode === "column") {
+      const digits = [...value].reverse();
+      root.querySelectorAll(".col-result").forEach((cell) => {
+        cell.textContent = digits[Number(cell.dataset.place)] || "";
+        cell.classList.add("found");
+      });
+      return;
+    }
     const target = root.querySelector("[data-reveal]");
     if (!target) return;
     target.textContent = /^\d+$/.test(value) ? F(Number(value)) : value;
@@ -771,8 +846,10 @@
         speech: `${capitalize(W(Number(picked)))} ${q.unit === "€" ? "Euro" : "Cent"} passt nicht.`,
       };
     if (q.say?.[picked]) return { text: `${picked} passt nicht.`, speech: `${capitalize(q.say[picked])} passt nicht.` };
+    if (q.mode === "units" && /^\d+$/.test(picked))
+      return { text: `${picked} ${q.unit} passt nicht.`, speech: `${capitalize(W(Number(picked)))} passt nicht.` };
     if (/^\d+$/.test(picked))
-      return { text: `${picked} passt nicht.`, speech: `${capitalize(W(Number(picked)))} passt nicht.` };
+      return { text: `${F(Number(picked))} passt nicht.`, speech: `${capitalize(W(Number(picked)))} passt nicht.` };
     return same(`${picked} passt nicht.`);
   }
   /*
@@ -845,11 +922,19 @@
         showAll(".step-arrow");
         const amount = Math.abs(q.step);
         return {
-          text: `Immer ${sign(q.step)} ${amount}.`,
+          text: `Immer ${sign(q.step)} ${F(amount)}.`,
           speech: `Immer ${signWord(q.step)} ${W(amount)}.`,
         };
       }
       case "compare":
+        if (q.big) {
+          if (n === 1)
+            return same(
+              "Das Krokodil frisst immer die größere Zahl. Hat eine Zahl mehr Stellen, ist sie größer. Sonst vergleiche von vorne.",
+            );
+          showAll(".compare-help");
+          return same("Vergleiche Stelle für Stelle von vorne. Die erste Stelle, die verschieden ist, entscheidet.");
+        }
         if (n === 1)
           return same(
             q.kind === "sum"
@@ -884,6 +969,7 @@
         help();
         return same("Schau auf den Zahlenstrahl.");
       case "calc":
+        if (q.unit > 10) return bigCalcTip(q, n, { help });
         if (n === 1) {
           if (q.op === "fillUp") return same("Wie viele Einer fehlen bis zum nächsten vollen Zehner?");
           if (q.op === "fillDown") return same("Nimm die Einer weg. Dann bist du beim vollen Zehner.");
@@ -912,7 +998,11 @@
       case "cross":
         return crossTip(q, n, { help });
       case "times":
-        return timesTip(q, n, { showAll, help });
+        return q.parts ? timesMoreTip(q, n, { showAll, help }) : timesTip(q, n, { showAll, help });
+      case "column":
+        return columnTip(q, n, { showAll, help });
+      case "units":
+        return unitsTip(q, n, { help });
       case "money":
         return moneyTip(q, n, { showAll, help });
       case "clock":
@@ -1042,6 +1132,66 @@
       text: `Erst ${q.a} ${sign} ${first} = ${middle}. Dann noch ${second} ${q.minus ? "weg" : "dazu"}.`,
       speech: `Erst ${W(q.a)} ${word} ${W(first)} ist ${W(middle)}. Dann noch ${W(second)} ${q.minus ? "weg" : "dazu"}.`,
     };
+  }
+  // Calculating with hundreds and thousands: only one place changes.
+  function bigCalcTip(q, n, { help }) {
+    const place = P[Math.log10(q.unit)];
+    const step = q.unit / 10;
+    if (n === 1) {
+      if (q.op === "fillUp")
+        return same(`Wie viel fehlt bis zum nächsten vollen ${place.name}? Zähle in ${F(step)}er-Schritten.`);
+      if (q.op === "fillDown") return same(`Nimm so viel weg, dass ein voller ${place.name} übrig bleibt.`);
+      if (q.op.startsWith("N")) return same(`Nur die ${place.plural} ändern sich. Die anderen Stellen bleiben gleich.`);
+      return {
+        text: `Rechne mit den ${place.dativePlural}: ${q.a / q.unit} ${place.plural} ${q.minus ? "minus" : "plus"} ${q.b / q.unit} ${place.plural}.`,
+        speech: `Rechne mit den ${place.dativePlural}: ${countWord(q.a / q.unit)} ${place.plural} ${q.minus ? "minus" : "plus"} ${countWord(q.b / q.unit)} ${place.plural}.`,
+      };
+    }
+    help();
+    if (q.fill)
+      return {
+        text: `Jedes Kästchen ist ${F(step)}. ${q.op === "fillUp" ? "Wie viele Kästchen sind noch frei?" : "Wie viele Kästchen sind voll?"}`,
+        speech: `Jedes Kästchen ist ${W(step)}. ${q.op === "fillUp" ? "Wie viele Kästchen sind noch frei?" : "Wie viele Kästchen sind voll?"}`,
+      };
+    return same(`Schau: Rechne nur mit den ${place.dativePlural}.`);
+  }
+  function timesMoreTip(q, n, { showAll, help }) {
+    const [x, , y] = q.parts;
+    if (n === 1) {
+      if (q.ask === "divide")
+        return { text: `Denk an die Malaufgabe: Wie oft passt ${y} in ${x}?`, speech: `Denk an die Malaufgabe: Wie oft passt ${W(y)} in ${W(x)}?` };
+      if (q.ask === "missing") return same(`Zähle in ${q.cols}er-Schritten, bis du bei ${q.parts[4]} bist.`);
+      if (q.ask === "tens") return same("Rechne zuerst ohne die Null. Dann hänge die Null wieder an.");
+      if (q.ask === "split") return same(`Zerlege ${y}: erst die Zehner mal ${x}, dann die Einer mal ${x}.`);
+      return same(`Welche Malaufgabe mit ${y} kommt nah an ${x}, aber nicht darüber? Der Rest muss kleiner als ${y} sein.`);
+    }
+    help();
+    if (!q.helpText) {
+      showAll(".row-sum");
+      return same(`Zähle die Reihen. Jede Reihe hat ${q.cols} Punkte.`);
+    }
+    return same("Schau auf die Hilfe.");
+  }
+  function columnTip(q, n, { showAll, help }) {
+    if (n === 1)
+      return same(
+        q.op === "+"
+          ? "Fang hinten bei den Einern an. Sind es 10 oder mehr, kommt der Übertrag in die nächste Spalte."
+          : "Fang hinten bei den Einern an. Reicht die obere Ziffer nicht, hilft ein Übertrag aus der nächsten Spalte.",
+      );
+    showAll(".col-carry");
+    if (n === 2) return same("Schau: Die kleinen Zahlen über dem Strich sind die Überträge.");
+    help(q.first.text);
+    return q.first;
+  }
+  function unitsTip(q, n, { help }) {
+    if (n === 1) return q.factQuestion;
+    if (n === 2 || !q.steps) {
+      help(q.fact.text);
+      return { text: `Schau: ${q.fact.text}.`, speech: q.fact.speech };
+    }
+    help(`${q.fact.text}, also ${q.steps.text}`);
+    return { text: `${q.fact.text}. Rechne: ${q.steps.text}.`, speech: `${q.fact.speech} ${q.steps.speech}` };
   }
   function timesTip(q, n, { showAll, help }) {
     const k = q.cols;
