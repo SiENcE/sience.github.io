@@ -1,4 +1,4 @@
-The Loonies 0.1.0: Erster Akt (Demo)
+The Loonies 0.1.1: Erster Akt (Demo)
 © 2026 OneBitKid (Florian Fischer). A free fan project, not affiliated with Warner Bros. or Amblin.
 
 Ein freies Fanprojekt, inspiriert von einem Abenteuerfilm aus dem Jahr 1985. Eigene Figuren, eigene
