@@ -147,6 +147,44 @@
   function tile(text, { hole = false, caption = "" } = {}) {
     return `<span class="number-slot"><span class="number-tile${hole ? " hole" : ""}"${hole ? " data-reveal" : ""}>${hole ? "?" : text}</span>${caption ? `<span class="tile-caption">${caption}</span>` : ""}</span>`;
   }
+  /*
+   * Ten or twenty field for mental arithmetic: one class per box ("full",
+   * "full take" crossed out, "add" coming in, "need" still free, "off").
+   */
+  function calcField(marks) {
+    const count = marks.length > 10 ? 2 : 1;
+    const frame = (f) => {
+      let cells = "";
+      for (let row = 0; row < 2; row++) {
+        for (let i = 0; i < 5; i++) cells += `<span class="cell ${marks[f * 10 + row * 5 + i] || ""}"></span>`;
+        cells += '<span class="row-label"></span>';
+      }
+      return `<span class="frame">${cells}</span>`;
+    };
+    return `<div class="frames calc-field" role="img" aria-label="${count === 1 ? "Zehnerfeld" : "Zwanzigerfeld"}">${Array.from({ length: count }, (_, f) => frame(f)).join("")}</div>`;
+  }
+  // a + b: a full boxes, b coming in; a − b: the last b of a crossed out.
+  function sumField(a, b, minus) {
+    const size = (minus ? a : a + b) > 10 ? 20 : 10;
+    return calcField(
+      Array.from({ length: size }, (_, i) =>
+        i < a ? (minus && i >= a - b ? "full take" : "full") : !minus && i < a + b ? "add" : "",
+      ),
+    );
+  }
+  // Doubling as a mirror: the same dots on both sides; "extra" dots in orange.
+  function mirrorField(left, right, extra = 0) {
+    const side = (n, more = 0) => {
+      const dots = [...Array(n).fill("dot"), ...Array(more).fill("dot extra")];
+      const rows = [];
+      for (let i = 0; i < dots.length; i += 5)
+        rows.push(`<span class="dot-row">${dots.slice(i, i + 5).map((cls) => `<span class="${cls}"></span>`).join("")}</span>`);
+      return `<span class="mirror-side">${rows.join("")}</span>`;
+    };
+    return `<div class="mirror-field" role="img" aria-label="Punkte mit Spiegel">${side(left)}<span class="mirror-line"></span>${side(right, extra)}</div>`;
+  }
+  const equation = (parts) =>
+    `<div class="equation">${parts.map((part) => (part === null ? gap : part)).join(" ")}</div>`;
   function placeChips(tens, ones) {
     return `<span class="place-chip tens"><strong>${tens}</strong> Z</span><span class="place-chip ones"><strong>${ones}</strong> E</span>`;
   }
@@ -559,6 +597,25 @@
             remainder: "Teile mit Rest.",
           }[q.ask] || "Rechne aus.",
         );
+      case "blitz":
+        return same(q.kind === "terms" ? "Welches Zeichen passt? Das Krokodil frisst die größere Seite." : "Rechne aus.");
+      case "complete":
+        return same("Ergänze: Wie viel fehlt?");
+      case "double":
+        return same(
+          { double: "Verdopple die Zahl.", half: "Halbiere die Zahl.", near: "Rechne mit dem Verdoppeln." }[q.ask],
+        );
+      case "mix":
+        return same(q.gapAt === q.parts.length - 1 ? "Rechne aus." : "Welche Zahl fehlt?");
+      case "family":
+        return same(
+          {
+            findSwap: "Welche Aufgabe ist die Tauschaufgabe?",
+            findInverse: "Welche Aufgabe ist die Umkehraufgabe?",
+            useSwap: "Rechne mit der Tauschaufgabe.",
+            useInverse: "Rechne mit der Umkehraufgabe.",
+          }[q.ask],
+        );
       case "money":
         if (q.ask === "count") return same("Wie viel Geld ist das?");
         return { text: q.question, speech: q.questionSpeech };
@@ -687,6 +744,48 @@
           return `${dotField(q.rows, q.cols)}${numberButtons(q.choices, q.say || {}, {}, q.ask === "task" ? "expression" : "")}`;
         const known = q.known ? `<p class="equation known">${q.known.text}</p>` : "";
         return `${known}<div class="equation">${q.rows} · ${q.cols} = ${gap}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${dotField(q.rows, q.cols)}</div>`;
+      }
+      case "blitz": {
+        if (q.kind === "terms") {
+          const side = (part) =>
+            `<span class="compare-side"><span class="number-tile wide term-tile">${part.text}</span><span class="compare-help" hidden><span class="place-chip">= <strong>${part.value}</strong></span></span></span>`;
+          return `<div class="compare-row">${side(q.left)}<span class="number-tile hole compare-gap" data-reveal>?</span>${side(q.right)}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices, COMPARE_WORDS)}`;
+        }
+        const help = q.kind === "chain" ? "" : sumField(q.a, q.b, q.minus);
+        return `${equation(q.parts)}${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${help}</div>`;
+      }
+      case "mix":
+        return `${equation(q.parts)}${listen("Aufgabe anhören")}${numberButtons(q.choices)}<p class="math-help" id="math-help" hidden></p>`;
+      case "complete": {
+        // Up to 100 the help is the steps over the next full ten.
+        if (q.target > 20)
+          return `${equation(q.parts)}${listen("Aufgabe anhören")}${numberButtons(q.choices)}<p class="math-help" id="math-help" hidden></p>`;
+        const size = q.target > 10 ? 20 : 10;
+        const field = calcField(
+          Array.from({ length: size }, (_, i) => (i < q.a ? "full" : i < q.target ? "need" : "off")),
+        );
+        return `${equation(q.parts)}${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${field}</div>`;
+      }
+      case "double": {
+        if (q.ask === "near")
+          return `${equation(q.parts)}${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${mirrorField(q.n, q.n, 1)}</div>`;
+        const double = q.ask === "double";
+        const half = double ? q.n : q.n / 2;
+        const arrow = `<span class="op-arrow"><small>${double ? "das Doppelte" : "die Hälfte"}</small>→</span>`;
+        // Up to 100 the help splits tens and ones (q.help) instead of the mirror.
+        const help = q.help ? '<p class="math-help" id="math-help" hidden></p>' : `<div class="math-help" id="math-help" hidden>${mirrorField(half, half)}</div>`;
+        return `<div class="number-row">${tile(q.n)}${arrow}${tile("", { hole: true })}</div>${listen("Aufgabe anhören")}${numberButtons(q.choices)}${help}`;
+      }
+      case "family": {
+        if (q.known) {
+          const name = q.ask === "findSwap" ? "Tauschaufgabe" : "Umkehraufgabe";
+          return `<div class="equation">${q.known.text}</div><p class="family-ask"><span>${name}:</span>${gap}</p>${listen("Aufgabe anhören")}${numberButtons(q.choices, q.say, {}, "expression")}<p class="math-help" id="math-help" hidden></p>`;
+        }
+        const check = q.check
+          ? `<p class="equation known">denn ${q.check.map((part) => (part === null ? '<span class="math-gap" data-reveal-copy>?</span>' : part)).join(" ")}</p>`
+          : "";
+        const help = q.ask === "useSwap" ? sumField(q.b, q.a, false) : sumField(q.s, q.b, true);
+        return `${equation(q.parts)}${check}${listen("Aufgabe anhören")}${numberButtons(q.choices)}<div class="math-help" id="math-help" hidden>${help}</div>`;
       }
       case "money": {
         const unitWord = q.unit === "€" ? "Euro" : "Cent";
@@ -826,6 +925,11 @@
     if (!target) return;
     target.textContent = /^\d+$/.test(value) ? F(Number(value)) : value;
     target.classList.add("found");
+    // The same number in a second place (13 − 7 = 6, denn 6 + 7 = 13).
+    root.querySelectorAll("[data-reveal-copy]").forEach((copy) => {
+      copy.textContent = target.textContent;
+      copy.classList.add("found");
+    });
   }
 
   /* ---------- Stepped help ---------- */
@@ -835,7 +939,7 @@
       return { text: `${F(Number(picked))} passt nicht.`, speech: `${capitalize(W(Number(picked)))} passt nicht.` };
     if (q.mode === "sort")
       return { text: `${picked} ist noch nicht dran.`, speech: `${capitalize(W(Number(picked)))} ist noch nicht dran.` };
-    if (q.mode === "compare")
+    if (q.mode === "compare" || q.kind === "terms")
       return { text: `${picked} passt nicht.`, speech: "Dieses Zeichen passt nicht." };
     if (q.mode === "venn" && q.ask === "place") return same("Da passt es nicht hin.");
     if (SIDES[picked]) return same(`${SIDES[picked][1]} stimmt nicht.`);
@@ -1003,6 +1107,16 @@
         return columnTip(q, n, { showAll, help });
       case "units":
         return unitsTip(q, n, { help });
+      case "blitz":
+        return blitzTip(q, n, { showAll, help });
+      case "mix":
+        return stepsTip(q, n, { help });
+      case "complete":
+        return q.tip ? stepsTip(q, n, { help }) : completeTip(q, n, { help });
+      case "double":
+        return q.tip ? stepsTip(q, n, { help }) : doubleTip(q, n, { help });
+      case "family":
+        return familyTip(q, n, { help });
       case "money":
         return moneyTip(q, n, { showAll, help });
       case "clock":
@@ -1213,6 +1327,130 @@
         ? `Zähle die Reihen. Jede Reihe hat ${k} Punkte.`
         : "Die Zahlen am Rand zählen die Reihen zusammen.",
     );
+  }
+  // Mental arithmetic: a strategy first, then the twenty field, then the steps.
+  const lower = (text) => text.replace(/^./, (x) => x.toLowerCase());
+  // Like same(), with the signs as words: "8 + 2 = 10" → "acht plus zwei ist zehn".
+  const saidShown = (text) => ({
+    text,
+    speech: same(text.replace(/ \+ /g, " plus ").replace(/ − /g, " minus ").replace(/ = /g, " ist ")).speech,
+  });
+  const BLITZ_TIPS = {
+    plus01: (q) =>
+      q.special === 0 ? "Mit 0 ändert sich nichts." : q.special === 1 ? "Plus 1 ist die Zahl danach." : "Plus 10 ist ein Zehner mehr.",
+    plus5: () => "5 ist eine ganze Hand. Zähle von dort weiter.",
+    double: () => "Zweimal die gleiche Zahl: Das ist das Doppelte.",
+    plus10: () => "Fang mit der größeren Zahl an und zähle weiter.",
+    plusTeen: () => "Rechne erst mit den Einern. Der Zehner bleibt.",
+    plusCross: () => "Rechne erst bis 10, dann weiter.",
+    minus01: (q) => (q.special === 0 ? "Minus 0: Es geht nichts weg." : "Minus 1 ist die Zahl davor."),
+    minus5_10: (q) => (q.special === 10 ? "Minus 10: Ein Zehner geht weg." : "Nimm eine ganze Hand weg: 5."),
+    minusHalf: (q) =>
+      q.sub === "half"
+        ? `Denk ans Verdoppeln: Welche Zahl und noch einmal dieselbe Zahl sind ${q.a}?`
+        : q.sub === "ten"
+          ? `Zerlege die 10: ${q.b} und wie viel sind zusammen 10?`
+          : "Nimm alle Einer weg. Was bleibt übrig?",
+    minus10: () => "Zähle zurück.",
+    minusTeen: (q) => (q.b > 10 ? "Nimm erst den Zehner weg, dann die Einer." : "Rechne erst mit den Einern. Der Zehner bleibt."),
+    minusCross: () => "Rechne erst zurück bis 10, dann weiter.",
+  };
+  function blitzTip(q, n, { showAll, help }) {
+    if (q.kind === "terms") {
+      if (n === 1) return same("Rechne zuerst beide Seiten aus. Das Krokodil frisst die größere Seite.");
+      showAll(".compare-help");
+      return same("Schau: So viel ist jede Seite.");
+    }
+    if (q.kind === "chain") {
+      if (n === 1) return same("Rechne von links nach rechts.");
+      help(q.first.text);
+      return { text: `Erst ${q.first.text}. Dann weiter.`, speech: `Erst ${lower(q.first.speech)}. Dann weiter.` };
+    }
+    if (n === 1) return same(BLITZ_TIPS[q.kind](q));
+    help();
+    if (n >= 3 && q.kind === "plusCross") {
+      const first = 10 - q.a;
+      return saidShown(`Erst ${q.a} + ${first} = 10. Dann noch ${q.b - first} dazu.`);
+    }
+    if (n >= 3 && q.kind === "minusCross") {
+      const first = q.a % 10;
+      return saidShown(`Erst ${q.a} − ${first} = 10. Dann noch ${q.b - first} weg.`);
+    }
+    return same(
+      q.minus
+        ? "Die durchgestrichenen Punkte gehen weg. Zähle, was übrig bleibt."
+        : "Die roten Punkte sind schon da, die blauen kommen dazu. Zähle alle.",
+    );
+  }
+  // Tasks with their own help from core.js: tip, then shown help, then help2.
+  function stepsTip(q, n, { help }) {
+    if (n === 1) return q.tip;
+    const shown = n >= 3 && q.help2 ? q.help2 : q.help;
+    help(shown.text);
+    // The help box shows the steps; Momo reads them aloud.
+    return { text: "Schau auf die Hilfe.", speech: `Schau: ${lower(shown.speech)}` };
+  }
+  function completeTip(q, n, { help }) {
+    const small = q.target === 20 && q.a < 10;
+    if (n === 1)
+      return same(
+        q.target < 20
+          ? `Zähle von ${q.a} weiter bis ${q.target}.`
+          : small
+            ? "Rechne erst bis 10, dann bis 20."
+            : "Wie viele Einer fehlen bis 20?",
+      );
+    help();
+    if (n >= 3 && small) return same(`Bis 10 fehlen ${10 - q.a}. Von 10 bis 20 fehlen noch 10.`);
+    return same("Wie viele Kästchen sind noch hell?");
+  }
+  function doubleTip(q, n, { help }) {
+    if (n === 1)
+      return saidShown(
+        {
+          double: `Das Doppelte heißt: ${q.n} + ${q.n}.`,
+          half: `Die Hälfte heißt: ${q.n} in zwei gleiche Teile teilen.`,
+          near: `Denk an ${q.n} + ${q.n}. Eine Zahl ist 1 größer.`,
+        }[q.ask],
+      );
+    help();
+    return same(
+      {
+        double: "Im Spiegel ist alles doppelt. Zähle die Punkte auf beiden Seiten.",
+        half: "Beide Seiten sind gleich groß. Zähle eine Seite.",
+        near: "Zähle alle Punkte. Der orange Punkt ist der eine mehr.",
+      }[q.ask],
+    );
+  }
+  function familyTip(q, n, { help }) {
+    if (q.ask === "findSwap") {
+      if (n === 1) return same("Bei der Tauschaufgabe tauschen die zwei Zahlen ihren Platz. Das Plus bleibt.");
+      help("Die erste Zahl kommt nach hinten, die zweite nach vorne.");
+      return same("Schau: Die Zahlen tauschen den Platz.");
+    }
+    if (q.ask === "findInverse") {
+      if (n === 1)
+        return same(
+          q.fromPlus
+            ? "Die Umkehraufgabe rechnet zurück: Aus plus wird minus."
+            : "Die Umkehraufgabe rechnet zurück: Aus minus wird plus.",
+        );
+      const start = q.fromPlus ? q.s : q.a;
+      help(`Fang bei ${start} an.`);
+      return same(
+        q.fromPlus
+          ? `Fang beim Ergebnis ${start} an und nimm ${q.b} wieder weg.`
+          : `Fang beim Ergebnis ${start} an und lege ${q.b} wieder dazu.`,
+      );
+    }
+    if (q.ask === "useSwap") {
+      if (n === 1) return same("Fang mit der größeren Zahl an. Das ist leichter.");
+      help();
+      return same(`Zähle von ${q.b} weiter. Die blauen Punkte kommen dazu.`);
+    }
+    if (n === 1) return same(`Denk an die Plusaufgabe: Welche Zahl plus ${q.b} ist ${q.s}?`);
+    help();
+    return same("Die durchgestrichenen Punkte gehen weg. Zähle, was übrig bleibt.");
   }
   function moneyTip(q, n, { showAll, help }) {
     if (q.ask === "count") {

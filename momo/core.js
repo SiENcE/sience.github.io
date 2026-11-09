@@ -76,21 +76,26 @@
     { id: "echo", icon: "🦜", title: "Quatschwort-Echo", color: "lavender", together: true, grades: { 1: 0, 2: 3 } },
     { id: "movement", icon: "👏", title: "Mitmach-Spiel", color: "peach", together: true, grades: { 1: 0, 2: 3 } },
     { id: "bundle", icon: "👀", title: "Zahlen-Blick", color: "sky", grades: { 1: 0, 2: 1 } },
-    { id: "place", icon: "🏠", title: "Zahlenhaus", color: "mint", grades: { 2: 0 } },
+    { id: "place", icon: "🏠", title: "Zahlenhaus", color: "mint", grades: { 2: 0, 3: 6 } },
     { id: "build", icon: "🏗️", title: "Zahlen bauen", color: "peach", grades: { 1: 0, 2: 1 } },
     { id: "line", icon: "📏", title: "Zahlenstrahl", color: "sky", grades: { 1: 0, 2: 1 } },
     { id: "chart", icon: "🟩", title: "Hundertertafel", color: "mint", grades: { 2: 0 } },
     { id: "steps", icon: "👣", title: "Weiterzählen", color: "yellow", grades: { 2: 0, 3: 7, 4: 9 } },
     { id: "compare", icon: "🐊", title: "Krokodil-Vergleich", color: "mint", grades: { 2: 0, 3: 6, 4: 8 } },
     { id: "sort", icon: "🪜", title: "Zahlen ordnen", color: "lavender", grades: { 2: 0 } },
-    { id: "adjacent", icon: "🏘️", title: "Zahlen-Nachbarn", color: "peach", grades: { 2: 0 } },
+    { id: "adjacent", icon: "🏘️", title: "Zahlen-Nachbarn", color: "peach", grades: { 2: 0, 3: 4 } },
     { id: "calc", icon: "🔟", title: "Zehner rechnen", color: "rose", grades: { 2: 0, 3: 7, 4: 10 } },
     { id: "graph", icon: "📶", title: "Säulen lesen", color: "yellow", grades: { 1: 0, 2: 4 } },
     { id: "count", icon: "✋", title: "Wie viele?", color: "peach", grades: { 1: 0, 2: 5 } },
     { id: "more", icon: "🍎", title: "Mehr oder weniger?", color: "rose", grades: { 1: 0, 2: 5 } },
     { id: "venn", icon: "⭕", title: "Mengen-Kreise", color: "lavender", grades: { 1: 0, 2: 3 } },
-    { id: "cross", icon: "🌉", title: "Über den Zehner", color: "sky", grades: { 1: 0, 2: 2 } },
+    { id: "cross", icon: "🌉", title: "Über den Zehner", color: "sky", grades: { 1: 0, 2: 2, 3: 5 } },
     { id: "times", icon: "🔵", title: "Malfelder", color: "lavender", grades: { 2: 0, 3: 7, 4: 10 } },
+    { id: "blitz", icon: "⚡", title: "Blitzrechnen", color: "yellow", grades: { 2: 0 } },
+    { id: "complete", icon: "🎯", title: "Ergänzen", color: "mint", grades: { 2: 0, 3: 6 } },
+    { id: "double", icon: "🦋", title: "Doppelt und halb", color: "lavender", grades: { 2: 0, 3: 6 } },
+    { id: "family", icon: "🔄", title: "Tausch und Umkehr", color: "peach", grades: { 2: 0 } },
+    { id: "mix", icon: "🔀", title: "Rechen-Mix", color: "yellow", grades: { 3: 0 } },
     { id: "column", icon: "🧾", title: "Schriftlich rechnen", color: "sky", grades: { 3: 0, 4: 4 } },
     { id: "units", icon: "📏", title: "Umrechnen", color: "peach", grades: { 3: 0, 4: 4 } },
     { id: "money", icon: "🪙", title: "Geld zählen", color: "yellow", grades: { 1: 0, 2: 1 } },
@@ -209,13 +214,22 @@
       games: ["tenfold", "placetable", "lay"],
     },
     {
+      id: "mental",
+      subject: "mathe",
+      icon: "💡",
+      title: "Kopfrechnen",
+      report: "Kopfrechnen bis 20",
+      color: "mint",
+      games: ["blitz", "complete", "double", "family"],
+    },
+    {
       id: "calc",
       subject: "mathe",
       icon: "➕",
       title: "Rechnen",
       report: "Rechnen",
       color: "rose",
-      games: ["calc", "cross", "column"],
+      games: ["calc", "cross", "mix", "column"],
     },
     {
       id: "times",
@@ -312,10 +326,21 @@
     return Math.min(start, LEVELS[mode].length - 1);
   }
   const firstGrade = (mode) => gradeSteps(mode)[0]?.[0] || 0;
-  // Grade 0 means "not chosen yet": every game.
+  const lastGrade = (mode) => gradeSteps(mode).at(-1)?.[0] || 0;
+  const subjectOf = (mode) => categoryOf(mode)?.subject;
+  /*
+   * A game belongs to the grades from its lowest to its highest one; above
+   * that it is too easy and hidden. Only a subject without any game of the
+   * grade (English from grade 3: beginners) keeps its games of lower grades.
+   * Grade 0 means "not chosen yet": every game.
+   */
   function inGrade(mode, grade) {
     const first = firstGrade(mode);
-    return first > 0 && (!grade || first <= grade);
+    if (!(first > 0 && (!grade || first <= grade))) return false;
+    if (!grade || lastGrade(mode) >= grade) return true;
+    return !ACTIVITIES.some(
+      (x) => subjectOf(x.id) === subjectOf(mode) && firstGrade(x.id) <= grade && lastGrade(x.id) >= grade,
+    );
   }
   // Highest level a game has reached: the stored record or the level now.
   const reachedLevel = (state, mode) =>
@@ -347,7 +372,9 @@
   }
   // Shown in the menu: games of the grade, plus games opened early by progress.
   function isOpen(mode, grade, state = null) {
-    return inGrade(mode, grade) || Boolean(state && unlockedBy(state, mode).length);
+    if (inGrade(mode, grade)) return true;
+    // Opening early is only for games of a higher grade, never for easy ones.
+    return Boolean(state && grade && firstGrade(mode) > grade && unlockedBy(state, mode).length);
   }
   function openGames(state) {
     return ACTIVITIES.filter((x) => isOpen(x.id, state.settings.grade, state)).map((x) => x.id);
@@ -799,6 +826,75 @@
       { ask: "tens", rows: [2, 3, 4, 5, 6, 7, 8, 9], max: 9, choices: 4, label: "Zehnereinmaleins: 3 · 40, 120 : 4" },
       { ask: "split", rows: [2, 3, 4, 5, 6, 7, 8, 9], max: 9, choices: 4, label: "zerlegen: 4 · 23 = 4 · 20 + 4 · 3" },
       { ask: "remainder", rows: [2, 3, 4, 5, 6, 7, 8, 9], max: 9, choices: 4, label: "mit Rest: 23 : 5 = 4 R 3" },
+    ],
+    // Mental arithmetic up to 20, one level per workbook page.
+    blitz: [
+      { ops: ["plus01"], choices: 3, label: "Plus mit 0, 1 und 10" },
+      { ops: ["plus5", "double"], choices: 3, label: "Plus mit 5 und Verdoppeln" },
+      { ops: ["plus10"], choices: 3, label: "Plusaufgaben bis 10" },
+      { ops: ["plusTeen"], choices: 3, label: "Plus bis 20 ohne Zehnerübergang: 14 + 3" },
+      { ops: ["plusCross"], choices: 4, label: "Plus bis 20 mit Zehnerübergang: 8 + 5" },
+      { ops: ["plus10", "plusTeen", "plusCross"], choices: 4, label: "Plus bis 20 – gemischt" },
+      { ops: ["minus01"], choices: 3, label: "Minus mit 1 und 0" },
+      { ops: ["minus5_10"], choices: 3, label: "Minus mit 10 und 5" },
+      { ops: ["minusHalf"], choices: 3, label: "Minus – Zerlegen und Halbieren: 10 − 4, 14 − 7" },
+      { ops: ["minus10"], choices: 3, label: "Minusaufgaben bis 10" },
+      { ops: ["minusTeen"], choices: 4, label: "Minus bis 20 ohne Zehnerübergang: 17 − 4" },
+      { ops: ["minusCross"], choices: 4, label: "Minus bis 20 mit Zehnerübergang: 13 − 5" },
+      { ops: ["minus10", "minusTeen", "minusCross"], choices: 4, label: "Minus bis 20 – gemischt" },
+      { ops: ["plus10", "plusTeen", "minus10", "minusTeen"], choices: 4, label: "Plus und Minus ohne Zehnerübergang" },
+      { ops: ["plusCross", "minusCross"], choices: 4, label: "Plus und Minus mit Zehnerübergang" },
+      {
+        ops: ["plus10", "plusTeen", "plusCross", "minus10", "minusTeen", "minusCross"],
+        choices: 4,
+        label: "Plus und Minus – gemischt A",
+      },
+      { ops: ["chain"], choices: 4, label: "Plus und Minus – gemischt B: drei Zahlen" },
+      { ops: ["terms"], choices: 3, label: "Terme vergleichen: 7 + 5 ○ 6 + 6" },
+    ],
+    // Completing to 8, 9, 10 and 20.
+    complete: [
+      { targets: [10], choices: 3, label: "Ergänzen bis 10: 6 + _ = 10" },
+      { targets: [8, 9], choices: 3, label: "bis 8 oder 9: 5 + _ = 9" },
+      { targets: [8, 9, 10], choices: 4, label: "bis 8, 9 oder 10" },
+      { targets: [20], from: "teen", choices: 3, label: "bis 20: 14 + _ = 20" },
+      { targets: [20], from: "small", choices: 4, label: "bis 20 über die 10: 7 + _ = 20" },
+      { targets: [10, 20], choices: 4, label: "bis 10 oder 20" },
+      // Grade 3: up to 100, over the next full ten.
+      { targets: [100], from: "tens", choices: 3, label: "Ergänzen bis 100: 70 + _ = 100" },
+      { targets: [100], from: "any", choices: 4, label: "bis 100: 37 + _ = 100" },
+      { targets: [50, 100], from: "any", choices: 4, label: "bis 50 oder 100" },
+    ],
+    // Doubling and halving; "max" is the biggest number in the task.
+    double: [
+      { asks: ["double"], max: 10, choices: 3, label: "Verdoppeln bis 5" },
+      { asks: ["double"], max: 20, choices: 3, label: "Verdoppeln bis 10" },
+      { asks: ["half"], max: 10, choices: 3, label: "Halbieren bis 10" },
+      { asks: ["half"], max: 20, choices: 4, label: "Halbieren bis 20" },
+      { asks: ["double", "half"], max: 20, choices: 4, label: "Verdoppeln und Halbieren" },
+      { asks: ["near"], max: 20, choices: 4, label: "Fast verdoppeln: 6 + 7 = 6 + 6 + 1" },
+      // Grade 3: das Doppelte und die Hälfte up to 100, tens and ones apart.
+      { asks: ["double"], max: 100, carry: false, choices: 4, label: "Das Doppelte bis 100: 34 → 68" },
+      { asks: ["half"], max: 100, carry: false, choices: 4, label: "Die Hälfte bis 100: 86 → 43" },
+      { asks: ["double", "half"], max: 100, carry: true, choices: 4, label: "mit Übergang: 37 → 74, 70 → 35" },
+    ],
+    // All four operations up to 100, with gaps (Platzhalter).
+    mix: [
+      { ops: ["divGap"], choices: 3, label: "Geteilt mit Platzhalter: 42 : _ = 6" },
+      { ops: ["times", "divide"], choices: 4, label: "Mal und Geteilt gemischt" },
+      { ops: ["timesGap", "divGap"], choices: 4, label: "Mal und Geteilt mit Platzhaltern" },
+      { ops: ["plusGap", "minusGap"], choices: 4, label: "Plus und Minus mit Platzhaltern: 34 + _ = 61" },
+      { ops: ["plus", "minus", "times", "divide"], choices: 4, label: "Alle Rechenoperationen" },
+      { ops: ["plusGap", "minusGap", "timesGap", "divGap"], choices: 4, label: "Alle Rechenoperationen mit Platzhaltern" },
+    ],
+    // Swapped tasks and inverse tasks: find them, then use them.
+    family: [
+      { asks: ["findSwap"], max: 10, choices: 3, label: "Tauschaufgabe finden: 3 + 5 → 5 + 3" },
+      { asks: ["useSwap"], max: 20, choices: 3, label: "Tauschaufgabe nutzen: 2 + 9 = 9 + 2" },
+      { asks: ["findInverse"], max: 10, choices: 3, label: "Umkehraufgabe finden: 7 + 2 → 9 − 2" },
+      { asks: ["useInverse"], max: 20, choices: 3, label: "Umkehraufgabe nutzen: 13 − 7, denn 6 + 7 = 13" },
+      { asks: ["findSwap", "findInverse"], max: 20, choices: 4, label: "Tausch oder Umkehr finden, bis 20" },
+      { asks: ["useSwap", "useInverse"], max: 20, choices: 4, label: "Tausch und Umkehr nutzen, bis 20" },
     ],
     // Written addition and subtraction in columns, with carries.
     column: [
@@ -3233,6 +3329,668 @@
     };
   }
 
+  /*
+   * Mental arithmetic up to 20 (grade 2): quick plus and minus tasks of the
+   * workbook kinds ("blitz"), completing to 8, 9, 10 and 20 ("complete"),
+   * doubling and halving ("double"), swapped and inverse tasks ("family").
+   * "parts" is the equation, null the gap. Speech comes from the shown text.
+   */
+  const mathSpeech = (text) =>
+    capitalize(
+      text
+        .replace(/\d+/g, (n) => numberWord(Number(n)))
+        .replace(/(^|\s)\?(?=\s|$)/g, "$1wie viel")
+        .replace(/ · /g, " mal ")
+        .replace(/ : /g, " geteilt durch ")
+        .replace(/ \+ /g, " plus ")
+        .replace(/ − /g, " minus ")
+        .replace(/ = /g, " ist "),
+    );
+  // Speech parts in the middle of a sentence start in lower case.
+  const mathWords = (text) => mathSpeech(text).replace(/^./, (x) => x.toLowerCase());
+  const said = (text) => ({ text, speech: mathSpeech(text) });
+  const signOf = (minus) => (minus ? "−" : "+");
+  const BLITZ_KINDS = ["plus10", "plusTeen", "plusCross", "minus10", "minusTeen", "minusCross"];
+  // One task of a kind: { a, b, minus, special, sub } with a result from 1 to 20.
+  function blitzPair(kind, random) {
+    const d = (min, max) => between(min, max, random);
+    const swap = (a, b, p = 0.3) => (random() < p ? { a: b, b: a } : { a, b });
+    switch (kind) {
+      case "plus01": {
+        const special = pick([0, 1, 10], random);
+        return { ...swap(d(2, special === 10 ? 10 : 19), special), minus: false, special };
+      }
+      case "plus5":
+        return { ...swap(d(1, 10), 5, 0.5), minus: false, special: 5 };
+      case "double": {
+        const n = d(2, 10);
+        return { a: n, b: n, minus: false };
+      }
+      case "plus10": {
+        const a = d(1, 9);
+        return { a, b: d(1, 10 - a), minus: false };
+      }
+      case "plusTeen": {
+        const a = 10 + d(1, 8);
+        return { ...swap(a, d(1, 9 - (a % 10))), minus: false };
+      }
+      case "plusCross": {
+        let a;
+        let b;
+        do [a, b] = [d(2, 9), d(2, 9)];
+        while (a + b <= 10);
+        return { a, b, minus: false };
+      }
+      case "minus01": {
+        const special = pick([0, 1], random);
+        return { a: d(2, 20), b: special, minus: true, special };
+      }
+      case "minus5_10": {
+        const special = pick([5, 10], random);
+        return { a: special === 10 ? d(11, 20) : d(6, 20), b: special, minus: true, special };
+      }
+      case "minusHalf": {
+        // Halving (14 − 7), splitting the ten (10 − 4), taking all ones (17 − 7).
+        const sub = pick(["half", "ten", "ones"], random);
+        if (sub === "half") {
+          const n = d(2, 10);
+          return { a: 2 * n, b: n, minus: true, sub };
+        }
+        if (sub === "ten") return { a: 10, b: d(1, 9), minus: true, sub };
+        const a = d(11, 19);
+        return { a, b: a % 10, minus: true, sub };
+      }
+      case "minus10": {
+        const a = d(3, 10);
+        return { a, b: d(1, a - 1), minus: true };
+      }
+      case "minusTeen": {
+        const a = 10 + d(2, 9);
+        const ones = a % 10;
+        // Mostly a single digit (17 − 4), sometimes a teen (17 − 13).
+        if (random() < 0.25) return { a, b: 10 + d(1, ones - 1), minus: true };
+        return { a, b: d(1, ones), minus: true };
+      }
+      default: {
+        // minusCross: 13 − 5, back over the ten.
+        let a;
+        let b;
+        do [a, b] = [d(11, 18), d(2, 9)];
+        while (a % 10 >= b);
+        return { a, b, minus: true };
+      }
+    }
+  }
+  // The explanation said after solving; the steps over the ten also help.
+  function blitzExplain(kind, { a, b, minus, sub }, result) {
+    if (kind === "plusCross") {
+      const first = 10 - a;
+      return said(`${a} + ${first} = 10, 10 + ${b - first} = ${result}.`);
+    }
+    if (kind === "minusCross") {
+      const first = a % 10;
+      return said(`${a} − ${first} = 10, 10 − ${b - first} = ${result}.`);
+    }
+    if (kind === "plusTeen") {
+      // The ones first, in the order of the task: 14 + 3 → 4 + 3, 3 + 14 → 3 + 4.
+      const ones = a > b ? `${a % 10} + ${b}` : `${a} + ${b % 10}`;
+      return said(`${ones} = ${result - 10}, also ${a} + ${b} = ${result}.`);
+    }
+    if (kind === "minusTeen") {
+      if (b > 10) return said(`${a} − 10 = ${a - 10}, ${a - 10} − ${b - 10} = ${result}.`);
+      return said(`${a % 10} − ${b} = ${(a % 10) - b}, also ${a} − ${b} = ${result}.`);
+    }
+    if (kind === "double") return said(`${a} + ${b} = ${result}. Das Doppelte von ${a} ist ${result}.`);
+    if (sub === "half") return said(`${a} − ${b} = ${result}. Die Hälfte von ${a} ist ${b}.`);
+    return said(`${a} ${signOf(minus)} ${b} = ${result}.`);
+  }
+  // Typical slips: forgetting the ten, counting the start number, the wrong sign.
+  function blitzSlips(kind, { a, b, minus, special }, result) {
+    if (kind === "plus01" || kind === "minus01")
+      return special === 0 ? [minus ? result - 1 : result + 1] : [a === special ? b : a];
+    if (kind === "minus5_10") return special === 10 ? [a - 1] : [result + 1];
+    if (kind === "plusCross" || kind === "plusTeen") return [result - 10, result - 1];
+    // 13 − 5: the smaller ones digit taken from the bigger one (5 − 3 = 2 → 12).
+    if (kind === "minusCross") return [10 + b - (a % 10), result + 1];
+    if (kind === "minusTeen") return b > 10 ? [a - (b - 10)] : [result - 10, result + 1];
+    return minus ? [result + 1, a + b] : [result - 1, result + 1];
+  }
+  // Two terms to compare (Terme vergleichen): at most two apart, often equal.
+  function termsQuestion(random) {
+    const term = () => {
+      const pair = blitzPair(pick(BLITZ_KINDS, random), random);
+      const text = `${pair.a} ${signOf(pair.minus)} ${pair.b}`;
+      return { text, value: pair.minus ? pair.a - pair.b : pair.a + pair.b, speech: mathWords(text) };
+    };
+    const left = term();
+    const equal = random() < 0.35;
+    let right;
+    do right = term();
+    while (
+      right.text === left.text ||
+      (equal ? right.value !== left.value : right.value === left.value || Math.abs(right.value - left.value) > 2)
+    );
+    const answer = left.value < right.value ? "<" : left.value > right.value ? ">" : "=";
+    const words = { "<": "ist kleiner als", ">": "ist größer als", "=": "ist genauso viel wie" };
+    return {
+      kind: "terms",
+      left,
+      right,
+      key: `${left.text}|${right.text}`,
+      answer,
+      choices: ["<", "=", ">"],
+      speech: `${left.speech} und ${right.speech}`,
+      explain: {
+        text: `${left.text} = ${left.value}, ${right.text} = ${right.value}. ${left.value} ${words[answer]} ${right.value}.`,
+        speech: `${capitalize(left.speech)} ist ${numberWord(left.value)}, ${right.speech} ist ${numberWord(right.value)}. ${capitalize(numberWord(left.value))} ${words[answer]} ${numberWord(right.value)}.`,
+      },
+      cue: `Vorlesen: ${left.text} und ${right.text}`,
+    };
+  }
+  // Three numbers (gemischt B): 7 + 5 − 3, every step stays from 1 to 20.
+  function chainQuestion(config, random) {
+    let a;
+    let b;
+    let c;
+    let ops;
+    let middle;
+    let result;
+    do {
+      [a, b, c] = [between(2, 20, random), between(1, 9, random), between(1, 9, random)];
+      ops = [random() < 0.5, random() < 0.5];
+      middle = ops[0] ? a - b : a + b;
+      result = ops[1] ? middle - c : middle + c;
+    } while (middle < 1 || middle > 20 || result < 1 || result > 20 || result === a);
+    const [s1, s2] = ops.map(signOf);
+    // Slip: the second sign read like the first one.
+    const sameSign = ops[0] ? middle - c : middle + c;
+    return {
+      kind: "chain",
+      a,
+      b,
+      c,
+      middle,
+      result,
+      parts: [a, s1, b, s2, c, "=", null],
+      number: result,
+      answer: String(result),
+      key: `${a}${s1}${b}${s2}${c}`,
+      choices: numberOptions(result, [sameSign], [result + 1, result - 1, result + 2, result - 2], config.choices, random, [], 20),
+      first: said(`${a} ${s1} ${b} = ${middle}`),
+      speech: mathWords(`${a} ${s1} ${b} ${s2} ${c}`),
+      explain: said(`${a} ${s1} ${b} = ${middle}, ${middle} ${s2} ${c} = ${result}.`),
+      cue: `Vorlesen: ${a} ${s1} ${b} ${s2} ${c} = ?`,
+    };
+  }
+  function generateBlitz(config, random) {
+    const kind = pick(config.ops, random);
+    if (kind === "terms") return termsQuestion(random);
+    if (kind === "chain") return chainQuestion(config, random);
+    const pair = blitzPair(kind, random);
+    const { a, b, minus } = pair;
+    const result = minus ? a - b : a + b;
+    const sign = signOf(minus);
+    return {
+      kind,
+      ...pair,
+      result,
+      parts: [a, sign, b, "=", null],
+      number: result,
+      answer: String(result),
+      key: `${a}${sign}${b}`,
+      choices: numberOptions(
+        result,
+        blitzSlips(kind, pair, result),
+        [result + 1, result - 1, result + 2, result - 2, minus ? a + b : result + 10],
+        config.choices,
+        random,
+        [],
+        20,
+      ),
+      speech: mathWords(`${a} ${sign} ${b}`),
+      explain: blitzExplain(kind, pair, result),
+      cue: `Vorlesen: ${a} ${sign} ${b} = ?`,
+    };
+  }
+  /*
+   * Grade 3 tasks up to 100 carry their own stepped help: "tip" after the
+   * first mistake, "help" (shown) after the second, "help2" after the third.
+   */
+  // Completing to 50 or 100: first to the next full ten, then on.
+  function completeBig(config, target, random) {
+    const tens = config.from === "tens";
+    let a;
+    // Full tens from 20 on, so the help never says "1 Zehner".
+    do a = tens ? 10 * between(2, target / 10 - 1, random) : between(11, target - 2, random);
+    while (!tens && a % 10 === 0);
+    const b = target - a;
+    const next = Math.ceil(a / 10) * 10;
+    // Slip: each digit completed to 10 (37 + 73 = 100), or the count of tens.
+    const slips = tens ? [b / 10] : [b + 10];
+    return {
+      a,
+      b,
+      target,
+      parts: [a, "+", null, "=", target],
+      number: b,
+      answer: String(b),
+      key: `${a}|${target}`,
+      choices: numberOptions(b, slips, [b + 1, b - 1, b + 10, b - 10, b + 2], config.choices, random, [], 100),
+      speech: `${numberWord(a)} plus wie viel ist ${numberWord(target)}?`,
+      tip: tens
+        ? said(`Wie viele Zehner fehlen bis ${target}?`)
+        : said(`Rechne erst bis zum nächsten Zehner, dann bis ${target}.`),
+      help: tens ? said(`${a / 10} Zehner + ? Zehner = ${target / 10} Zehner`) : said(`${a} + ${next - a} = ${next}`),
+      help2: tens ? null : said(`${a} + ${next - a} = ${next}, ${next} + ${target - next} = ${target}`),
+      explain: tens
+        ? said(`${a} + ${b} = ${target}.`)
+        : said(`${a} + ${next - a} = ${next}, ${next} + ${target - next} = ${target}. Also ${a} + ${b} = ${target}.`),
+      cue: `Vorlesen: ${a} + ? = ${target}`,
+    };
+  }
+  // Das Doppelte und die Hälfte up to 100: tens and ones apart.
+  function doubleBig(config, ask, random) {
+    const double = ask === "double";
+    const ok = (x) => {
+      const [t, o] = [Math.floor(x / 10), x % 10];
+      if (double) return config.carry ? o >= 5 : o <= 4;
+      // Odd tens from 30 on (12 to 18 split into 0 + 14 makes no sense).
+      return x % 2 === 0 && (config.carry ? t % 2 === 1 && t >= 3 : t % 2 === 0);
+    };
+    let n;
+    do n = double ? between(11, 49, random) : 2 * between(6, 49, random);
+    while (!ok(n));
+    const result = double ? 2 * n : n / 2;
+    const t = n - (n % 10);
+    const o = n % 10;
+    if (double) {
+      return {
+        ask,
+        n,
+        number: result,
+        answer: String(result),
+        key: `${ask}|${n}`,
+        // Slips: the carry forgotten (37 → 64), only the tens doubled (34 → 64).
+        choices: numberOptions(
+          result,
+          [config.carry ? 2 * t + ((2 * o) % 10) : 2 * t + o],
+          [result + 10, result - 10, result + 1, result - 1, result + 2],
+          config.choices,
+          random,
+          [n],
+          100,
+        ),
+        speech: `Das Doppelte von ${numberWord(n)}`,
+        tip: said(o ? "Verdopple erst die Zehner, dann die Einer." : "Verdopple die Zehner."),
+        help: o ? said(`${t} + ${t} = ${2 * t}, ${o} + ${o} = ${2 * o}`) : said(`${t / 10} Zehner + ${t / 10} Zehner = ${t / 5} Zehner`),
+        explain: o
+          ? said(`Das Doppelte von ${n}: ${t} + ${t} = ${2 * t}, ${o} + ${o} = ${2 * o}, zusammen ${result}.`)
+          : said(`Das Doppelte von ${n} ist ${result}: ${n} + ${n} = ${result}.`),
+        cue: `Vorlesen: das Doppelte von ${n}`,
+      };
+    }
+    // Odd tens: split so both parts halve well (74 = 60 + 14).
+    const [first, second] = config.carry ? [t - 10, o + 10] : [t, o];
+    return {
+      ask,
+      n,
+      number: result,
+      answer: String(result),
+      key: `${ask}|${n}`,
+      // Slips: the tens halved and rounded down (74 → 32), the ones kept (86 → 46).
+      choices: numberOptions(
+        result,
+        [config.carry ? Math.floor(t / 20) * 10 + o / 2 : t / 2 + o],
+        [result + 10, result - 10, result + 1, result - 1, result + 5],
+        config.choices,
+        random,
+        [n],
+        100,
+      ),
+      speech: `Die Hälfte von ${numberWord(n)}`,
+      tip: config.carry
+        ? said(`Zerlege ${n} so, dass sich beide Teile gut halbieren lassen.`)
+        : said(o ? "Halbiere erst die Zehner, dann die Einer." : "Halbiere die Zehner."),
+      help: config.carry
+        ? said(`${n} = ${first} + ${second}. Die Hälfte von ${first} ist ${first / 2}, die Hälfte von ${second} ist ${second / 2}.`)
+        : o
+          ? said(`Die Hälfte von ${t} ist ${t / 2}, die Hälfte von ${o} ist ${o / 2}.`)
+          : said(`Die Hälfte von ${t / 10} Zehnern sind ${t / 20} Zehner.`),
+      explain: said(`Die Hälfte von ${n} ist ${result}, denn ${result} + ${result} = ${n}.`),
+      cue: `Vorlesen: die Hälfte von ${n}`,
+    };
+  }
+  /*
+   * Rechen-Mix (grade 3): plus and minus up to 100, times and divided, each
+   * also with a gap (Platzhalter) anywhere in the equation.
+   */
+  const tensOf = (x) => x - (x % 10);
+  // Digits taken apart without borrowing (61 − 34 → 33): a typical slip.
+  const digitGap = (x, y) => Math.abs(tensOf(x) - tensOf(y)) + Math.abs((x % 10) - (y % 10));
+  function mixTask(op, random) {
+    const d = (min, max) => between(min, max, random);
+    if (["times", "divide", "timesGap", "divGap"].includes(op)) {
+      const [n, k] = [d(2, 10), d(2, 10)];
+      const p = n * k;
+      const because = `${p} : ${k} = ${n}, denn ${n} · ${k} = ${p}.`;
+      if (op === "times")
+        return {
+          parts: [n, "·", k, "=", null],
+          answer: p,
+          slips: [n + k, p + k, p - k],
+          tip: "Denk an eine Kernaufgabe: mal 2, mal 5 oder mal 10.",
+          help: n > 5 ? `5 · ${k} = ${5 * k}, dazu noch ${n - 5} · ${k}` : `${k}, ${2 * k}, ${3 * k} …`,
+          explain: `${n} · ${k} = ${p}.`,
+        };
+      if (op === "divide")
+        return {
+          parts: [p, ":", k, "=", null],
+          answer: n,
+          slips: [n + 1, n - 1, k],
+          tip: `Denk an die Malaufgabe: ? · ${k} = ${p}.`,
+          help: `Zähle in ${k}er-Schritten bis ${p}.`,
+          explain: because,
+        };
+      if (op === "timesGap") {
+        const firstGap = random() < 0.5;
+        const [known, missing] = firstGap ? [k, n] : [n, k];
+        return {
+          parts: firstGap ? [null, "·", k, "=", p] : [n, "·", null, "=", p],
+          answer: missing,
+          slips: [p - known, missing + 1, missing - 1],
+          tip: firstGap ? `Welche Zahl mal ${k} ist ${p}?` : `${n} mal welche Zahl ist ${p}?`,
+          help: `Rechne geteilt: ${p} : ${known} = ?`,
+          explain: `${n} · ${k} = ${p}.`,
+        };
+      }
+      // divGap: 42 : _ = 6 or _ : 7 = 6.
+      if (random() < 0.5)
+        return {
+          parts: [p, ":", null, "=", n],
+          answer: k,
+          slips: [n === k ? k + 1 : n, k + 1, k - 1],
+          tip: `Durch welche Zahl teilst du ${p}, damit ${n} herauskommt?`,
+          help: `${n} · ? = ${p}`,
+          explain: because,
+        };
+      return {
+        parts: [null, ":", k, "=", n],
+        answer: p,
+        slips: [n + k, p + k, p - k],
+        tip: "Rechne mit der Umkehraufgabe: mal statt geteilt.",
+        help: `${n} · ${k} = ?`,
+        explain: because,
+      };
+    }
+    // Plus and minus up to 100: two two-digit numbers.
+    let a;
+    let b;
+    do [a, b] = [d(11, 89), d(11, 89)];
+    while (a + b > 100 || a === b);
+    const s = a + b;
+    const stepTip = "Rechne erst mit den Zehnern, dann mit den Einern.";
+    if (op === "plus") {
+      const mid = a + tensOf(b);
+      return {
+        parts: [a, "+", b, "=", null],
+        answer: s,
+        // Slips: the carry forgotten, only the tens added.
+        slips: [(a % 10) + (b % 10) >= 10 ? s - 10 : s + 10, mid],
+        tip: stepTip,
+        help: `${a} + ${tensOf(b)} = ${mid}`,
+        explain: b % 10 ? `${a} + ${tensOf(b)} = ${mid}, ${mid} + ${b % 10} = ${s}.` : `${a} + ${b} = ${s}.`,
+      };
+    }
+    if (op === "minus") {
+      const mid = s - tensOf(b);
+      return {
+        parts: [s, "−", b, "=", null],
+        answer: a,
+        slips: [digitGap(s, b), mid],
+        tip: stepTip,
+        help: `${s} − ${tensOf(b)} = ${mid}`,
+        explain: b % 10 ? `${s} − ${tensOf(b)} = ${mid}, ${mid} − ${b % 10} = ${a}.` : `${s} − ${b} = ${a}.`,
+      };
+    }
+    if (op === "plusGap") {
+      const firstGap = random() < 0.3;
+      const [known, missing] = firstGap ? [b, a] : [a, b];
+      return {
+        parts: firstGap ? [null, "+", b, "=", s] : [a, "+", null, "=", s],
+        answer: missing,
+        slips: [digitGap(s, known), missing + 10, missing - 10],
+        tip: "Rechne mit der Umkehraufgabe: minus statt plus.",
+        help: `${s} − ${known} = ?`,
+        explain: `${a} + ${b} = ${s}, denn ${s} − ${known} = ${missing}.`,
+      };
+    }
+    // minusGap: 61 − _ = 27 or _ − 34 = 27.
+    if (random() < 0.5)
+      return {
+        parts: [s, "−", null, "=", a],
+        answer: b,
+        slips: [digitGap(s, a), b + 10, b - 10],
+        tip: `Wie viel musst du von ${s} wegnehmen, damit ${a} übrig bleibt?`,
+        help: `${s} − ${a} = ?`,
+        explain: `${s} − ${b} = ${a}, denn ${a} + ${b} = ${s}.`,
+      };
+    return {
+      parts: [null, "−", b, "=", a],
+      answer: s,
+      slips: [Math.abs(a - b), s + 10, s - 10],
+      tip: "Rechne mit der Umkehraufgabe: plus statt minus.",
+      help: `${a} + ${b} = ?`,
+      explain: `${s} − ${b} = ${a}, denn ${a} + ${b} = ${s}.`,
+    };
+  }
+  function generateMix(config, random) {
+    const op = pick(config.ops, random);
+    const task = mixTask(op, random);
+    const text = task.parts.map((x) => (x === null ? "?" : x)).join(" ");
+    // A gap at the end is the result: "34 plus 27"; else "34 plus wie viel ist 61".
+    const spoken = task.parts.at(-1) === null ? text.replace(/ = \?$/, "") : text;
+    return {
+      op,
+      parts: task.parts,
+      gapAt: task.parts.indexOf(null),
+      number: task.answer,
+      answer: String(task.answer),
+      key: text,
+      choices: numberOptions(
+        task.answer,
+        task.slips,
+        [task.answer + 1, task.answer - 1, task.answer + 10, task.answer - 10, task.answer + 2],
+        config.choices,
+        random,
+        [],
+        100,
+      ),
+      speech: mathWords(spoken),
+      tip: said(task.tip),
+      help: said(task.help),
+      explain: said(task.explain),
+      cue: `Vorlesen: ${text}`,
+    };
+  }
+  // Completing: 6 + _ = 10, 5 + _ = 9, 14 + _ = 20, 7 + _ = 20.
+  function generateComplete(config, random) {
+    const target = pick(config.targets, random);
+    if (target > 20) return completeBig(config, target, random);
+    const from = target < 20 ? "small" : config.from;
+    const a =
+      target < 20
+        ? between(1, target - 1, random)
+        : from === "teen"
+          ? between(11, 19, random)
+          : from === "small"
+            ? between(1, 9, random)
+            : between(1, 19, random);
+    const b = target - a;
+    // To 8 or 9: the partner to 10 instead; to 20: the ten forgotten (7 + 3)
+    // or the ones digit of the shown number (14 + 4).
+    const slips = target < 10 ? [10 - a] : target === 20 ? [a < 10 ? 10 - a : a % 10] : [];
+    return {
+      a,
+      b,
+      target,
+      parts: [a, "+", null, "=", target],
+      number: b,
+      answer: String(b),
+      key: `${a}|${target}`,
+      choices: numberOptions(b, slips, [b + 1, b - 1, b + 2, b - 2], config.choices, random, [], 20),
+      speech: `${numberWord(a)} plus wie viel ist ${numberWord(target)}?`,
+      explain:
+        target === 20 && a < 10
+          ? said(`${a} + ${10 - a} = 10, 10 + 10 = 20. Also ${a} + ${b} = 20.`)
+          : said(`${a} + ${b} = ${target}.`),
+      cue: `Vorlesen: ${a} + ? = ${target}`,
+    };
+  }
+  // Doubling (4 → 8), halving (14 → 7) and nearly doubling (6 + 7 = 6 + 6 + 1).
+  function generateDouble(config, random) {
+    const ask = pick(config.asks, random);
+    if (ask === "near") {
+      const n = between(2, Math.floor((config.max - 1) / 2), random);
+      const [a, b] = random() < 0.5 ? [n, n + 1] : [n + 1, n];
+      const result = a + b;
+      return {
+        ask,
+        n,
+        a,
+        b,
+        number: result,
+        answer: String(result),
+        key: `near|${a}|${b}`,
+        parts: [a, "+", b, "=", null],
+        // Slips: the double without the one more, or one more on both sides.
+        choices: numberOptions(result, [2 * n, 2 * n + 2], [result + 1, result - 1, result + 2], config.choices, random, [], 20),
+        speech: mathWords(`${a} + ${b}`),
+        explain: said(`${n} + ${n} = ${2 * n}, 1 mehr: ${a} + ${b} = ${result}.`),
+        cue: `Vorlesen: ${a} + ${b} = ?`,
+      };
+    }
+    if (config.max > 20) return doubleBig(config, ask, random);
+    const double = ask === "double";
+    const n = double ? between(1, config.max / 2, random) : 2 * between(1, config.max / 2, random);
+    const result = double ? 2 * n : n / 2;
+    return {
+      ask,
+      n,
+      number: result,
+      answer: String(result),
+      key: `${ask}|${n}`,
+      // Doubling: 2 added instead (4 → 6); halving: 2 taken away (14 → 12).
+      choices: numberOptions(
+        result,
+        double ? [n + 2] : [n - 2],
+        [result + 1, result - 1, result + 2, result - 2],
+        config.choices,
+        random,
+        [n],
+        20,
+      ),
+      speech: double ? `Das Doppelte von ${numberWord(n)}` : `Die Hälfte von ${numberWord(n)}`,
+      explain: double
+        ? said(`Das Doppelte von ${n} ist ${result}: ${n} + ${n} = ${result}.`)
+        : said(`Die Hälfte von ${n} ist ${result}: ${result} + ${result} = ${n}.`),
+      cue: `Vorlesen: ${double ? "das Doppelte" : "die Hälfte"} von ${n}`,
+    };
+  }
+  /*
+   * Swapped tasks (3 + 5 = 5 + 3) and inverse tasks (7 + 5 = 12 → 12 − 5 = 7).
+   * Finding them offers expressions; 12 − 7 (the inverse of the swapped task)
+   * and 5 + 7 for 12 − 5 are never offered, so exactly one card is right.
+   */
+  function generateFamily(config, random) {
+    const ask = pick(config.asks, random);
+    const d = (min, max) => between(min, max, random);
+    const offer = (answer, wrong) => {
+      const others = [...new Set(wrong)].filter((x) => x !== answer).slice(0, config.choices - 1);
+      const choices = shuffle([answer, ...others], random);
+      return { answer, choices, say: Object.fromEntries(choices.map((x) => [x, mathWords(x)])) };
+    };
+    let a;
+    let b;
+    do [a, b] = [d(1, config.max - 1), d(1, config.max - 1)];
+    while (a === b || a + b > config.max);
+    const s = a + b;
+    if (ask === "findSwap") {
+      const wrong = shuffle([`${s} − ${b}`, `${a} + ${s}`, `${a} + ${b + 1}`, `${Math.max(a, b)} − ${Math.min(a, b)}`], random);
+      return {
+        ask,
+        a,
+        b,
+        s,
+        known: said(`${a} + ${b} = ${s}`),
+        key: `${ask}|${a}+${b}`,
+        ...offer(`${b} + ${a}`, wrong),
+        speech: mathSpeech(`${a} + ${b} = ${s}.`),
+        explain: said(`${a} + ${b} = ${b} + ${a} = ${s}. Tauschaufgaben haben das gleiche Ergebnis.`),
+        cue: `Vorlesen: ${a} + ${b} = ${s}. Tauschaufgabe?`,
+      };
+    }
+    if (ask === "findInverse") {
+      // From plus to minus or from minus to plus.
+      const fromPlus = random() < 0.5;
+      const known = fromPlus ? `${a} + ${b} = ${s}` : `${s} − ${b} = ${a}`;
+      const answer = fromPlus ? `${s} − ${b}` : `${a} + ${b}`;
+      const wrong = fromPlus
+        ? shuffle([`${b} + ${a}`, `${s} + ${b}`, `${s} + ${a}`], random)
+        : shuffle([`${s} + ${b}`, `${s} + ${a}`, `${Math.max(a, b)} − ${Math.min(a, b)}`], random);
+      return {
+        ask,
+        a,
+        b,
+        s,
+        fromPlus,
+        known: said(known),
+        key: `${ask}|${known}`,
+        ...offer(answer, wrong),
+        speech: mathSpeech(`${known}.`),
+        explain: fromPlus
+          ? said(`${a} + ${b} = ${s}, also ${s} − ${b} = ${a}. Die Umkehraufgabe rechnet zurück.`)
+          : said(`${s} − ${b} = ${a}, also ${a} + ${b} = ${s}. Die Umkehraufgabe rechnet zurück.`),
+        cue: `Vorlesen: ${known}. Umkehraufgabe?`,
+      };
+    }
+    if (ask === "useSwap") {
+      // The small number first: counting on from the big one is easier.
+      const [small, big] = [Math.min(a, b), Math.max(a, b)];
+      return {
+        ask,
+        a: small,
+        b: big,
+        s,
+        parts: [small, "+", big, "=", big, "+", small, "=", null],
+        number: s,
+        answer: String(s),
+        key: `${ask}|${small}+${big}`,
+        // Slips: counting the start number, minus instead of plus.
+        choices: numberOptions(s, [s - 1, big - small], [s + 1, s + 2, s - 2], config.choices, random, [], 20),
+        speech: mathWords(`${small} + ${big}`),
+        explain: said(`${big} + ${small} = ${s}, also ${small} + ${big} = ${s}.`),
+        cue: `Vorlesen: ${small} + ${big} = ${big} + ${small} = ?`,
+      };
+    }
+    // useInverse: 13 − 7 = ?, because ? + 7 = 13.
+    return {
+      ask,
+      a,
+      b,
+      s,
+      parts: [s, "−", b, "=", null],
+      check: [null, "+", b, "=", s],
+      number: a,
+      answer: String(a),
+      key: `${ask}|${s}-${b}`,
+      // Slips: the number taken away, plus instead of minus.
+      choices: numberOptions(a, [b, s + b], [a + 1, a - 1, a + 2], config.choices, random, [], 20),
+      speech: mathWords(`${s} − ${b}`),
+      explain: said(`${a} + ${b} = ${s}, also ${s} − ${b} = ${a}.`),
+      cue: `Vorlesen: ${s} − ${b} = ?, denn ? + ${b} = ${s}`,
+    };
+  }
+
   function digitChoices(answer, other, count, random) {
     // The other digit of the number is the typical mix-up; near digits fill up.
     const pool = [...Array(10).keys()]
@@ -3270,6 +4028,11 @@
     if (mode === "column") return generateColumn(config, previous, random);
     if (mode === "units") return generateUnits(config, previous, random);
     if (mode === "times" && TIMES_MORE.includes(config.ask)) return timesMore(config, previous, random);
+    if (mode === "blitz") return generateBlitz(config, random);
+    if (mode === "complete") return generateComplete(config, random);
+    if (mode === "double") return generateDouble(config, random);
+    if (mode === "family") return generateFamily(config, random);
+    if (mode === "mix") return generateMix(config, random);
     if (mode === "spell") return generateSpell(config, previous, random);
     if (mode === "wordtype") return generateWordtype(config, previous, random);
     if (mode === "tense") return generateTense(config, previous, random);
@@ -5193,6 +5956,8 @@
     space: "Zahlen verorten: auf einem Maßband oder Lineal zeigen lassen („Wo ist 37?“), eine Hundertertafel ausdrucken und Wege gehen – nach rechts 1 mehr, nach unten 10 mehr.",
     compare: "Vergleichen im Alltag: Hausnummern, Preise oder Seitenzahlen – „Welche ist größer? Schau zuerst auf die Zehner.“ Das Krokodil frisst immer die größere Zahl.",
     big: "Große Zahlen greifbar machen: 10 Büroklammern zu einer Kette, 10 Ketten zu einem Bündel – so entsteht aus Einern ein Hunderter. Zahlen vom Kassenzettel oder aus der Zeitung in eine selbst gezeichnete Stellentafel schreiben und laut lesen; leere Stellen bekommen eine Null.",
+    mental:
+      "Kopfrechnen bis 20 kurz und oft üben, z. B. beim Warten oder im Auto: „Wie viel ist das Doppelte von 7?“, „Was fehlt von 6 bis 10?“ Über den Zehner rechnet man in zwei Schritten (8 + 5 = 8 + 2 + 3). Minusaufgaben mit der Plusaufgabe prüfen: 13 − 7 = 6, denn 6 + 7 = 13.",
     calc: "Mit Zehnern rechnen: 10-Cent-Münzen oder Zehnerstangen legen. Bei 52 + 30 bleiben die Einer gleich, nur die Zehner ändern sich – genauso bei 352 + 300 mit den Hundertern. Beim schriftlichen Rechnen hilft kariertes Papier: jede Ziffer in ein Kästchen, Einer unter Einer, und immer hinten anfangen.",
     sets: "Mengen im Alltag: Besteck oder Murmeln zählen, Paare bilden („Wer hat mehr?“), eine Strichliste führen und Spielzeug nach zwei Merkmalen sortieren – z. B. rot und rund. Was gehört in beide Gruppen?",
     enlisten:

@@ -3830,3 +3830,86 @@ body:has(dialog[open]) {
     font-size: 1.3rem;
   }
 }
+/* Mental arithmetic: twenty field with boxes coming in, taken away or free */
+.calc-field .frame .cell.add::after {
+  content: "";
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #4f84b2;
+}
+.calc-field .frame .cell.take {
+  background: linear-gradient(135deg, transparent 44%, #6b5a4a 44%, #6b5a4a 56%, transparent 56%);
+}
+.calc-field .frame .cell.take::after {
+  opacity: 0.35;
+}
+.calc-field .frame .cell.need {
+  background: #fdf0c8;
+  border-color: #e0a92e;
+  border-style: dashed;
+}
+.calc-field .frame .cell.off {
+  opacity: 0.25;
+}
+/* Doubling: dots on both sides of a mirror */
+.mirror-field {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin: 10px 0 6px;
+}
+.mirror-side {
+  display: grid;
+  gap: 6px;
+}
+.mirror-line {
+  align-self: stretch;
+  width: 4px;
+  min-height: 28px;
+  border-radius: 2px;
+  background: repeating-linear-gradient(#9a6fb0 0 6px, transparent 6px 10px);
+}
+.mirror-side .dot.extra {
+  background: #f0a35e;
+}
+.op-arrow {
+  display: grid;
+  justify-items: center;
+  align-self: center;
+  font-size: 1.8rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #b5560f;
+}
+.op-arrow small {
+  font-size: 0.95rem;
+}
+.family-ask {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 4px 0 8px;
+  font-size: 1.2rem;
+  font-weight: 800;
+  color: var(--muted);
+}
+.number-tile.term-tile {
+  font-size: 1.8rem;
+  white-space: nowrap;
+}
+/* Impressum at the end of the adult data tab */
+.imprint .parent-tips {
+  margin: 8px 0;
+}
+.imprint code {
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.imprint .imprint-copyright {
+  margin-top: 10px;
+  font-weight: 700;
+}
